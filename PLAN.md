@@ -8,7 +8,7 @@
 > v1.3 变更：**T1 完成并验收合并**（2e58be5）——工程骨架 + Debug/Release 双构建路径（Release 裁剪实测 -29.5%）；第 12 节新增第 6/7 条：本机构建环境配方（VS Code 插件式安装，export.ps1 不可用）与 Debug/Release 切换的 sdkconfig 缓存坑。验收记录见 docs/reviews/。
 > v1.4 变更：**T2 完成并验收合并**（43dbb8f）——BSP 引脚/外设初始化；上板实测 AS5600@0x36 首轮发现 → **板上有外部 I2C 上拉（T0 遗留定案）**；发现 GPIO10（UART1 TX）板上接 LED、空闲常亮属正常。
 > v1.5 变更：**UART1 引脚改定 TX=GPIO41 / RX=GPIO42**——需求方给出空闲脚池（IO7/IO3/IO46/IO45/IO39~42），筛除 strapping 脚（3/45/46）后选 JTAG 组（39~42 永久闲置）；GPIO10 板载 LED 随弃用熄灭，GPIO7 留作二期限位输入候选。BSP Kconfig 默认值已同步，**重新构建前必须删 sdkconfig**（第 12 节第 7 条）。
-> v1.6 变更：**TX 行结尾定案 `\r\n`**（§4.2 补充，GRBL 惯例，ok/error/状态帧统一）+ **T3 吞吐判据 3000→2400 行/秒**（4B 帧上限 2880，修正 v1.4 按 3B 帧的计算）；T3 代码级验收通过（见 docs/reviews/T3-acceptance.md），上板验收待执行。
+> v1.6 变更：**TX 行结尾定案 `\r\n`**（§4.2 补充，GRBL 惯例，ok/error/状态帧统一）+ **T3 吞吐判据 3000→2400 行/秒**（4B 帧上限 2880，修正 v1.4 按 3B 帧的计算）；T3 代码级验收通过（见 docs/reviews/T3-acceptance.md），上板验收待执行；入档 T3 实现偏差：**UART1 驱动所有权归 protocol 组件**（删除 bsp 无队列实例重装，T2/T3 节均已标注）。
 
 ---
 
@@ -229,14 +229,14 @@ F 单位 mm/min；A 单位 mm/s²；X 单位 mm。
 
 - **前置**：T1；**T0 的引脚表**（表未齐先用 Kconfig 占位默认值，并留 TODO）
 - **产出**：`components/bsp/`：Kconfig 引脚项 + **UART1**（协议）/ UART0（日志）/ I2C(400kHz) / GPIO(EN/DIR) 初始化
-- **内容**：引脚全部走 Kconfig（默认值按 docs/hardware.md：**UART1=41/42（2026-09-12 由 10/11 改定，避开 GPIO10 板载 LED，弃用全部 strapping 脚）**、TMC 单线 17/18、STEP=5、DIR=6、EN=21、I2C=8/9）；I2C 用 ESP-IDF v6 `i2c_master` API；**EN 低有效（TMC2209）在 BSP 初始化最早阶段拉高（失能），规避上电复位期间悬空误使能**；I2C 总线初始化若扫描失败，先尝试启用 ESP32-S3 内部上拉再扫（应对板上无上拉的情况）
+- **内容**：引脚全部走 Kconfig（默认值按 docs/hardware.md：**UART1=41/42（2026-09-12 由 10/11 改定，避开 GPIO10 板载 LED，弃用全部 strapping 脚）**、TMC 单线 17/18、STEP=5、DIR=6、EN=21、I2C=8/9）；I2C 用 ESP-IDF v6 `i2c_master` API；**EN 低有效（TMC2209）在 BSP 初始化最早阶段拉高（失能），规避上电复位期间悬空误使能**；I2C 总线初始化若扫描失败，先尝试启用 ESP32-S3 内部上拉再扫（应对板上无上拉的情况）。【v1.6 入档：bsp 安装的 UART1 驱动**不带事件队列**，仅为自检报文与占位；驱动所有权归 T3 protocol（重装带队列实例）】
 - **验收**：板上 I2C 扫描发现 0x36（AS5600）✅【2026-09-12 上板实测：首轮（无内部上拉）即发现 0x36 → 板上有外部上拉，T0 遗留问题定案】；UART1 收发回环（配合 T3 联测）→ 移交 T3。
 
-### T3 · 通信协议栈（comm_task） 【M】
+### T3 · 通信协议栈（comm_task） 【✅ 代码级验收通过 2026-09-12，上板验收待执行】
 
 - **前置**：T2
 - **产出**：`components/protocol/`：UART1 事件驱动的行装配（128B 行缓冲、超长/超时丢弃并报 `error:3`）、实时字符在**行中间**即可拦截处理、TX 单互斥锁、ok/error 发送、`?` 触发状态帧回调、`!` 转发停止事件
-- **内容**：RX 用 uart driver event queue；`\n`/`\r\n` 兼容；实时字符表 `? !`；状态帧注册回调接口（T9 接入）
+- **内容**：RX 用 uart driver event queue；`\n`/`\r\n` 兼容；实时字符表 `? !`；状态帧注册回调接口（T9 接入）。【v1.6 入档实现偏差：**UART1 驱动所有权归 protocol**——`protocol_start()` 先删除 bsp 安装的无队列驱动、再重装带事件队列实例（引脚/波特率仍读 BSP Kconfig，单一事实来源保持）；此为任务包疏漏的正确处置，详见 docs/reviews/T3-acceptance.md §3】
 - **验收**：PC 用串口工具经飞线模块：发未知行回 `error:1`；发合法占位行回 `ok`；行发送途中插入 `?` 能立即回帧（不等行结束）；短行（3B）持续灌入 `ok` 计数零丢失、速率 **≥2400 行/秒**【v1.6 修正：`ok\r\n` 为 4B 帧，TX 上限 11520÷4=2880 行/s；v1.4 的 3000 按 3B 帧计算，判据物理不可达】。压力测试脚本：`tools/t3_stress_test.py`（自动判定 PASS/FAIL）。
 
 ### T4 · G-code 解析器（纯逻辑组件） 【M】
