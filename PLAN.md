@@ -1,10 +1,11 @@
 # ESP32-S3 单轴 G-code 运动控制器 · 开发计划
 
-> 版本 v1.2 · 2026-09-11
+> 版本 v1.3 · 2026-09-12
 > 本文档是分发执行计划：任务 T0–T12 各自自包含，可直接分配给独立 Agent 执行。
 > 执行前必读：第 2 节（决策与假设）、第 4 节（协议规范）、第 12 节（Agent 执行约定）。
 > v1.1 变更：定案 AS5600 仅遥测、UART1 独立通道、G0/G1 内联 A 字段（F/A 模态）、2GT 同步轮直驱换算、上电=0+G92 建零、仅立即停（无暂停/恢复）、周期上报+`?` 查询；删除失步报警、M204、HOLD/ALARM 状态。
 > v1.2 变更：**T0 完成**（硬件定案见 docs/hardware.md）——引脚表定案（UART1=GPIO10/11、TMC 单线 17=TX/18=RX、STEP=5、DIR=6、EN=21、DIAG=16、I2C=8/9）；软限位默认启用 0–600mm；无逻辑分析仪/示波器，T5/T6/T12 验收改为软件判据；性能默认值待实测校准。
+> v1.3 变更：**T1 完成并验收合并**（2e58be5）——工程骨架 + Debug/Release 双构建路径（Release 裁剪实测 -29.5%）；第 12 节新增第 6/7 条：本机构建环境配方（VS Code 插件式安装，export.ps1 不可用）与 Debug/Release 切换的 sdkconfig 缓存坑。验收记录见 docs/reviews/。
 
 ---
 
@@ -214,12 +215,12 @@ F 单位 mm/min；A 单位 mm/s²；X 单位 mm。
   2. 性能指标（最大线速度/加速度）未实测 → 按 NVS 默认值（3000mm/min / 2000mm/s²），实测后 `$n=v` 校准
 - **后续任务硬件相关内容一律以 docs/hardware.md 为准。**
 
-### T1 · 工程骨架与构建基线 【S】
+### T1 · 工程骨架与构建基线 【✅ 已完成 2026-09-12，已验收合并】
 
 - **前置**：无
-- **产出**：可编译烧录的 ESP-IDF v6.0.2 工程：CMake、`sdkconfig.defaults`、`partitions.csv`（nvs 24K + factory 2M + 余量）、`main/app_main.c`、全部空组件目录、任务看门狗开启
+- **产出**：可编译烧录的 ESP-IDF v6.0.2 工程：CMake、`sdkconfig.defaults`、`sdkconfig.release`（Release 日志编译期裁剪，实测 178512→125776 B）、`partitions.csv`（nvs 24K + factory 2M + 余量）、`main/app_main.c`、全部空组件目录、任务看门狗开启
 - **内容**：按 3.3 建目录；Flash 80MHz、CPU 240MHz；FreeRTOS tick 1kHz；UART0 日志保留（DEBUG/RELEASE 编译开关）
-- **验收**：`idf.py build` 通过；烧录后打印启动横幅；看门狗喂狗正常跑 10 分钟。
+- **验收**：`idf.py build` 通过（Debug/Release 双构建零错误，日志裁剪实测有效）；烧录后打印启动横幅；看门狗喂狗正常跑 10 分钟。【后两项待上板人工验证，验收记录见 docs/reviews/T1-acceptance.md 与 T1-fix-acceptance.md】
 
 ### T2 · BSP 引脚与外设初始化 【S】
 
@@ -379,3 +380,15 @@ T1 ─┬─ T2 ─┬─ T3 ─────┐
 3. 不得跨任务修改公共接口；确需变更，先在本文档对应任务节登记改动。
 4. 所有时序/寄存器细节以器件数据手册为准（TMC2209、AS5600、CH340K、CH224K），本文档给出的数值是起点，任务内有义务核对。
 5. `idf.py build` 通过 + 本任务验收全过 = 完成；不引入与任务无关的改动。
+6. **本机构建环境（VS Code 插件式安装，标准 `export.ps1` 不可用，2026-09-12 实测）**，构建前按此设置：
+   ```powershell
+   $env:IDF_PATH='C:\Users\SM\.espressif\v6.0.2\esp-idf'
+   $env:IDF_TOOLS_PATH='C:\Espressif\tools'          # 注意：不是 C:\Espressif
+   $env:IDF_PYTHON_ENV_PATH='C:\Espressif\tools\python_env\idf6.0_py3.11_env'
+   $env:ESP_IDF_VERSION='6.0.2'                       # idf_component_manager 必需
+   $env:PYTHONDONTWRITEBYTECODE='1'                   # 规避沙箱对 .pyc 的拦截
+   $env:PATH='C:\Espressif\tools\cmake\4.0.3\bin;C:\Espressif\tools\ninja\1.12.1;C:\Espressif\tools\xtensa-esp-elf\esp-15.2.0_20251204\xtensa-esp-elf\bin;' + $env:PATH
+   # 之后用 venv 的 python 直接调 idf.py：
+   & 'C:\Espressif\tools\python_env\idf6.0_py3.11_env\Scripts\python.exe' "$env:IDF_PATH\tools\idf.py" build
+   ```
+7. **Debug/Release 切换坑**：`sdkconfig` 缓存存在时 kconfgen 沿用旧值，切换构建类型必须先 `Remove-Item .\sdkconfig`，否则 Release 日志裁剪会**静默失效**。T1 已实现的 Release 路径：`idf.py -DCMAKE_BUILD_TYPE=Release build`。
