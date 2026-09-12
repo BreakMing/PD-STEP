@@ -5,17 +5,20 @@ menu "BSP - Board Support Package"
     # ------------------------------------------------------------------
     config BSP_UART1_TX_GPIO
         int "UART1 TX GPIO (protocol channel)"
-        default 10
+        default 41
         help
             GPIO for UART1 TX (host protocol channel via CH343P).
-            Default matches docs/hardware.md §3 (GPIO10).
+            Changed from GPIO10 to GPIO41 (2026-09-12): GPIO10 has an
+            on-board LED (idle-high = always lit); GPIO41/42 chosen from
+            the free pin pool (IO7/IO3/IO46/IO45/IO39-42) avoiding all
+            strapping pins. See docs/hardware.md §3.
 
     config BSP_UART1_RX_GPIO
         int "UART1 RX GPIO (protocol channel)"
-        default 11
+        default 42
         help
             GPIO for UART1 RX (host protocol channel via CH343P).
-            Default matches docs/hardware.md §3 (GPIO11).
+            See BSP_UART1_TX_GPIO help for rationale (was GPIO11).
 
     config BSP_UART1_BAUD
         int "UART1 baud rate"
