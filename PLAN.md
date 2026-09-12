@@ -220,7 +220,7 @@ F 单位 mm/min；A 单位 mm/s²；X 单位 mm。
 - **前置**：无
 - **产出**：可编译烧录的 ESP-IDF v6.0.2 工程：CMake、`sdkconfig.defaults`、`sdkconfig.release`（Release 日志编译期裁剪，实测 178512→125776 B）、`partitions.csv`（nvs 24K + factory 2M + 余量）、`main/app_main.c`、全部空组件目录、任务看门狗开启
 - **内容**：按 3.3 建目录；Flash 80MHz、CPU 240MHz；FreeRTOS tick 1kHz；UART0 日志保留（DEBUG/RELEASE 编译开关）
-- **验收**：`idf.py build` 通过（Debug/Release 双构建零错误，日志裁剪实测有效）；烧录后打印启动横幅；看门狗喂狗正常跑 10 分钟。【后两项待上板人工验证，验收记录见 docs/reviews/T1-acceptance.md 与 T1-fix-acceptance.md】
+- **验收**：`idf.py build` 通过（Debug/Release 双构建零错误，日志裁剪实测有效）；烧录后打印启动横幅；看门狗喂狗正常跑 10 分钟。【✅ 三项全部通过：2026-09-12 上板实测——横幅+PSRAM 8MB test OK+qio 确认、10 分钟零输出零复位。验收记录见 docs/reviews/T1-acceptance.md 与 T1-fix-acceptance.md】
 
 ### T2 · BSP 引脚与外设初始化 【S】
 
