@@ -1,0 +1,16 @@
+# Release build overrides
+#
+# Strips all ESP_LOG output at compile time.
+#
+# Strategy: set default log level to NONE (0), and keep maximum log level
+# at "same as default" (the default choice).  Since LOG_LOCAL_LEVEL defaults
+# to CONFIG_LOG_MAXIMUM_LEVEL (see esp_log_level.h), all ESP_LOGx macros
+# evaluate to dead code and are compiled out.
+#
+# We don't set LOG_MAXIMUM_LEVEL directly because the Kconfig choice
+# LOG_MAXIMUM_LEVEL has no "None" option; it inherits from default level.
+CONFIG_LOG_DEFAULT_LEVEL_NONE=y
+CONFIG_LOG_DEFAULT_LEVEL=0
+# Ensure maximum level follows default (so both become 0 = NONE)
+CONFIG_LOG_MAXIMUM_EQUALS_DEFAULT=y
+CONFIG_LOG_MAXIMUM_LEVEL=0
