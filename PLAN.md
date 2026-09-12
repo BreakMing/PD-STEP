@@ -1,11 +1,12 @@
 # ESP32-S3 单轴 G-code 运动控制器 · 开发计划
 
-> 版本 v1.3 · 2026-09-12
+> 版本 v1.4 · 2026-09-12
 > 本文档是分发执行计划：任务 T0–T12 各自自包含，可直接分配给独立 Agent 执行。
 > 执行前必读：第 2 节（决策与假设）、第 4 节（协议规范）、第 12 节（Agent 执行约定）。
 > v1.1 变更：定案 AS5600 仅遥测、UART1 独立通道、G0/G1 内联 A 字段（F/A 模态）、2GT 同步轮直驱换算、上电=0+G92 建零、仅立即停（无暂停/恢复）、周期上报+`?` 查询；删除失步报警、M204、HOLD/ALARM 状态。
 > v1.2 变更：**T0 完成**（硬件定案见 docs/hardware.md）——引脚表定案（UART1=GPIO10/11、TMC 单线 17=TX/18=RX、STEP=5、DIR=6、EN=21、DIAG=16、I2C=8/9）；软限位默认启用 0–600mm；无逻辑分析仪/示波器，T5/T6/T12 验收改为软件判据；性能默认值待实测校准。
 > v1.3 变更：**T1 完成并验收合并**（2e58be5）——工程骨架 + Debug/Release 双构建路径（Release 裁剪实测 -29.5%）；第 12 节新增第 6/7 条：本机构建环境配方（VS Code 插件式安装，export.ps1 不可用）与 Debug/Release 切换的 sdkconfig 缓存坑。验收记录见 docs/reviews/。
+> v1.4 变更：**T2 完成并验收合并**（43dbb8f）——BSP 引脚/外设初始化；上板实测 AS5600@0x36 首轮发现 → **板上有外部 I2C 上拉（T0 遗留定案）**；发现 GPIO10（UART1 TX）板上接 LED、空闲常亮属正常。
 
 ---
 
@@ -222,12 +223,12 @@ F 单位 mm/min；A 单位 mm/s²；X 单位 mm。
 - **内容**：按 3.3 建目录；Flash 80MHz、CPU 240MHz；FreeRTOS tick 1kHz；UART0 日志保留（DEBUG/RELEASE 编译开关）
 - **验收**：`idf.py build` 通过（Debug/Release 双构建零错误，日志裁剪实测有效）；烧录后打印启动横幅；看门狗喂狗正常跑 10 分钟。【✅ 三项全部通过：2026-09-12 上板实测——横幅+PSRAM 8MB test OK+qio 确认、10 分钟零输出零复位。验收记录见 docs/reviews/T1-acceptance.md 与 T1-fix-acceptance.md】
 
-### T2 · BSP 引脚与外设初始化 【S】
+### T2 · BSP 引脚与外设初始化 【✅ 已完成 2026-09-12，已验收合并】
 
 - **前置**：T1；**T0 的引脚表**（表未齐先用 Kconfig 占位默认值，并留 TODO）
 - **产出**：`components/bsp/`：Kconfig 引脚项 + **UART1**（协议）/ UART0（日志）/ I2C(400kHz) / GPIO(EN/DIR) 初始化
 - **内容**：引脚全部走 Kconfig（默认值按 docs/hardware.md：UART1=10/11、TMC 单线 17/18、STEP=5、DIR=6、EN=21、I2C=8/9）；I2C 用 ESP-IDF v6 `i2c_master` API；**EN 低有效（TMC2209）在 BSP 初始化最早阶段拉高（失能），规避上电复位期间悬空误使能**；I2C 总线初始化若扫描失败，先尝试启用 ESP32-S3 内部上拉再扫（应对板上无上拉的情况）
-- **验收**：板上 I2C 扫描发现 0x36（AS5600）；UART1 收发回环（配合 T3 联测）。
+- **验收**：板上 I2C 扫描发现 0x36（AS5600）✅【2026-09-12 上板实测：首轮（无内部上拉）即发现 0x36 → 板上有外部上拉，T0 遗留问题定案】；UART1 收发回环（配合 T3 联测）→ 移交 T3。
 
 ### T3 · 通信协议栈（comm_task） 【M】
 
