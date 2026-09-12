@@ -1,10 +1,11 @@
 /*
  * ESP32-S3 Single-Axis G-code Motion Controller
- * T2: BSP - app_main entry point
+ * T3: Communication Protocol - app_main entry point
  *
  * app_main calls bsp_early_init() as its very first line (to pull
  * TMC2209 EN high and disable the driver), then prints the startup
- * banner, then calls bsp_init() for full peripheral init.
+ * banner, then calls bsp_init() for full peripheral init, then
+ * starts the protocol comm task.
  */
 
 #include <stdio.h>
@@ -16,6 +17,7 @@
 #include "esp_task_wdt.h"
 
 #include "bsp.h"
+#include "protocol.h"
 
 static const char *TAG = "app_main";
 
@@ -50,7 +52,7 @@ void app_main(void)
 
     ESP_LOGI(TAG, "========================================");
     ESP_LOGI(TAG, " ESP32-S3 Single-Axis Motion Controller");
-    ESP_LOGI(TAG, " T2 BSP - Pin & Peripheral Init");
+    ESP_LOGI(TAG, " T3 Comm Stack - UART1 Protocol");
     ESP_LOGI(TAG, " Target: ESP32-S3-WROOM-1-N16R8");
     ESP_LOGI(TAG, "========================================");
 
@@ -66,6 +68,17 @@ void app_main(void)
     if (bsp_err != ESP_OK) {
         ESP_LOGE(TAG, "BSP init failed: %s", esp_err_to_name(bsp_err));
         /* Continue anyway — placeholder task still runs for watchdog test */
+    }
+
+    /* Start communication protocol stack.
+     * Re-initializes UART1 with an event queue and starts comm_task
+     * on CPU0.  Placeholder line/status/stop callbacks are active
+     * until T4/T9/T6 register their own. */
+    if (bsp_err == ESP_OK) {
+        esp_err_t proto_err = protocol_start();
+        if (proto_err != ESP_OK) {
+            ESP_LOGE(TAG, "Protocol start failed: %s", esp_err_to_name(proto_err));
+        }
     }
 
     /* Task watchdog is already enabled via sdkconfig.defaults
