@@ -1,0 +1,103 @@
+menu "BSP - Board Support Package"
+
+    # ------------------------------------------------------------------
+    # UART1 (protocol channel - host communication)
+    # ------------------------------------------------------------------
+    config BSP_UART1_TX_GPIO
+        int "UART1 TX GPIO (protocol channel)"
+        default 10
+        help
+            GPIO for UART1 TX (host protocol channel via CH343P).
+            Default matches docs/hardware.md §3 (GPIO10).
+
+    config BSP_UART1_RX_GPIO
+        int "UART1 RX GPIO (protocol channel)"
+        default 11
+        help
+            GPIO for UART1 RX (host protocol channel via CH343P).
+            Default matches docs/hardware.md §3 (GPIO11).
+
+    config BSP_UART1_BAUD
+        int "UART1 baud rate"
+        default 115200
+        help
+            UART1 baud rate. Default 115200 8N1 per hardware.md §5.
+
+    # ------------------------------------------------------------------
+    # TMC2209 single-wire UART (for T5)
+    # ------------------------------------------------------------------
+    config BSP_TMC_UART_TX_GPIO
+        int "TMC2209 UART TX GPIO"
+        default 17
+        help
+            TMC2209 PDN_UART TX (through on-board 1kΩ resistor).
+            Default matches docs/hardware.md §3 (GPIO17).
+            Initialization is done in T5, not here.
+
+    config BSP_TMC_UART_RX_GPIO
+        int "TMC2209 UART RX GPIO"
+        default 18
+        help
+            TMC2209 PDN_UART RX (direct connection).
+            Default matches docs/hardware.md §3 (GPIO18).
+            Initialization is done in T5, not here.
+
+    # ------------------------------------------------------------------
+    # Stepper signals (STEP / DIR / EN / DIAG)
+    # ------------------------------------------------------------------
+    config BSP_STEP_GPIO
+        int "TMC2209 STEP GPIO"
+        default 5
+        help
+            STEP pulse output. Default matches docs/hardware.md §3 (GPIO5).
+
+    config BSP_DIR_GPIO
+        int "TMC2209 DIR GPIO"
+        default 6
+        help
+            DIR direction output. Default matches docs/hardware.md §3 (GPIO6).
+
+    config BSP_EN_GPIO
+        int "TMC2209 EN GPIO (active low)"
+        default 21
+        help
+            TMC2209 ENN (enable, active low).
+            Default matches docs/hardware.md §3 (GPIO21).
+            Pulled HIGH (disabled) in bsp_early_init() as the very first
+            peripheral action to avoid accidental enable during reset.
+
+    config BSP_DIAG_GPIO
+        int "TMC2209 DIAG1 GPIO"
+        default 16
+        help
+            TMC2209 DIAG1 (stall / over-temperature indicator, input).
+            Default matches docs/hardware.md §3 (GPIO16).
+
+    # ------------------------------------------------------------------
+    # I2C bus (AS5600 encoder)
+    # ------------------------------------------------------------------
+    config BSP_I2C_SDA_GPIO
+        int "I2C SDA GPIO"
+        default 8
+        help
+            I2C SDA (AS5600). Default matches docs/hardware.md §3 (GPIO8).
+
+    config BSP_I2C_SCL_GPIO
+        int "I2C SCL GPIO"
+        default 9
+        help
+            I2C SCL (AS5600). Default matches docs/hardware.md §3 (GPIO9).
+
+    config BSP_I2C_FREQ_HZ
+        int "I2C clock frequency (Hz)"
+        default 400000
+        help
+            I2C SCL frequency. Default 400kHz (Fast Mode).
+
+    config BSP_AS5600_I2C_ADDR
+        hex "AS5600 I2C 7-bit address"
+        default 0x36
+        help
+            AS5600 default I2C address, per hardware.md §4 (0x36).
+
+endmenu
