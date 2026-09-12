@@ -1,0 +1,24 @@
+# Build directories
+build/
+sdkconfig
+sdkconfig.old
+
+# ESP-IDF specific
+managed_components/
+dependencies.lock
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Editor / OS
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Logs and temp
+*.log
