@@ -1,0 +1,14 @@
+menu "Settings (NVS Parameter Store)"
+
+config SETTINGS_SELF_TEST
+    bool "Run settings self-test on boot"
+    default n
+    help
+        When enabled, the firmware runs all settings unit tests
+        during startup (after settings_init, before protocol stack).
+        Results printed via ESP_LOG, final summary line:
+        "SELF-TEST DONE: <n>/<total> PASS" (tag: settings_selftest).
+
+        For on-target verification only.  Keep disabled in production.
+
+endmenu

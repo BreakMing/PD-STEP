@@ -29,8 +29,10 @@
 #include "esp_task_wdt.h"
 #include "driver/uart.h"
 
-/* BSP Kconfig — we reuse pin/baud configuration from BSP */
+/* BSP Kconfig — we reuse pin configuration from BSP.
+ * Baud rate comes from settings ($11), with Kconfig fallback. */
 #include "bsp.h"
+#include "settings.h"
 
 static const char *TAG = "protocol";
 
@@ -349,9 +351,13 @@ static esp_err_t uart1_reinit_with_queue(void)
     /* Remove the driver instance that bsp installed */
     uart_driver_delete(UART_PORT_NUM);
 
-    /* UART config (same parameters as bsp: 8N1, same baud rate) */
+    /* UART config (8N1, baud from settings $11 with Kconfig fallback) */
+    int baud = settings_uart_baud();
+    if (baud <= 0) {
+        baud = CONFIG_BSP_UART1_BAUD;  /* fallback if settings not ready */
+    }
     uart_config_t uart_cfg = {
-        .baud_rate = CONFIG_BSP_UART1_BAUD,
+        .baud_rate = baud,
         .data_bits = UART_DATA_8_BITS,
         .parity = UART_PARITY_DISABLE,
         .stop_bits = UART_STOP_BITS_1,
@@ -393,7 +399,7 @@ static esp_err_t uart1_reinit_with_queue(void)
              "(TX=%d RX=%d @ %d baud, queue depth %d)",
              CONFIG_BSP_UART1_TX_GPIO,
              CONFIG_BSP_UART1_RX_GPIO,
-             CONFIG_BSP_UART1_BAUD,
+             baud,
              UART_QUEUE_SIZE);
 
     return ESP_OK;

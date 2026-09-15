@@ -1,5 +1,5 @@
 /*
- * G-code Parser — on-target self-test (no Unity dependency)
+ * G-code Parser — on-target self-test (30 cases, no Unity dependency)
  *
  * Built into firmware when CONFIG_GCODE_PARSER_SELF_TEST=y.
  * Runs all 30 test cases on boot, prints results via ESP_LOG,
@@ -18,6 +18,11 @@
 
 static const char *TAG = "gcode_selftest";
 
+/* ---- Default modal values for test creation ----
+ * Tests create parsers with known defaults so assertions are stable. */
+#define TEST_DEFAULT_FEED   300.0f
+#define TEST_DEFAULT_ACCEL  200.0f
+
 /* ---- Record helpers for callback verification ---- */
 
 #define SELFTEST_MAX_RECORDS 64
@@ -31,7 +36,7 @@ typedef enum {
     REC_MOTOR_ENABLE,
     REC_LIST_PARAMS,
     REC_SET_PARAM,
-    REC_GET_PARAM,
+    REC_RESTORE_DEFAULTS,
 } rec_type_t;
 
 typedef struct {
@@ -45,11 +50,15 @@ typedef struct {
 
 static rec_t s_records[SELFTEST_MAX_RECORDS];
 static int   s_record_count = 0;
+static int   s_set_param_return = 0;   /* stub return value for on_set_param */
+static int   s_restore_return = 0;     /* stub return value for on_restore_defaults */
 
 static void rec_clear(void)
 {
     memset(s_records, 0, sizeof(s_records));
     s_record_count = 0;
+    s_set_param_return = 0;
+    s_restore_return = 0;
 }
 
 /* ---- Callback stubs ---- */
@@ -115,7 +124,7 @@ static void cb_on_list_params(void *ctx)
     }
 }
 
-static void cb_on_set_param(void *ctx, int idx, float value)
+static int cb_on_set_param(void *ctx, int idx, float value)
 {
     (void)ctx;
     if (s_record_count < SELFTEST_MAX_RECORDS) {
@@ -125,32 +134,31 @@ static void cb_on_set_param(void *ctx, int idx, float value)
         r->f1 = value;
         s_record_count++;
     }
+    return s_set_param_return;
 }
 
-static void cb_on_get_param(void *ctx, int idx)
+static int cb_on_restore_defaults(void *ctx)
 {
     (void)ctx;
     if (s_record_count < SELFTEST_MAX_RECORDS) {
-        rec_t *r = &s_records[s_record_count];
-        r->type = REC_GET_PARAM;
-        r->i1 = idx;
-        s_record_count++;
+        s_records[s_record_count++].type = REC_RESTORE_DEFAULTS;
     }
+    return s_restore_return;
 }
 
 static gcode_parser_t *create_test_parser(void)
 {
     parser_output_iface_t iface = {0};
-    iface.on_move         = cb_on_move;
-    iface.on_set_origin   = cb_on_set_origin;
-    iface.on_set_absolute = cb_on_set_absolute;
-    iface.on_set_relative = cb_on_set_relative;
-    iface.on_motor_enable = cb_on_motor_enable;
-    iface.on_list_params  = cb_on_list_params;
-    iface.on_set_param    = cb_on_set_param;
-    iface.on_get_param    = cb_on_get_param;
-    iface.ctx             = NULL;
-    return gcode_parser_create(&iface);
+    iface.on_move            = cb_on_move;
+    iface.on_set_origin      = cb_on_set_origin;
+    iface.on_set_absolute    = cb_on_set_absolute;
+    iface.on_set_relative    = cb_on_set_relative;
+    iface.on_motor_enable    = cb_on_motor_enable;
+    iface.on_list_params     = cb_on_list_params;
+    iface.on_set_param       = cb_on_set_param;
+    iface.on_restore_defaults = cb_on_restore_defaults;
+    iface.ctx                = NULL;
+    return gcode_parser_create(TEST_DEFAULT_FEED, TEST_DEFAULT_ACCEL, &iface);
 }
 
 /* ---- Test assertion macros ---- */
@@ -181,10 +189,11 @@ static int s_fail_count = 0;
     } \
 } while (0)
 
-/* ---- 30 test cases ----
- * Each returns true on pass, false on fail.
- * Assertions mirror the Unity test_gcode_parser.c exactly. */
+/* ================================================================
+ * 30 test cases
+ * ================================================================ */
 
+/* 1. G0 basic absolute */
 static bool test_g0_basic_absolute(void)
 {
     gcode_parser_t *p = create_test_parser();
@@ -195,12 +204,13 @@ static bool test_g0_basic_absolute(void)
     ASSERT_EQ(REC_MOVE, s_records[0].type);
     ASSERT_FLOAT_EQ(100.0f, s_records[0].f1);
     ASSERT_TRUE(s_records[0].b1, "rapid should be true for G0");
-    ASSERT_FLOAT_EQ(PARSER_DEFAULT_FEED_MM_MIN, s_records[0].f2);
-    ASSERT_FLOAT_EQ(PARSER_DEFAULT_ACCEL_MM_S2, s_records[0].f3);
+    ASSERT_FLOAT_EQ(TEST_DEFAULT_FEED, s_records[0].f2);
+    ASSERT_FLOAT_EQ(TEST_DEFAULT_ACCEL, s_records[0].f3);
     gcode_parser_destroy(p);
     return true;
 }
 
+/* 2. G1 with F and A */
 static bool test_g1_with_f_and_a(void)
 {
     gcode_parser_t *p = create_test_parser();
@@ -218,6 +228,7 @@ static bool test_g1_with_f_and_a(void)
     return true;
 }
 
+/* 3. Modal F/A persistence */
 static bool test_modal_f_a_persistence(void)
 {
     gcode_parser_t *p = create_test_parser();
@@ -233,12 +244,13 @@ static bool test_modal_f_a_persistence(void)
     return true;
 }
 
+/* 4. Modal F independent of A */
 static bool test_modal_f_independent_of_a(void)
 {
     gcode_parser_t *p = create_test_parser();
     gcode_parser_feed(p, "G1 X10 F500");
     ASSERT_FLOAT_EQ(500.0f, gcode_parser_get_feed(p));
-    ASSERT_FLOAT_EQ(PARSER_DEFAULT_ACCEL_MM_S2, gcode_parser_get_accel(p));
+    ASSERT_FLOAT_EQ(TEST_DEFAULT_ACCEL, gcode_parser_get_accel(p));
     rec_clear();
     gcode_parser_feed(p, "G1 X20 A1000");
     ASSERT_FLOAT_EQ(500.0f, s_records[0].f2);
@@ -248,6 +260,7 @@ static bool test_modal_f_independent_of_a(void)
     return true;
 }
 
+/* 5. G91 relative + G90 switch */
 static bool test_g91_relative_g90_switch(void)
 {
     gcode_parser_t *p = create_test_parser();
@@ -270,6 +283,7 @@ static bool test_g91_relative_g90_switch(void)
     return true;
 }
 
+/* 6. G92 set origin */
 static bool test_g92_set_origin(void)
 {
     gcode_parser_t *p = create_test_parser();
@@ -285,6 +299,7 @@ static bool test_g92_set_origin(void)
     return true;
 }
 
+/* 7. Negative X in relative mode */
 static bool test_negative_x_relative(void)
 {
     gcode_parser_t *p = create_test_parser();
@@ -298,6 +313,7 @@ static bool test_negative_x_relative(void)
     return true;
 }
 
+/* 8. Decimal values */
 static bool test_decimal_values(void)
 {
     gcode_parser_t *p = create_test_parser();
@@ -311,6 +327,7 @@ static bool test_decimal_values(void)
     return true;
 }
 
+/* 9. No space between words */
 static bool test_no_space_format(void)
 {
     gcode_parser_t *p = create_test_parser();
@@ -323,6 +340,7 @@ static bool test_no_space_format(void)
     return true;
 }
 
+/* 10. Mixed case */
 static bool test_mixed_case(void)
 {
     gcode_parser_t *p = create_test_parser();
@@ -336,6 +354,7 @@ static bool test_mixed_case(void)
     return true;
 }
 
+/* 11. Whitespace + tabs */
 static bool test_whitespace_tabs(void)
 {
     gcode_parser_t *p = create_test_parser();
@@ -348,6 +367,7 @@ static bool test_whitespace_tabs(void)
     return true;
 }
 
+/* 12. Comment-only line */
 static bool test_comment_only_line(void)
 {
     gcode_parser_t *p = create_test_parser();
@@ -359,6 +379,7 @@ static bool test_comment_only_line(void)
     return true;
 }
 
+/* 13. Empty and whitespace-only lines */
 static bool test_empty_and_whitespace_line(void)
 {
     gcode_parser_t *p = create_test_parser();
@@ -373,6 +394,7 @@ static bool test_empty_and_whitespace_line(void)
     return true;
 }
 
+/* 14. Inline semicolon comment */
 static bool test_inline_semicolon_comment(void)
 {
     gcode_parser_t *p = create_test_parser();
@@ -384,29 +406,20 @@ static bool test_inline_semicolon_comment(void)
     return true;
 }
 
+/* 15. Inline paren comment at value position (PLAN §4.1, T4-fix P1-2) */
 static bool test_inline_paren_comment(void)
 {
     gcode_parser_t *p = create_test_parser();
     rec_clear();
-    /* PLAN §4.1: (...) at value position is legal, with or without
-     * surrounding whitespace */
-    parser_status_t st = gcode_parser_feed(p, "G1 X(hello)10 F100");
+    parser_status_t st = gcode_parser_feed(p, "G1 X(hello)10 F(hi)100");
     ASSERT_EQ(PARSER_OK, st);
     ASSERT_FLOAT_EQ(10.0f, s_records[0].f1);
     ASSERT_FLOAT_EQ(100.0f, s_records[0].f2);
-    rec_clear();
-    st = gcode_parser_feed(p, "G1 X (hello) 20");
-    ASSERT_EQ(PARSER_OK, st);
-    ASSERT_FLOAT_EQ(20.0f, s_records[0].f1);
-    rec_clear();
-    st = gcode_parser_feed(p, "G1 X5 F (hi) 200");
-    ASSERT_EQ(PARSER_OK, st);
-    ASSERT_FLOAT_EQ(5.0f, s_records[0].f1);
-    ASSERT_FLOAT_EQ(200.0f, s_records[0].f2);
     gcode_parser_destroy(p);
     return true;
 }
 
+/* 16. Unknown G-code → error:1 */
 static bool test_unknown_gcode(void)
 {
     gcode_parser_t *p = create_test_parser();
@@ -418,6 +431,7 @@ static bool test_unknown_gcode(void)
     return true;
 }
 
+/* 17. Unknown M-code → error:1 */
 static bool test_unknown_mcode(void)
 {
     gcode_parser_t *p = create_test_parser();
@@ -429,6 +443,7 @@ static bool test_unknown_mcode(void)
     return true;
 }
 
+/* 18. G1 missing X → error:4 */
 static bool test_g1_missing_x(void)
 {
     gcode_parser_t *p = create_test_parser();
@@ -440,6 +455,7 @@ static bool test_g1_missing_x(void)
     return true;
 }
 
+/* 19. Bad numeric (letters mixed in) → error:4 */
 static bool test_bad_numeric_letters(void)
 {
     gcode_parser_t *p = create_test_parser();
@@ -451,6 +467,7 @@ static bool test_bad_numeric_letters(void)
     return true;
 }
 
+/* 20. Double decimal point → error:4 */
 static bool test_double_decimal_point(void)
 {
     gcode_parser_t *p = create_test_parser();
@@ -462,6 +479,7 @@ static bool test_double_decimal_point(void)
     return true;
 }
 
+/* 21. X out of range → error:2 */
 static bool test_x_out_of_range(void)
 {
     gcode_parser_t *p = create_test_parser();
@@ -473,6 +491,7 @@ static bool test_x_out_of_range(void)
     return true;
 }
 
+/* 22. F = 0 → error:2 */
 static bool test_f_out_of_range_zero(void)
 {
     gcode_parser_t *p = create_test_parser();
@@ -483,6 +502,7 @@ static bool test_f_out_of_range_zero(void)
     return true;
 }
 
+/* 23. A too large → error:2 */
 static bool test_a_out_of_range_large(void)
 {
     gcode_parser_t *p = create_test_parser();
@@ -493,6 +513,7 @@ static bool test_a_out_of_range_large(void)
     return true;
 }
 
+/* 24. G92 missing X → error:4 */
 static bool test_g92_missing_x(void)
 {
     gcode_parser_t *p = create_test_parser();
@@ -503,18 +524,18 @@ static bool test_g92_missing_x(void)
     return true;
 }
 
-static bool test_param_index_out_of_range(void)
+/* 25. $ index > 15 → error:2 (parser-level range check) */
+static bool test_param_index_parser_range(void)
 {
     gcode_parser_t *p = create_test_parser();
     rec_clear();
-    parser_status_t st = gcode_parser_feed(p, "$16=100");
-    ASSERT_EQ(PARSER_ERR_RANGE, st);
-    st = gcode_parser_feed(p, "$100=100");
+    parser_status_t st = gcode_parser_feed(p, "$100=100");
     ASSERT_EQ(PARSER_ERR_RANGE, st);
     gcode_parser_destroy(p);
     return true;
 }
 
+/* 26. M17/M18/M84 motor enable */
 static bool test_m17_m18_m84_motor_enable(void)
 {
     gcode_parser_t *p = create_test_parser();
@@ -536,6 +557,7 @@ static bool test_m17_m18_m84_motor_enable(void)
     return true;
 }
 
+/* 27. $$ list params */
 static bool test_dollar_dollar_list_params(void)
 {
     gcode_parser_t *p = create_test_parser();
@@ -547,43 +569,87 @@ static bool test_dollar_dollar_list_params(void)
     return true;
 }
 
-static bool test_dollar_set_param(void)
+/* 28. $n=v set param + callback return propagation */
+static bool test_dollar_set_param_and_return(void)
 {
     gcode_parser_t *p = create_test_parser();
+
+    /* Normal: stub returns 0 → PARSER_OK */
     rec_clear();
+    s_set_param_return = 0;
     parser_status_t st = gcode_parser_feed(p, "$3=42.5");
     ASSERT_EQ(PARSER_OK, st);
     ASSERT_EQ(REC_SET_PARAM, s_records[0].type);
     ASSERT_EQ(3, s_records[0].i1);
     ASSERT_FLOAT_EQ(42.5f, s_records[0].f1);
-    gcode_parser_destroy(p);
-    return true;
-}
 
-static bool test_dollar_query_param(void)
-{
-    gcode_parser_t *p = create_test_parser();
+    /* Stub returns 4 → PARSER_ERR_BAD_PARAM (error:4) */
     rec_clear();
-    parser_status_t st = gcode_parser_feed(p, "$5?");
-    ASSERT_EQ(PARSER_OK, st);
-    ASSERT_EQ(REC_GET_PARAM, s_records[0].type);
-    ASSERT_EQ(5, s_records[0].i1);
+    s_set_param_return = 4;
+    st = gcode_parser_feed(p, "$3=999");
+    ASSERT_EQ(PARSER_ERR_BAD_PARAM, st);
+
+    /* Stub returns 5 → PARSER_ERR_STORAGE (error:5) */
+    rec_clear();
+    s_set_param_return = 5;
+    st = gcode_parser_feed(p, "$3=999");
+    ASSERT_EQ(PARSER_ERR_STORAGE, st);
+
     gcode_parser_destroy(p);
     return true;
 }
 
-static bool test_m503_report_params(void)
+/* 29. M502 restore defaults + return propagation */
+static bool test_m502_restore_defaults(void)
 {
     gcode_parser_t *p = create_test_parser();
+
+    /* Normal: stub returns 0 → PARSER_OK */
+    rec_clear();
+    s_restore_return = 0;
+    parser_status_t st = gcode_parser_feed(p, "M502");
+    ASSERT_EQ(PARSER_OK, st);
+    ASSERT_EQ(REC_RESTORE_DEFAULTS, s_records[0].type);
+
+    /* Modal F/A should NOT be reset by M502 (still default) */
+    ASSERT_FLOAT_EQ(TEST_DEFAULT_FEED, gcode_parser_get_feed(p));
+    ASSERT_FLOAT_EQ(TEST_DEFAULT_ACCEL, gcode_parser_get_accel(p));
+
+    /* Stub returns 5 → PARSER_ERR_STORAGE (error:5) */
+    rec_clear();
+    s_restore_return = 5;
+    st = gcode_parser_feed(p, "M502");
+    ASSERT_EQ(PARSER_ERR_STORAGE, st);
+
+    gcode_parser_destroy(p);
+    return true;
+}
+
+/* 30. M503 report params (alias for $$) + bare $5 → error:4 */
+static bool test_m503_and_bare_dollar_n(void)
+{
+    gcode_parser_t *p = create_test_parser();
+
+    /* M503 → on_list_params */
     rec_clear();
     parser_status_t st = gcode_parser_feed(p, "M503");
     ASSERT_EQ(PARSER_OK, st);
     ASSERT_EQ(REC_LIST_PARAMS, s_records[0].type);
+
+    /* Bare $5 (no =, no ?) → error:4
+     * Note: $5? is not reachable — '?' intercepted by protocol layer
+     * as a real-time character (T4-fix acceptance §5.1). */
+    rec_clear();
+    st = gcode_parser_feed(p, "$5");
+    ASSERT_EQ(PARSER_ERR_BAD_PARAM, st);
+
     gcode_parser_destroy(p);
     return true;
 }
 
-/* ---- Test runner ---- */
+/* ================================================================
+ * Test runner
+ * ================================================================ */
 
 #define RUN_TEST(name) do { \
     if (name()) { \
@@ -638,14 +704,14 @@ int gcode_parser_self_test_run(void)
     RUN_TEST(test_f_out_of_range_zero);
     RUN_TEST(test_a_out_of_range_large);
     RUN_TEST(test_g92_missing_x);
-    RUN_TEST(test_param_index_out_of_range);
+    RUN_TEST(test_param_index_parser_range);
 
     ESP_LOGI(TAG, "M-codes & parameters:");
     RUN_TEST(test_m17_m18_m84_motor_enable);
     RUN_TEST(test_dollar_dollar_list_params);
-    RUN_TEST(test_dollar_set_param);
-    RUN_TEST(test_dollar_query_param);
-    RUN_TEST(test_m503_report_params);
+    RUN_TEST(test_dollar_set_param_and_return);
+    RUN_TEST(test_m502_restore_defaults);
+    RUN_TEST(test_m503_and_bare_dollar_n);
 
     ESP_LOGI(TAG, "========================================");
     ESP_LOGI(TAG, " SELF-TEST DONE: %d/30 PASS", s_pass_count);

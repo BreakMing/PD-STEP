@@ -1,17 +1,16 @@
 #!/usr/bin/env python3
 """
-G-code Parser — Python logic verification (equivalent to C implementation)
+G-code Parser — Python logic verification (reference model of C implementation)
 
-This is a Python port of the C gcode_parser, used to verify the parsing
-logic on the host when no C compiler is available.  The algorithm,
-state machine, error codes, and modal semantics are intentionally kept
-identical to the C implementation.
+Python port of the C gcode_parser, kept in sync with components/gcode_parser/
+interface (T11 version: gcode_parser_create(init_feed, init_accel, iface),
+no $n? syntax, on_set_param returns int, M502 restore defaults).
 
 Run:
     python test_gcode_parser_verify.py
 
-This is NOT a replacement for the C unit tests (test_gcode_parser.c,
-ESP-IDF Unity framework).  It's a host-side logic verification that the
+This is NOT a replacement for the on-target C self-test
+(gcode_parser_self_test.c).  It's a host-side logic verification that the
 parsing algorithm behaves as expected across all 30 test cases.
 """
 
@@ -23,8 +22,11 @@ PARSER_OK = 0
 PARSER_ERR_UNKNOWN_CMD = 1
 PARSER_ERR_RANGE = 2
 PARSER_ERR_BAD_PARAM = 4
+PARSER_ERR_STORAGE = 5
 
 # ---- Defaults & limits ----
+# Test-only fallback initial modal values.  In firmware these come from
+# NVS settings (settings_default_feed / settings_default_accel, PLAN §4.3).
 DEFAULT_FEED = 300.0
 DEFAULT_ACCEL = 200.0
 MAX_POS_MM = 1.0e6
@@ -36,10 +38,11 @@ MAX_PARAM_INDEX = 15
 
 
 class GCodeParser:
-    def __init__(self):
+    def __init__(self, init_feed_mm_min=DEFAULT_FEED,
+                 init_accel_mm_s2=DEFAULT_ACCEL):
         self.absolute_mode = True
-        self.modal_feed = DEFAULT_FEED
-        self.modal_accel = DEFAULT_ACCEL
+        self.modal_feed = init_feed_mm_min
+        self.modal_accel = init_accel_mm_s2
         self.current_pos_mm = 0.0
         self.callbacks = {}
 
@@ -47,8 +50,12 @@ class GCodeParser:
         self.callbacks[name] = fn
 
     def _fire(self, name, *args):
+        """Fire a callback.  Returns the callback's return value (or None).
+        Integer-returning callbacks (set_param, restore_defaults) use
+        the C convention: 0=ok, 4=invalid, 5=storage failure."""
         if name in self.callbacks:
-            self.callbacks[name](*args)
+            return self.callbacks[name](*args)
+        return None
 
     def feed(self, line):
         s = line.strip()
@@ -136,6 +143,16 @@ class GCodeParser:
                 return PARSER_OK
             elif mcode in (18, 84):
                 self._fire('motor_enable', False)
+                return PARSER_OK
+            elif mcode == 502:
+                # M502 — restore factory defaults.  Does NOT reset the
+                # parser's modal F/A runtime values (reboot picks up the
+                # new defaults).  Callback returns 0=ok, 5=storage failure.
+                rc = self._fire('restore_defaults')
+                if rc == 5:
+                    return PARSER_ERR_STORAGE
+                if rc is not None and rc != 0:
+                    return PARSER_ERR_BAD_PARAM
                 return PARSER_OK
             elif mcode == 503:
                 self._fire('list_params')
@@ -326,22 +343,19 @@ class GCodeParser:
             if idx < 0 or idx > MAX_PARAM_INDEX:
                 return PARSER_ERR_RANGE
 
-            self._fire('set_param', idx, val)
+            # Callback returns 0=ok, 4=invalid, 5=storage failure
+            rc = self._fire('set_param', idx, val)
+            if rc == 4:
+                return PARSER_ERR_BAD_PARAM
+            if rc == 5:
+                return PARSER_ERR_STORAGE
+            if rc is not None and rc != 0:
+                return PARSER_ERR_BAD_PARAM
             return PARSER_OK
 
-        elif rest and rest[0] == '?':
-            rest = rest[1:].strip()
-            if rest and rest[0] not in (';', '('):
-                rest2 = rest.split(';', 1)[0].strip()
-                if rest2:
-                    return PARSER_ERR_BAD_PARAM
-
-            if idx < 0 or idx > MAX_PARAM_INDEX:
-                return PARSER_ERR_RANGE
-
-            self._fire('get_param', idx)
-            return PARSER_OK
-
+        # Bare "$<n>" with no '=' — invalid.  ($<n>? was removed in T11:
+        # '?' never reaches the parser — the protocol layer intercepts
+        # it as a real-time character, PLAN §4.4.)
         return PARSER_ERR_BAD_PARAM
 
 
@@ -384,6 +398,10 @@ def assert_float_eq(a, b, eps=0.001, msg=""):
 class Recorder:
     def __init__(self):
         self.events = []
+        # Configurable return values for integer-returning callbacks
+        # (mirrors C stub behavior in gcode_parser_self_test.c)
+        self.set_param_return = 0
+        self.restore_return = 0
 
     def clear(self):
         self.events = []
@@ -408,9 +426,11 @@ class Recorder:
 
     def on_set_param(self, idx, val):
         self.events.append(('set_param', idx, val))
+        return self.set_param_return
 
-    def on_get_param(self, idx):
-        self.events.append(('get_param', idx))
+    def on_restore_defaults(self):
+        self.events.append(('restore_defaults',))
+        return self.restore_return
 
 
 def make_parser():
@@ -423,7 +443,7 @@ def make_parser():
     p.set_callback('motor_enable', r.on_motor_enable)
     p.set_callback('list_params', r.on_list_params)
     p.set_callback('set_param', r.on_set_param)
-    p.set_callback('get_param', r.on_get_param)
+    p.set_callback('restore_defaults', r.on_restore_defaults)
     return p, r
 
 
@@ -676,25 +696,52 @@ def test_dollar_dollar_list():
     assert_eq(r.events[0][0], 'list_params')
 
 
-def test_dollar_set_param():
+def test_dollar_set_param_and_return():
+    # rc 0 → PARSER_OK; rc 4 → error:4; rc 5 → error:5 (C convention)
     p, r = make_parser()
+    r.set_param_return = 0
     assert_eq(p.feed("$3=42.5"), PARSER_OK)
     assert_eq(r.events[0][0], 'set_param')
     assert_eq(r.events[0][1], 3)
     assert_float_eq(r.events[0][2], 42.5)
 
+    r.clear()
+    r.set_param_return = 4
+    assert_eq(p.feed("$3=999"), PARSER_ERR_BAD_PARAM)
 
-def test_dollar_query_param():
+    r.clear()
+    r.set_param_return = 5
+    assert_eq(p.feed("$3=999"), PARSER_ERR_STORAGE)
+
+
+def test_m502_restore_defaults():
+    # rc 0 → PARSER_OK; modal F/A not reset; rc 5 → error:5
     p, r = make_parser()
-    assert_eq(p.feed("$5?"), PARSER_OK)
-    assert_eq(r.events[0][0], 'get_param')
-    assert_eq(r.events[0][1], 5)
+    p.feed("G1 X10 F1200 A800")
+    r.clear()
+
+    r.restore_return = 0
+    assert_eq(p.feed("M502"), PARSER_OK)
+    assert_eq(r.events[0][0], 'restore_defaults')
+    # Modal values survive M502 (reboot picks up new defaults)
+    assert_float_eq(p.modal_feed, 1200.0)
+    assert_float_eq(p.modal_accel, 800.0)
+
+    r.clear()
+    r.restore_return = 5
+    assert_eq(p.feed("M502"), PARSER_ERR_STORAGE)
 
 
-def test_m503_report_params():
+def test_m503_and_bare_dollar_n():
+    # M503 → list_params; bare $5 (no '=') → error:4
+    # ($n? syntax removed in T11 — '?' intercepted by protocol layer)
     p, r = make_parser()
     assert_eq(p.feed("M503"), PARSER_OK)
     assert_eq(r.events[0][0], 'list_params')
+
+    r.clear()
+    assert_eq(p.feed("$5"), PARSER_ERR_BAD_PARAM)
+    assert_eq(p.feed("$5?"), PARSER_ERR_BAD_PARAM)
 
 
 # ================================================================
@@ -745,9 +792,9 @@ def main():
     print("\nM-codes & parameters:")
     run_test("M17/M18/M84 motor enable", test_m17_m18_motor_enable)
     run_test("$$ list params", test_dollar_dollar_list)
-    run_test("$n=v set param", test_dollar_set_param)
-    run_test("$n? query param", test_dollar_query_param)
-    run_test("M503 report params", test_m503_report_params)
+    run_test("$n=v set param + rc propagation", test_dollar_set_param_and_return)
+    run_test("M502 restore defaults", test_m502_restore_defaults)
+    run_test("M503 + bare $n → error:4", test_m503_and_bare_dollar_n)
 
     print(f"\n=========================================")
     print(f"Total: {total}  Passed: {passed}  Failed: {failed}")

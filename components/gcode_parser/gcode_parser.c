@@ -345,7 +345,8 @@ static parser_status_t parse_g92(gcode_parser_t *p, const char *line)
     return PARSER_OK;
 }
 
-/* Parse $<n>=<v> or $<n>? (parameter set / query).
+/* Parse $<n>=<v> (parameter set).
+ * $<n>? has been removed (PLAN v1.10 — unreachable due to real-time '?').
  * Expects s to point just past the '$'. */
 static parser_status_t parse_dollar(gcode_parser_t *p, const char *s)
 {
@@ -377,25 +378,17 @@ static parser_status_t parse_dollar(gcode_parser_t *p, const char *s)
         }
 
         if (p->iface.on_set_param != NULL) {
-            p->iface.on_set_param(p->iface.ctx, idx, val);
-        }
-        return PARSER_OK;
-
-    } else if (*s == '?') {
-        /* $<n>? — query parameter */
-        s++;  /* skip '?' */
-        s = skip_ws(s);
-        if (*s != '\0' && *s != ';' && *s != '(') {
-            return PARSER_ERR_BAD_PARAM;
-        }
-
-        if (p->iface.on_get_param != NULL) {
-            p->iface.on_get_param(p->iface.ctx, idx);
+            int rc = p->iface.on_set_param(p->iface.ctx, idx, val);
+            if (rc == 4) return PARSER_ERR_BAD_PARAM;
+            if (rc == 5) return PARSER_ERR_STORAGE;
+            if (rc != 0) return PARSER_ERR_BAD_PARAM;
         }
         return PARSER_OK;
 
     } else if (*s == '\0' || *s == ';' || *s == '(') {
-        /* Bare "$" or "$ ; comment" — invalid */
+        /* Bare "$<n>" (no '=') — invalid.
+         * Note: $<n>? is dead code — '?' intercepted as real-time char
+         * by protocol layer before line assembly (see T4-fix §5.1). */
         return PARSER_ERR_BAD_PARAM;
     } else {
         return PARSER_ERR_BAD_PARAM;
@@ -531,6 +524,15 @@ parser_status_t gcode_parser_feed(gcode_parser_t *p, const char *line)
                 p->iface.on_motor_enable(p->iface.ctx, false);
             }
             return PARSER_OK;
+        case 502:  /* M502 — restore factory defaults */
+            if (p->iface.on_restore_defaults != NULL) {
+                int rc = p->iface.on_restore_defaults(p->iface.ctx);
+                if (rc == 5) return PARSER_ERR_STORAGE;
+                if (rc != 0) return PARSER_ERR_BAD_PARAM;
+            }
+            /* Note: M502 does NOT reset parser modal F/A values.
+             * New defaults take effect after reboot. */
+            return PARSER_OK;
         case 503:  /* M503 — report parameters (same as $$) */
             if (p->iface.on_list_params != NULL) {
                 p->iface.on_list_params(p->iface.ctx);
@@ -549,7 +551,9 @@ parser_status_t gcode_parser_feed(gcode_parser_t *p, const char *line)
  * Lifecycle
  * ================================================================ */
 
-gcode_parser_t *gcode_parser_create(const parser_output_iface_t *iface)
+gcode_parser_t *gcode_parser_create(float init_feed_mm_min,
+                                     float init_accel_mm_s2,
+                                     const parser_output_iface_t *iface)
 {
     gcode_parser_t *p = (gcode_parser_t *)calloc(1, sizeof(gcode_parser_t));
     if (p == NULL) {
@@ -564,8 +568,8 @@ gcode_parser_t *gcode_parser_create(const parser_output_iface_t *iface)
 
     /* Default modal state */
     p->absolute_mode = true;   /* G90 — absolute by default (GRBL convention) */
-    p->modal_feed = PARSER_DEFAULT_FEED_MM_MIN;
-    p->modal_accel = PARSER_DEFAULT_ACCEL_MM_S2;
+    p->modal_feed = init_feed_mm_min;
+    p->modal_accel = init_accel_mm_s2;
     p->current_pos_mm = 0.0f;
 
     return p;
