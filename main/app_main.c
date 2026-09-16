@@ -27,6 +27,7 @@
 #include "settings.h"
 #include "step_engine.h"
 #include "tmc2209.h"
+#include "planner.h"
 #include "driver/uart.h"
 
 #ifdef CONFIG_APP_JOINT_TEST
@@ -48,7 +49,8 @@ static gcode_parser_t *s_parser = NULL;
 #if defined(CONFIG_TMC2209_SELF_TEST) || \
     defined(CONFIG_TMC2209_BRINGUP) || \
     defined(CONFIG_TMC2209_SPIN_TEST) || \
-    defined(CONFIG_APP_JOINT_TEST)
+    defined(CONFIG_APP_JOINT_TEST) || \
+    defined(CONFIG_PLANNER_SELF_TEST)
 static int log_mirror_vprintf(const char *fmt, va_list ap)
 {
     char buf[384];
@@ -71,42 +73,53 @@ static void install_log_mirror(void)
 }
 #endif
 
-/* ---- Placeholder callbacks ----
+/* ---- Parser output callbacks ----
  *
- * on_move / on_set_origin / on_set_absolute / on_set_relative
- * remain no-op placeholders (T7/T8 later).
+ * on_move / on_set_origin        → planner (T7 done here).
+ * on_motor_enable                → TMC2209 (T5 done).
+ * on_stop (protocol)             → step_engine (T6 done below).
+ * on_list_params / on_set_param /
+ * on_restore_defaults            → settings (T11 done).
  *
- * on_motor_enable → TMC2209 (T5 done).
- * on_stop (protocol) → step_engine (T6 done below).
- *
- * on_list_params / on_set_param / on_restore_defaults are wired to
- * real settings component (T11 done here).
+ * on_set_absolute / on_set_relative stay no-ops: the parser already
+ * resolves G90/G91 internally and reports an absolute target (T4 design,
+ * documented in gcode_parser.h).
  */
 
-static void cb_on_move(void *ctx, float target_mm, float feed_mm_min,
-                       float accel_mm_s2, bool rapid)
+static int cb_on_move(void *ctx, float target_mm, float feed_mm_min,
+                      float accel_mm_s2, bool rapid)
 {
-    (void)ctx; (void)target_mm; (void)feed_mm_min;
-    (void)accel_mm_s2; (void)rapid;
-    /* T7 step planner will replace this. */
+    (void)ctx;
+    (void)rapid;   /* G0 and G1 behave identically this version (PLAN §4.3) */
+    return (int)planner_enqueue(target_mm, feed_mm_min, accel_mm_s2);
 }
 
 static void cb_on_set_origin(void *ctx, float new_pos_mm)
 {
-    (void)ctx; (void)new_pos_mm;
-    /* T8 AS5600 + planner. */
+    (void)ctx;
+    planner_set_origin(new_pos_mm);
 }
 
 static void cb_on_set_absolute(void *ctx)
 {
     (void)ctx;
-    /* T7 planner. */
+    /* Parser resolves G90/G91 internally — nothing to do. */
 }
 
 static void cb_on_set_relative(void *ctx)
 {
     (void)ctx;
-    /* T7 planner. */
+    /* Parser resolves G90/G91 internally — nothing to do. */
+}
+
+/* --- $10 direction inversion glue (T6 orphan interface) ---
+ * step_engine_set_dir_invert() had no runtime consumer: without this
+ * subscription, changing $10 at runtime would have no effect. */
+static void cb_on_settings_change(int idx, float new_value)
+{
+    if (idx == 10) {
+        step_engine_set_dir_invert(new_value != 0.0f);
+    }
 }
 
 static void cb_on_motor_enable(void *ctx, bool enable)
@@ -241,7 +254,8 @@ void app_main(void)
 #if defined(CONFIG_TMC2209_SELF_TEST) || \
     defined(CONFIG_TMC2209_BRINGUP) || \
     defined(CONFIG_TMC2209_SPIN_TEST) || \
-    defined(CONFIG_APP_JOINT_TEST)
+    defined(CONFIG_APP_JOINT_TEST) || \
+    defined(CONFIG_PLANNER_SELF_TEST)
     if (bsp_err == ESP_OK) {
         install_log_mirror();
     }
@@ -256,6 +270,9 @@ void app_main(void)
 #endif
 #ifdef CONFIG_STEP_ENGINE_SELF_TEST
     step_engine_self_test_run();
+#endif
+#ifdef CONFIG_PLANNER_SELF_TEST
+    planner_self_test_run();
 #endif
 #ifdef CONFIG_TMC2209_SELF_TEST
     tmc2209_self_test_run();
@@ -300,6 +317,23 @@ void app_main(void)
                          esp_err_to_name(se_err));
             }
 
+            /* ---- Motion planner init (T7) ----
+             * Must come after step_engine_init and before the parser is
+             * created.  Idempotent — the self-test above may already have
+             * initialized it. */
+            esp_err_t pl_err = planner_init();
+            if (pl_err != ESP_OK) {
+                ESP_LOGE(TAG, "Planner init failed: %s",
+                         esp_err_to_name(pl_err));
+            }
+
+            /* $10 direction inversion: seed the engine from NVS, then
+             * track runtime changes via a settings subscription. */
+            step_engine_set_dir_invert(settings_invert_dir());
+            if (!settings_subscribe(cb_on_settings_change)) {
+                ESP_LOGW(TAG, "settings subscribe for $10 failed (slots full)");
+            }
+
             /* Register immediate stop callback (replaces protocol's
              * default "log only" placeholder — PLAN T6 spec). */
             protocol_register_stop_cb(cb_on_stop);
@@ -310,11 +344,12 @@ void app_main(void)
              * Registers as line handler, replacing T3 placeholder.
              *
              * Integration points:
-             *   on_move → T7 step planner
-             *   on_set_origin → T8 AS5600 + planner
-             *   on_set_absolute/relative → T7 planner
-             *   on_motor_enable → T5 TMC2209 (done)
-             *   on_list_params/on_set_param/on_restore_defaults → T11 (done)
+             *   on_move / on_set_origin       → planner (T7, done)
+             *   on_motor_enable               → T5 TMC2209 (done)
+             *   on_list_params/on_set_param/
+             *   on_restore_defaults           → T11 settings (done)
+             *   on_set_absolute/relative      → no-op (parser resolves
+             *                                   G90/G91 internally)
              */
             parser_output_iface_t iface = {
                 .on_move             = cb_on_move,

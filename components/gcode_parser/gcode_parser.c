@@ -277,14 +277,20 @@ static parser_status_t parse_move(gcode_parser_t *p, const char *line,
         p->modal_accel = a_val;
     }
 
-    /* Update tracked position */
-    p->current_pos_mm = target_mm;
-
-    /* Fire callback */
+    /* Fire callback BEFORE committing the tracked position (T7):
+     * if the planner rejects the target (soft limit → error:2), the
+     * commanded coordinate must not move — otherwise a rejected G91
+     * move would skew the relative-coordinate base. */
     if (p->iface.on_move != NULL) {
-        p->iface.on_move(p->iface.ctx, target_mm, p->modal_feed,
-                         p->modal_accel, is_g0);
+        int ret = p->iface.on_move(p->iface.ctx, target_mm, p->modal_feed,
+                                   p->modal_accel, is_g0);
+        if (ret != 0) {
+            return (ret == 2) ? PARSER_ERR_RANGE : PARSER_ERR_BAD_PARAM;
+        }
     }
+
+    /* Commit tracked position (accepted target) */
+    p->current_pos_mm = target_mm;
 
     return PARSER_OK;
 }

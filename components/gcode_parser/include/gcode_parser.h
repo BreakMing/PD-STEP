@@ -55,10 +55,11 @@ typedef enum {
  *
  * Callbacks that return int use the convention:
  *   0 = success
+ *   2 = range rejection (soft limit)  — on_move only
  *   4 = invalid value / unknown index
  *   5 = storage failure
- * The parser propagates non-zero returns as PARSER_ERR_BAD_PARAM
- * or PARSER_ERR_STORAGE respectively.
+ * The parser propagates non-zero returns as PARSER_ERR_RANGE,
+ * PARSER_ERR_BAD_PARAM or PARSER_ERR_STORAGE respectively.
  */
 typedef struct {
     /* Motion command (G0 / G1).
@@ -68,9 +69,16 @@ typedef struct {
      *             specified on the line.
      * accel_mm_s2: effective acceleration (mm/s²).  Modal value if not
      *             specified on the line.
-     * rapid     : true for G0 (rapid), false for G1 (linear feed). */
-    void (*on_move)(void *ctx, float target_mm, float feed_mm_min,
-                    float accel_mm_s2, bool rapid);
+     * rapid     : true for G0 (rapid), false for G1 (linear feed).
+     *
+     * Returns: 0 = accepted (position committed, motion planned);
+     *          2 = rejected by soft limits (→ error:2, position NOT
+     *              committed, so a rejected move cannot skew G91);
+     *          any other non-zero is treated as 4 (defensive).
+     * The parser fires this BEFORE committing its tracked position —
+     * see parse_move(). */
+    int (*on_move)(void *ctx, float target_mm, float feed_mm_min,
+                   float accel_mm_s2, bool rapid);
 
     /* Set origin offset (G92 X<pos>). */
     void (*on_set_origin)(void *ctx, float new_pos_mm);

@@ -1,12 +1,12 @@
 /*
- * G-code Parser — on-target self-test (30 cases, no Unity dependency)
+ * G-code Parser — on-target self-test (33 cases, no Unity dependency)
  *
  * Built into firmware when CONFIG_GCODE_PARSER_SELF_TEST=y.
- * Runs all 30 test cases on boot, prints results via ESP_LOG,
+ * Runs all 33 test cases on boot, prints results via ESP_LOG,
  * and returns the number of passing tests.
  *
  * Entry point: gcode_parser_self_test_run()
- * Final line: "SELF-TEST DONE: <n>/30 PASS"
+ * Final line: "SELF-TEST DONE: <n>/33 PASS"
  */
 
 #include "gcode_parser.h"
@@ -52,6 +52,7 @@ static rec_t s_records[SELFTEST_MAX_RECORDS];
 static int   s_record_count = 0;
 static int   s_set_param_return = 0;   /* stub return value for on_set_param */
 static int   s_restore_return = 0;     /* stub return value for on_restore_defaults */
+static int   s_move_return = 0;        /* stub return value for on_move */
 
 static void rec_clear(void)
 {
@@ -59,12 +60,13 @@ static void rec_clear(void)
     s_record_count = 0;
     s_set_param_return = 0;
     s_restore_return = 0;
+    s_move_return = 0;
 }
 
 /* ---- Callback stubs ---- */
 
-static void cb_on_move(void *ctx, float target_mm, float feed_mm_min,
-                       float accel_mm_s2, bool rapid)
+static int cb_on_move(void *ctx, float target_mm, float feed_mm_min,
+                      float accel_mm_s2, bool rapid)
 {
     (void)ctx;
     if (s_record_count < SELFTEST_MAX_RECORDS) {
@@ -76,6 +78,7 @@ static void cb_on_move(void *ctx, float target_mm, float feed_mm_min,
         r->b1 = rapid;
         s_record_count++;
     }
+    return s_move_return;
 }
 
 static void cb_on_set_origin(void *ctx, float new_pos_mm)
@@ -148,6 +151,12 @@ static int cb_on_restore_defaults(void *ctx)
 
 static gcode_parser_t *create_test_parser(void)
 {
+    /* Reset stub return values so every test starts from a
+     * deterministic state (they are file-scope statics). */
+    s_move_return       = 0;
+    s_set_param_return  = 0;
+    s_restore_return    = 0;
+
     parser_output_iface_t iface = {0};
     iface.on_move            = cb_on_move;
     iface.on_set_origin      = cb_on_set_origin;
@@ -647,6 +656,89 @@ static bool test_m503_and_bare_dollar_n(void)
     return true;
 }
 
+/* 31. on_move rejection (soft limit) → error:2, position NOT committed */
+static bool test_move_rejected_by_consumer(void)
+{
+    gcode_parser_t *p = create_test_parser();
+
+    /* Establish a known position */
+    rec_clear();
+    parser_status_t st = gcode_parser_feed(p, "G1 X10 F100");
+    ASSERT_EQ(PARSER_OK, st);
+    ASSERT_FLOAT_EQ(10.0f, gcode_parser_get_position(p));
+
+    /* Consumer rejects the move (soft limit → 2) */
+    rec_clear();
+    s_move_return = 2;
+    st = gcode_parser_feed(p, "G1 X20");
+    ASSERT_EQ(PARSER_ERR_RANGE, st);
+    ASSERT_FLOAT_EQ(10.0f, gcode_parser_get_position(p));
+
+    /* Defensive: any other non-zero maps to error:4 */
+    rec_clear();
+    s_move_return = 9;
+    st = gcode_parser_feed(p, "G1 X30");
+    ASSERT_EQ(PARSER_ERR_BAD_PARAM, st);
+    ASSERT_FLOAT_EQ(10.0f, gcode_parser_get_position(p));
+
+    gcode_parser_destroy(p);
+    return true;
+}
+
+/* 32. Rejected relative move must not pollute the G91 base */
+static bool test_rejected_move_keeps_relative_base(void)
+{
+    gcode_parser_t *p = create_test_parser();
+
+    gcode_parser_feed(p, "G1 X100 F100");   /* absolute 100 */
+    gcode_parser_feed(p, "G91");            /* relative mode */
+
+    /* Rejected +50 — the base must stay at 100 */
+    rec_clear();
+    s_move_return = 2;
+    parser_status_t st = gcode_parser_feed(p, "G1 X50");
+    ASSERT_EQ(PARSER_ERR_RANGE, st);
+    ASSERT_FLOAT_EQ(100.0f, gcode_parser_get_position(p));
+
+    /* Next accepted relative move resolves against 100, not 150 */
+    s_move_return = 0;
+    rec_clear();
+    st = gcode_parser_feed(p, "G1 X30");
+    ASSERT_EQ(PARSER_OK, st);
+    ASSERT_FLOAT_EQ(130.0f, s_records[0].f1);
+
+    gcode_parser_destroy(p);
+    return true;
+}
+
+/* 33. A rejected line leaves the modal F/A usable for the next line */
+static bool test_rejected_line_keeps_modal(void)
+{
+    gcode_parser_t *p = create_test_parser();
+
+    gcode_parser_feed(p, "G1 X10 F100 A200");
+    ASSERT_FLOAT_EQ(100.0f, gcode_parser_get_feed(p));
+    ASSERT_FLOAT_EQ(200.0f, gcode_parser_get_accel(p));
+
+    /* Rejected line carries no F/A words — modal state must survive */
+    rec_clear();
+    s_move_return = 2;
+    parser_status_t st = gcode_parser_feed(p, "G1 X20");
+    ASSERT_EQ(PARSER_ERR_RANGE, st);
+
+    /* The next accepted move still uses the previous modal F/A */
+    s_move_return = 0;
+    rec_clear();
+    st = gcode_parser_feed(p, "G1 X30");
+    ASSERT_EQ(PARSER_OK, st);
+    ASSERT_FLOAT_EQ(30.0f, s_records[0].f1);
+    ASSERT_FLOAT_EQ(100.0f, s_records[0].f2);
+    ASSERT_FLOAT_EQ(200.0f, s_records[0].f3);
+
+    gcode_parser_destroy(p);
+    return true;
+}
+
 /* ================================================================
  * Test runner
  * ================================================================ */
@@ -666,7 +758,7 @@ int gcode_parser_self_test_run(void)
     s_fail_count = 0;
 
     ESP_LOGI(TAG, "========================================");
-    ESP_LOGI(TAG, " G-code Parser Self-Test (30 cases)");
+    ESP_LOGI(TAG, " G-code Parser Self-Test (33 cases)");
     ESP_LOGI(TAG, "========================================");
 
     ESP_LOGI(TAG, "Basic commands:");
@@ -713,8 +805,13 @@ int gcode_parser_self_test_run(void)
     RUN_TEST(test_m502_restore_defaults);
     RUN_TEST(test_m503_and_bare_dollar_n);
 
+    ESP_LOGI(TAG, "Consumer rejection (T7 on_move return):");
+    RUN_TEST(test_move_rejected_by_consumer);
+    RUN_TEST(test_rejected_move_keeps_relative_base);
+    RUN_TEST(test_rejected_line_keeps_modal);
+
     ESP_LOGI(TAG, "========================================");
-    ESP_LOGI(TAG, " SELF-TEST DONE: %d/30 PASS", s_pass_count);
+    ESP_LOGI(TAG, " SELF-TEST DONE: %d/33 PASS", s_pass_count);
     ESP_LOGI(TAG, "========================================");
 
     return s_pass_count;

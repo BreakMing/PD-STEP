@@ -11,7 +11,7 @@ Run:
 
 This is NOT a replacement for the on-target C self-test
 (gcode_parser_self_test.c).  It's a host-side logic verification that the
-parsing algorithm behaves as expected across all 30 test cases.
+parsing algorithm behaves as expected across all 33 test cases.
 """
 
 import sys
@@ -268,14 +268,22 @@ class GCodeParser:
         if abs(target) > MAX_POS_MM:
             return PARSER_ERR_RANGE
 
-        # Update modal state
+        # Update modal state (line property — applies even if the move
+        # is rejected downstream, matching GRBL semantics)
         if has_f:
             self.modal_feed = f_val
         if has_a:
             self.modal_accel = a_val
 
+        # Fire the callback BEFORE committing the tracked position (T7):
+        # a soft-limit rejection must not skew the G91 base.
+        # Return convention: 0=accepted, 2=soft limit, other non-zero=4.
+        ret = self._fire('move', target, self.modal_feed, self.modal_accel,
+                         rapid)
+        if ret is not None and ret != 0:
+            return PARSER_ERR_RANGE if ret == 2 else PARSER_ERR_BAD_PARAM
+
         self.current_pos_mm = target
-        self._fire('move', target, self.modal_feed, self.modal_accel, rapid)
         return PARSER_OK
 
     def _parse_g92(self, rest):
@@ -400,6 +408,7 @@ class Recorder:
         self.events = []
         # Configurable return values for integer-returning callbacks
         # (mirrors C stub behavior in gcode_parser_self_test.c)
+        self.move_return = 0        # 0=accept, 2=soft limit, other=4
         self.set_param_return = 0
         self.restore_return = 0
 
@@ -408,6 +417,7 @@ class Recorder:
 
     def on_move(self, target, feed, accel, rapid):
         self.events.append(('move', target, feed, accel, rapid))
+        return self.move_return
 
     def on_set_origin(self, pos):
         self.events.append(('set_origin', pos))
@@ -448,7 +458,7 @@ def make_parser():
 
 
 # ================================================================
-# 30 test cases
+# 33 test cases
 # ================================================================
 
 def test_g0_basic_absolute():
@@ -744,10 +754,62 @@ def test_m503_and_bare_dollar_n():
     assert_eq(p.feed("$5?"), PARSER_ERR_BAD_PARAM)
 
 
+def test_move_rejected_by_consumer():
+    # on_move returns 2 → error:2, position NOT committed (T7)
+    p, r = make_parser()
+    assert_eq(p.feed("G1 X10 F100"), PARSER_OK)
+    assert_float_eq(p.current_pos_mm, 10.0, msg="position after accepted move")
+
+    r.move_return = 2
+    assert_eq(p.feed("G1 X20"), PARSER_ERR_RANGE)
+    assert_float_eq(p.current_pos_mm, 10.0,
+                    msg="position must not move on soft-limit rejection")
+
+    # Any other non-zero return is treated defensively as error:4
+    r.move_return = 9
+    assert_eq(p.feed("G1 X30"), PARSER_ERR_BAD_PARAM)
+    assert_float_eq(p.current_pos_mm, 10.0,
+                    msg="position must not move on error:4 rejection")
+
+
+def test_rejected_move_keeps_relative_base():
+    # A rejected G91 move must not pollute the relative-coordinate base
+    p, r = make_parser()
+    assert_eq(p.feed("G1 X100 F100"), PARSER_OK)
+    assert_eq(p.feed("G91"), PARSER_OK)
+
+    r.move_return = 2
+    assert_eq(p.feed("G1 X50"), PARSER_ERR_RANGE)
+    assert_float_eq(p.current_pos_mm, 100.0, msg="G91 base unchanged")
+
+    r.move_return = 0
+    r.clear()
+    assert_eq(p.feed("G1 X30"), PARSER_OK)
+    # 100 + 30, not 150 + 30
+    assert_float_eq(r.events[0][1], 130.0, msg="relative target")
+
+
+def test_rejected_line_keeps_modal():
+    # A rejected line without F/A leaves the modal values usable
+    p, r = make_parser()
+    assert_eq(p.feed("G1 X10 F100 A200"), PARSER_OK)
+    assert_float_eq(p.modal_feed, 100.0)
+    assert_float_eq(p.modal_accel, 200.0)
+
+    r.move_return = 2
+    assert_eq(p.feed("G1 X20"), PARSER_ERR_RANGE)
+
+    r.move_return = 0
+    r.clear()
+    assert_eq(p.feed("G1 X30"), PARSER_OK)
+    assert_float_eq(r.events[0][1], 30.0, msg="target")
+    assert_float_eq(r.events[0][2], 100.0, msg="modal feed retained")
+    assert_float_eq(r.events[0][3], 200.0, msg="modal accel retained")
+
+
 # ================================================================
 # Main
 # ================================================================
-
 def main():
     print("G-code Parser — Python Logic Verification")
     print("=========================================\n")
@@ -796,6 +858,13 @@ def main():
     run_test("M502 restore defaults", test_m502_restore_defaults)
     run_test("M503 + bare $n → error:4", test_m503_and_bare_dollar_n)
 
+    print("\nConsumer rejection (T7 on_move return):")
+    run_test("on_move reject → error:2, position unchanged",
+             test_move_rejected_by_consumer)
+    run_test("Rejected move keeps G91 base",
+             test_rejected_move_keeps_relative_base)
+    run_test("Rejected line keeps modal F/A", test_rejected_line_keeps_modal)
+
     print(f"\n=========================================")
     print(f"Total: {total}  Passed: {passed}  Failed: {failed}")
 
@@ -803,7 +872,7 @@ def main():
         print("\n*** SOME TESTS FAILED ***")
         return 1
     else:
-        print("\nAll 30 tests passed!")
+        print("\nAll 33 tests passed!")
         return 0
 
 
