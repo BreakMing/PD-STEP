@@ -291,3 +291,12 @@ i2c_master_bus_handle_t bsp_get_i2c_bus(void)
 {
     return s_i2c_bus;
 }
+
+/* ================================================================
+ * TMC2209 EN control
+ * ================================================================ */
+void bsp_tmc_en_set(bool enable)
+{
+    /* ENN is active low: enable=true → GPIO low */
+    gpio_set_level(BSP_PIN_EN, enable ? 0 : 1);
+}

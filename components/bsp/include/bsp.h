@@ -53,6 +53,14 @@ esp_err_t bsp_init(void);
  */
 i2c_master_bus_handle_t bsp_get_i2c_bus(void);
 
+/**
+ * @brief TMC2209 ENN control (active low).
+ *
+ * @param enable  true → drive EN low (driver enabled);
+ *                false → drive EN high (driver disabled).
+ */
+void bsp_tmc_en_set(bool enable);
+
 #ifdef __cplusplus
 }
 #endif

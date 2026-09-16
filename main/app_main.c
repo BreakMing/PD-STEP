@@ -11,9 +11,11 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <stdarg.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_log.h"
+#include "esp_log_write.h"
 #include "esp_chip_info.h"
 #include "esp_system.h"
 #include "esp_task_wdt.h"
@@ -22,10 +24,45 @@
 #include "protocol.h"
 #include "gcode_parser.h"
 #include "settings.h"
+#include "tmc2209.h"
+#include "driver/uart.h"
 
 static const char *TAG = "app_main";
 
 static gcode_parser_t *s_parser = NULL;
+
+/* ---- Dual-port log mirror (test builds only) ----
+ * When any TMC2209 test build is enabled, the board may be powered
+ * from a PD wall charger (12V for the motor, no USB data link).
+ * Mirror every ESP_LOG line to UART1 (TX=GPIO41, 115200) so a
+ * USB-serial adapter + VOFA+ can capture self-test and bring-up
+ * evidence while motor supply is on.  UART0 keeps its normal
+ * console output via stdout.  Hook lives until reboot; the normal
+ * firmware (all test switches off) is compiled without it. */
+#if defined(CONFIG_TMC2209_SELF_TEST) || \
+    defined(CONFIG_TMC2209_BRINGUP) || \
+    defined(CONFIG_TMC2209_SPIN_TEST)
+static int log_mirror_vprintf(const char *fmt, va_list ap)
+{
+    char buf[384];
+    int n = vsnprintf(buf, sizeof(buf), fmt, ap);
+    if (n > 0) {
+        if (n >= (int)sizeof(buf)) {
+            n = (int)sizeof(buf) - 1;
+        }
+        uart_write_bytes(UART_NUM_1, buf, n);
+        fputs(buf, stdout);
+    }
+    return n;
+}
+
+static void install_log_mirror(void)
+{
+    esp_log_set_vprintf(log_mirror_vprintf);
+    ESP_LOGI(TAG, "log mirror active: all logs also on UART1 "
+                  "(TX=GPIO41, 115200)");
+}
+#endif
 
 /* ---- Placeholder callbacks ----
  *
@@ -64,8 +101,8 @@ static void cb_on_set_relative(void *ctx)
 
 static void cb_on_motor_enable(void *ctx, bool enable)
 {
-    (void)ctx; (void)enable;
-    /* T5 TMC2209 driver. */
+    (void)ctx;
+    tmc2209_enable(enable);
 }
 
 /* --- T11 real: list all parameters ($$ / M503) ---
@@ -165,7 +202,7 @@ void app_main(void)
 
     ESP_LOGI(TAG, "========================================");
     ESP_LOGI(TAG, " ESP32-S3 Single-Axis Motion Controller");
-    ESP_LOGI(TAG, " T11 Settings & NVS — Parameter Persistence");
+    ESP_LOGI(TAG, " T5 TMC2209 Driver — UART Current Control");
     ESP_LOGI(TAG, " Target: ESP32-S3-WROOM-1-N16R8");
     ESP_LOGI(TAG, "========================================");
 
@@ -181,6 +218,16 @@ void app_main(void)
         ESP_LOGE(TAG, "BSP init failed: %s", esp_err_to_name(bsp_err));
     }
 
+    /* Mirror logs to UART1 as soon as the UART1 driver exists
+     * (bsp_init installed it) — before any self-test output. */
+#if defined(CONFIG_TMC2209_SELF_TEST) || \
+    defined(CONFIG_TMC2209_BRINGUP) || \
+    defined(CONFIG_TMC2209_SPIN_TEST)
+    if (bsp_err == ESP_OK) {
+        install_log_mirror();
+    }
+#endif
+
     /* ---- Self-tests (gated by Kconfig, default off) ---- */
 #ifdef CONFIG_SETTINGS_SELF_TEST
     settings_self_test_run();
@@ -188,6 +235,30 @@ void app_main(void)
 #ifdef CONFIG_GCODE_PARSER_SELF_TEST
     gcode_parser_self_test_run();
 #endif
+#ifdef CONFIG_TMC2209_SELF_TEST
+    tmc2209_self_test_run();
+#endif
+
+    /* ---- TMC2209 init (after BSP, before protocol) ---- */
+    if (bsp_err == ESP_OK) {
+        tmc2209_config_t tmc_cfg = {
+            .uart_num   = UART_NUM_2,
+            .tx_pin     = CONFIG_BSP_TMC_UART_TX_GPIO,
+            .rx_pin     = CONFIG_BSP_TMC_UART_RX_GPIO,
+            .baud       = 115200,
+            .slave_addr = 0,
+            .r_sense    = CONFIG_TMC2209_RSENSE,
+        };
+        esp_err_t tmc_err = tmc2209_init(&tmc_cfg);
+        if (tmc_err != ESP_OK) {
+            ESP_LOGE(TAG, "TMC2209 init failed: %s", esp_err_to_name(tmc_err));
+        }
+
+        /* Layer 2: hardware bring-up test (after TMC init) */
+#ifdef CONFIG_TMC2209_BRINGUP
+        tmc2209_bringup_run();
+#endif
+    }
 
     /* ---- Protocol stack ---- */
     if (bsp_err == ESP_OK) {
