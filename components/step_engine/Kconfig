@@ -1,0 +1,20 @@
+menu "Step Engine (GPTimer ISR pulse generator)"
+
+config STEP_ENGINE_SELF_TEST
+    bool "Run step-engine self-test on boot"
+    default n
+    help
+        When enabled, the firmware runs all step-engine unit tests
+        during startup (after BSP init, before protocol stack).
+        Results printed via ESP_LOG, final summary line:
+        "SELF-TEST DONE: <n>/<total> PASS" (tag: step_selftest).
+
+        Tests cover: step count accuracy, period accuracy,
+        immediate stop, queue behavior, direction change,
+        very low speed (chain-wait), direction inversion,
+        and ISR execution time measurement.
+
+        For on-target verification only.  Keep disabled in
+        production firmware.
+
+endmenu

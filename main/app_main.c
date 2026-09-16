@@ -4,7 +4,8 @@
  *
  * Startup order:
  *   bsp_early_init → settings_init → banner → bsp_init →
- *   [selftest if enabled] → protocol_start →
+ *   [selftest if enabled] → TMC2209 init (T5) → protocol_start →
+ *   step_engine_init + stop_cb (T6) →
  *   gcode_parser_create(settings_default_feed, settings_default_accel) →
  *   register as line handler.
  */
@@ -24,6 +25,7 @@
 #include "protocol.h"
 #include "gcode_parser.h"
 #include "settings.h"
+#include "step_engine.h"
 #include "tmc2209.h"
 #include "driver/uart.h"
 
@@ -66,8 +68,11 @@ static void install_log_mirror(void)
 
 /* ---- Placeholder callbacks ----
  *
- * on_move / on_set_origin / on_set_absolute / on_set_relative /
- * on_motor_enable remain no-op placeholders (T5/T6/T7/T8 later).
+ * on_move / on_set_origin / on_set_absolute / on_set_relative
+ * remain no-op placeholders (T7/T8 later).
+ *
+ * on_motor_enable → TMC2209 (T5 done).
+ * on_stop (protocol) → step_engine (T6 done below).
  *
  * on_list_params / on_set_param / on_restore_defaults are wired to
  * real settings component (T11 done here).
@@ -78,7 +83,7 @@ static void cb_on_move(void *ctx, float target_mm, float feed_mm_min,
 {
     (void)ctx; (void)target_mm; (void)feed_mm_min;
     (void)accel_mm_s2; (void)rapid;
-    /* T6 step_engine will replace this. */
+    /* T7 step planner will replace this. */
 }
 
 static void cb_on_set_origin(void *ctx, float new_pos_mm)
@@ -103,6 +108,14 @@ static void cb_on_motor_enable(void *ctx, bool enable)
 {
     (void)ctx;
     tmc2209_enable(enable);
+}
+
+/* --- T6 step_engine: immediate stop callback ---
+ * Registered as protocol stop_cb; replaces the default "log only"
+ * placeholder with actual step_engine_stop() (PLAN T6 spec). */
+static void cb_on_stop(void)
+{
+    step_engine_stop();
 }
 
 /* --- T11 real: list all parameters ($$ / M503) ---
@@ -202,7 +215,7 @@ void app_main(void)
 
     ESP_LOGI(TAG, "========================================");
     ESP_LOGI(TAG, " ESP32-S3 Single-Axis Motion Controller");
-    ESP_LOGI(TAG, " T5 TMC2209 Driver — UART Current Control");
+    ESP_LOGI(TAG, " T5+T6 Integrated — TMC2209 + Step Engine");
     ESP_LOGI(TAG, " Target: ESP32-S3-WROOM-1-N16R8");
     ESP_LOGI(TAG, "========================================");
 
@@ -235,6 +248,9 @@ void app_main(void)
 #ifdef CONFIG_GCODE_PARSER_SELF_TEST
     gcode_parser_self_test_run();
 #endif
+#ifdef CONFIG_STEP_ENGINE_SELF_TEST
+    step_engine_self_test_run();
+#endif
 #ifdef CONFIG_TMC2209_SELF_TEST
     tmc2209_self_test_run();
 #endif
@@ -266,16 +282,32 @@ void app_main(void)
         if (proto_err != ESP_OK) {
             ESP_LOGE(TAG, "Protocol start failed: %s", esp_err_to_name(proto_err));
         } else {
+            /* ---- Step engine init (T6) ----
+             * STEP/DIR GPIOs already configured by bsp_init (OUT LOW).
+             * We just pass pin numbers; engine does NOT re-init GPIOs
+             * and does NOT touch EN pin (TMC stays disabled until
+             * M17 / joint test enables it). */
+            esp_err_t se_err = step_engine_init(CONFIG_BSP_STEP_GPIO,
+                                                CONFIG_BSP_DIR_GPIO);
+            if (se_err != ESP_OK) {
+                ESP_LOGE(TAG, "Step engine init failed: %s",
+                         esp_err_to_name(se_err));
+            }
+
+            /* Register immediate stop callback (replaces protocol's
+             * default "log only" placeholder — PLAN T6 spec). */
+            protocol_register_stop_cb(cb_on_stop);
+
             /* ---- G-code parser init ----
              * Modal F/A initial values come from NVS settings (PLAN §4.3:
              * "startup initial value comes from NVS").
              * Registers as line handler, replacing T3 placeholder.
              *
              * Integration points:
-             *   on_move → T6 step_engine
+             *   on_move → T7 step planner
              *   on_set_origin → T8 AS5600 + planner
              *   on_set_absolute/relative → T7 planner
-             *   on_motor_enable → T5 TMC2209
+             *   on_motor_enable → T5 TMC2209 (done)
              *   on_list_params/on_set_param/on_restore_defaults → T11 (done)
              */
             parser_output_iface_t iface = {
