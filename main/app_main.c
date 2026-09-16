@@ -22,6 +22,7 @@
 #include "protocol.h"
 #include "gcode_parser.h"
 #include "settings.h"
+#include "step_engine.h"
 
 static const char *TAG = "app_main";
 
@@ -66,6 +67,14 @@ static void cb_on_motor_enable(void *ctx, bool enable)
 {
     (void)ctx; (void)enable;
     /* T5 TMC2209 driver. */
+}
+
+/* --- T6 step_engine: immediate stop callback ---
+ * Registered as protocol stop_cb; replaces the default "log only"
+ * placeholder with actual step_engine_stop() (PLAN T6 spec). */
+static void cb_on_stop(void)
+{
+    step_engine_stop();
 }
 
 /* --- T11 real: list all parameters ($$ / M503) ---
@@ -188,6 +197,9 @@ void app_main(void)
 #ifdef CONFIG_GCODE_PARSER_SELF_TEST
     gcode_parser_self_test_run();
 #endif
+#ifdef CONFIG_STEP_ENGINE_SELF_TEST
+    step_engine_self_test_run();
+#endif
 
     /* ---- Protocol stack ---- */
     if (bsp_err == ESP_OK) {
@@ -195,6 +207,21 @@ void app_main(void)
         if (proto_err != ESP_OK) {
             ESP_LOGE(TAG, "Protocol start failed: %s", esp_err_to_name(proto_err));
         } else {
+            /* ---- Step engine init (T6) ----
+             * STEP/DIR GPIOs already configured by bsp_init (OUT LOW).
+             * We just pass pin numbers; engine does NOT re-init GPIOs
+             * and does NOT touch EN pin (TMC stays disabled for now). */
+            esp_err_t se_err = step_engine_init(CONFIG_BSP_STEP_GPIO,
+                                                CONFIG_BSP_DIR_GPIO);
+            if (se_err != ESP_OK) {
+                ESP_LOGE(TAG, "Step engine init failed: %s",
+                         esp_err_to_name(se_err));
+            }
+
+            /* Register immediate stop callback (replaces protocol's
+             * default "log only" placeholder — PLAN T6 spec). */
+            protocol_register_stop_cb(cb_on_stop);
+
             /* ---- G-code parser init ----
              * Modal F/A initial values come from NVS settings (PLAN §4.3:
              * "startup initial value comes from NVS").
