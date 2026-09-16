@@ -34,6 +34,10 @@
 void app_joint_test_run(void);
 #endif
 
+#ifdef CONFIG_APP_M3_TEST
+void app_m3_test_run(gcode_parser_t *parser);
+#endif
+
 static const char *TAG = "app_main";
 
 static gcode_parser_t *s_parser = NULL;
@@ -50,6 +54,7 @@ static gcode_parser_t *s_parser = NULL;
     defined(CONFIG_TMC2209_BRINGUP) || \
     defined(CONFIG_TMC2209_SPIN_TEST) || \
     defined(CONFIG_APP_JOINT_TEST) || \
+    defined(CONFIG_APP_M3_TEST) || \
     defined(CONFIG_PLANNER_SELF_TEST)
 static int log_mirror_vprintf(const char *fmt, va_list ap)
 {
@@ -255,6 +260,7 @@ void app_main(void)
     defined(CONFIG_TMC2209_BRINGUP) || \
     defined(CONFIG_TMC2209_SPIN_TEST) || \
     defined(CONFIG_APP_JOINT_TEST) || \
+    defined(CONFIG_APP_M3_TEST) || \
     defined(CONFIG_PLANNER_SELF_TEST)
     if (bsp_err == ESP_OK) {
         install_log_mirror();
@@ -379,6 +385,13 @@ void app_main(void)
     /* ---- Joint motion test (T5+T6, gated by Kconfig) ---- */
 #ifdef CONFIG_APP_JOINT_TEST
     app_joint_test_run();
+#endif
+
+    /* ---- M3 joint test (real G-code driving real motor, gated by Kconfig) ---- */
+#ifdef CONFIG_APP_M3_TEST
+    if (s_parser != NULL) {
+        app_m3_test_run(s_parser);
+    }
 #endif
 
     /* Task watchdog: Idle task auto-subscribed per sdkconfig.defaults */
