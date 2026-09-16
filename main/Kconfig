@@ -1,0 +1,13 @@
+menu "Application"
+
+config APP_JOINT_TEST
+    bool "T5+T6 joint motion test (real motor, runs on boot)"
+    default n
+    help
+        Enables the T5 (TMC2209) + T6 (step_engine) joint motion test.
+        Runs automatically on boot after all subsystems are up.
+        The motor physically moves — 12V motor supply required.
+        Phases: A (forward 2 rev trapezoid), B (reverse back to 0),
+        C (slow long move with '!' immediate stop via UART1).
+
+endmenu

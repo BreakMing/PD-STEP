@@ -29,6 +29,10 @@
 #include "tmc2209.h"
 #include "driver/uart.h"
 
+#ifdef CONFIG_APP_JOINT_TEST
+void app_joint_test_run(void);
+#endif
+
 static const char *TAG = "app_main";
 
 static gcode_parser_t *s_parser = NULL;
@@ -43,7 +47,8 @@ static gcode_parser_t *s_parser = NULL;
  * firmware (all test switches off) is compiled without it. */
 #if defined(CONFIG_TMC2209_SELF_TEST) || \
     defined(CONFIG_TMC2209_BRINGUP) || \
-    defined(CONFIG_TMC2209_SPIN_TEST)
+    defined(CONFIG_TMC2209_SPIN_TEST) || \
+    defined(CONFIG_APP_JOINT_TEST)
 static int log_mirror_vprintf(const char *fmt, va_list ap)
 {
     char buf[384];
@@ -235,7 +240,8 @@ void app_main(void)
      * (bsp_init installed it) — before any self-test output. */
 #if defined(CONFIG_TMC2209_SELF_TEST) || \
     defined(CONFIG_TMC2209_BRINGUP) || \
-    defined(CONFIG_TMC2209_SPIN_TEST)
+    defined(CONFIG_TMC2209_SPIN_TEST) || \
+    defined(CONFIG_APP_JOINT_TEST)
     if (bsp_err == ESP_OK) {
         install_log_mirror();
     }
@@ -334,6 +340,11 @@ void app_main(void)
             }
         }
     }
+
+    /* ---- Joint motion test (T5+T6, gated by Kconfig) ---- */
+#ifdef CONFIG_APP_JOINT_TEST
+    app_joint_test_run();
+#endif
 
     /* Task watchdog: Idle task auto-subscribed per sdkconfig.defaults */
     xTaskCreate(placeholder_task, "placeholder", 2048, NULL, 1, NULL);
