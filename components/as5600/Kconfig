@@ -1,0 +1,33 @@
+menu "AS5600 Encoder"
+
+config AS5600_INVERT_DIR
+    bool "Invert encoder counting direction"
+    default y
+    help
+        Mirror the 12-bit raw angle so the reported position INCREASES
+        when the motor moves in its +X (DIR high) direction.
+
+        The raw angle's sense depends on how the magnet is mounted on
+        the shaft — flipping the magnet 180 degrees reverses it.  This
+        is a mounting calibration, not a defect.
+
+        On this build: ENABLED.  Measured 2026-09-17: "G1 X120 F1200"
+        made the commanded position go +120 mm while the encoder
+        reported -117 mm, i.e. the raw angle counts DOWN for a +X move.
+        Re-check this setting if the magnet is re-mounted, the motor is
+        rewired, or $10 (invert_dir) is changed — $10 flips the motor's
+        physical direction, which flips the encoder sense as well.
+
+        Implementation: applied in as5600_read_raw() (driver layer), so
+        the pure-logic tracker and its self-test cases are unaffected.
+
+config AS5600_SELF_TEST
+    bool "Run AS5600 encoder self-test on boot"
+    default n
+    help
+        Runs the AS5600 self-test during startup: pure-logic
+        multi-turn tracking cases plus live I2C read / noise checks.
+        Ends with a guided manual check (turn the shaft 3 turns).
+        Final line: "SELF-TEST DONE: <n>/<total> PASS".
+
+endmenu

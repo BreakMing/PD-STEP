@@ -28,6 +28,7 @@
 #include "step_engine.h"
 #include "tmc2209.h"
 #include "planner.h"
+#include "as5600.h"
 #include "driver/uart.h"
 
 #ifdef CONFIG_APP_JOINT_TEST
@@ -55,6 +56,7 @@ static gcode_parser_t *s_parser = NULL;
     defined(CONFIG_TMC2209_SPIN_TEST) || \
     defined(CONFIG_APP_JOINT_TEST) || \
     defined(CONFIG_APP_M3_TEST) || \
+    defined(CONFIG_AS5600_SELF_TEST) || \
     defined(CONFIG_PLANNER_SELF_TEST)
 static int log_mirror_vprintf(const char *fmt, va_list ap)
 {
@@ -103,6 +105,7 @@ static void cb_on_set_origin(void *ctx, float new_pos_mm)
 {
     (void)ctx;
     planner_set_origin(new_pos_mm);
+    as5600_set_origin(new_pos_mm);   /* D10: encoder report shifts too */
 }
 
 static void cb_on_set_absolute(void *ctx)
@@ -261,11 +264,22 @@ void app_main(void)
     defined(CONFIG_TMC2209_SPIN_TEST) || \
     defined(CONFIG_APP_JOINT_TEST) || \
     defined(CONFIG_APP_M3_TEST) || \
+    defined(CONFIG_AS5600_SELF_TEST) || \
     defined(CONFIG_PLANNER_SELF_TEST)
     if (bsp_err == ESP_OK) {
         install_log_mirror();
     }
 #endif
+
+    /* ---- AS5600 encoder (T8): I2C device + 1 kHz sampling task ----
+     * Placed before the self-tests so the sampling task is already
+     * running when they execute (PLAN §3.1 data flow). */
+    if (bsp_err == ESP_OK) {
+        esp_err_t as_err = as5600_init();
+        if (as_err != ESP_OK) {
+            ESP_LOGE(TAG, "AS5600 init failed: %s", esp_err_to_name(as_err));
+        }
+    }
 
     /* ---- Self-tests (gated by Kconfig, default off) ---- */
 #ifdef CONFIG_SETTINGS_SELF_TEST
@@ -279,6 +293,9 @@ void app_main(void)
 #endif
 #ifdef CONFIG_PLANNER_SELF_TEST
     planner_self_test_run();
+#endif
+#ifdef CONFIG_AS5600_SELF_TEST
+    as5600_self_test_run();
 #endif
 #ifdef CONFIG_TMC2209_SELF_TEST
     tmc2209_self_test_run();
