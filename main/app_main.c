@@ -29,6 +29,7 @@
 #include "tmc2209.h"
 #include "planner.h"
 #include "as5600.h"
+#include "monitor.h"
 #include "driver/uart.h"
 
 #ifdef CONFIG_APP_JOINT_TEST
@@ -57,7 +58,8 @@ static gcode_parser_t *s_parser = NULL;
     defined(CONFIG_APP_JOINT_TEST) || \
     defined(CONFIG_APP_M3_TEST) || \
     defined(CONFIG_AS5600_SELF_TEST) || \
-    defined(CONFIG_PLANNER_SELF_TEST)
+    defined(CONFIG_PLANNER_SELF_TEST) || \
+    defined(CONFIG_MONITOR_SELF_TEST)
 static int log_mirror_vprintf(const char *fmt, va_list ap)
 {
     char buf[384];
@@ -106,6 +108,7 @@ static void cb_on_set_origin(void *ctx, float new_pos_mm)
     (void)ctx;
     planner_set_origin(new_pos_mm);
     as5600_set_origin(new_pos_mm);   /* D10: encoder report shifts too */
+    monitor_note_origin(new_pos_mm); /* D10: commanded report shifts too */
 }
 
 static void cb_on_set_absolute(void *ctx)
@@ -265,7 +268,8 @@ void app_main(void)
     defined(CONFIG_APP_JOINT_TEST) || \
     defined(CONFIG_APP_M3_TEST) || \
     defined(CONFIG_AS5600_SELF_TEST) || \
-    defined(CONFIG_PLANNER_SELF_TEST)
+    defined(CONFIG_PLANNER_SELF_TEST) || \
+    defined(CONFIG_MONITOR_SELF_TEST)
     if (bsp_err == ESP_OK) {
         install_log_mirror();
     }
@@ -398,6 +402,17 @@ void app_main(void)
             }
         }
     }
+
+    /* ---- T9 telemetry (needs planner + as5600 + step_engine + tmc2209) ---- */
+    esp_err_t mon_err = monitor_init();
+    if (mon_err != ESP_OK) {
+        ESP_LOGE(TAG, "Monitor init failed: %s", esp_err_to_name(mon_err));
+    }
+
+    /* ---- Monitor self-test (late position: reads the components above) ---- */
+#ifdef CONFIG_MONITOR_SELF_TEST
+    monitor_self_test_run();
+#endif
 
     /* ---- Joint motion test (T5+T6, gated by Kconfig) ---- */
 #ifdef CONFIG_APP_JOINT_TEST

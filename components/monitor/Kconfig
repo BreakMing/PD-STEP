@@ -1,0 +1,12 @@
+menu "Monitor / Telemetry"
+
+config MONITOR_SELF_TEST
+    bool "Run monitor telemetry self-test on boot"
+    default n
+    help
+        Runs the telemetry self-test: TMC flag-mapping and frame
+        formatting cases (pure logic) plus live '?'-frame and
+        periodic-reporting checks.
+        Final line: "SELF-TEST DONE: <n>/<total> PASS".
+
+endmenu
