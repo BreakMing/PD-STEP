@@ -35,6 +35,22 @@ static bool             s_initialized = false;
 static volatile int32_t s_pos_steps = 0;    /* commanded position */
 static float            s_k = 0.0f;         /* steps per mm */
 
+/* ---- Executed↔commanded reference pair (T10) ----
+ *
+ * commanded = s_ref_pos + s * (engine_steps - s_ref_eng),   s = $10 ? -1 : +1
+ *
+ * The pair is (re)anchored exactly when the two frames are known to agree:
+ *   - planner_init():        power-up origin (D10)
+ *   - enqueue from idle:     the queue drained, so the last commanded
+ *                            position IS the executed one
+ *   - planner_set_origin():  G92 declares the current position
+ * An immediate stop ('!') is then a pure mapping of the frozen counter
+ * through this pair, which keeps G92 offsets intact (see
+ * planner_rebase_to_executed()).
+ */
+static int32_t s_ref_eng = 0;   /* engine steps at the anchor */
+static int32_t s_ref_pos = 0;   /* commanded steps at the anchor */
+
 #ifdef CONFIG_PLANNER_SELF_TEST
 static step_seg_t s_last_seg;
 #endif
@@ -78,6 +94,12 @@ esp_err_t planner_init(void)
     }
 
     s_pos_steps = 0;   /* D10: power-up position is 0 */
+
+    /* T10: anchor the executed↔commanded pair at the power-up origin.
+     * (Also corrects the pair when init runs after the engine has been
+     * exercised by a self-test.) */
+    s_ref_eng = step_engine_position_steps();
+    s_ref_pos = 0;
 
     if (!settings_subscribe(on_settings_change)) {
         ESP_LOGW(TAG, "settings subscribe failed (slots full) — "
@@ -241,6 +263,16 @@ planner_status_t planner_enqueue(float target_mm, float feed_mm_min,
      * In that case the move is cancelled: drop the segment, leave the
      * commanded position untouched, and report success so the G-code
      * line still answers "ok". */
+
+    /* T10: a move starting from an idle queue makes commanded and executed
+     * positions agree, so this is the moment to anchor the rebase pair.
+     * Must be sampled before the enqueue — a successful enqueue makes the
+     * engine busy at once. */
+    if (!step_engine_busy()) {
+        s_ref_eng = step_engine_position_steps();
+        s_ref_pos = s_pos_steps;
+    }
+
     while (!step_engine_enqueue(&seg)) {
         if (!step_engine_busy()) {
             ESP_LOGW(TAG, "move cancelled by '!' stop — segment dropped");
@@ -265,8 +297,39 @@ void planner_set_origin(float new_pos_mm)
         return;
     }
     s_pos_steps = (int32_t)lroundf(new_pos_mm * s_k);
+
+    /* T10: G92 declares the *current* position, so the executed↔commanded
+     * pair agrees again from here on — re-anchor it.  Without this, a '!'
+     * arriving while the axis is standing still would rebase the commanded
+     * position back to the pre-G92 frame. */
+    s_ref_eng = step_engine_position_steps();
+    s_ref_pos = s_pos_steps;
+
     ESP_LOGI(TAG, "origin set: %.4f mm = %ld steps",
              (double)new_pos_mm, (long)s_pos_steps);
+}
+
+/* ================================================================
+ * Immediate stop support (T10)
+ * ================================================================ */
+
+void planner_rebase_to_executed(void)
+{
+    if (!s_initialized) {
+        return;
+    }
+
+    /* Engine steps are physical (DIR = dir ^ $10): a logical forward move
+     * counts up when $10 = 0 and down when $10 = 1. */
+    int32_t delta = step_engine_position_steps() - s_ref_eng;
+    if (settings_invert_dir()) {
+        delta = -delta;
+    }
+
+    s_pos_steps = s_ref_pos + delta;
+
+    ESP_LOGI(TAG, "rebase to executed: %ld steps (%.4f mm)",
+             (long)s_pos_steps, (double)planner_position_mm());
 }
 
 /* ================================================================

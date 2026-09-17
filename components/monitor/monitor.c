@@ -6,7 +6,8 @@
  *   E  as5600_position_mm()       measured position  (portMUX protected)
  *   V  as5600_velocity_mm_s()*60  measured velocity, signed, mm/min
  *   T  tmc2209_read_status()      DRV_STATUS decoded → single flag
- *   STATE step_engine_busy()      RUN / IDLE (T10 replaces this source)
+ *   STATE sysctl_state_str()      IDLE / RUN from the T10 state machine
+ *                                 (which derives RUN from step_engine_busy())
  *
  * report_hz ($9) is read fresh on every frame: the four settings
  * subscriber slots are already taken (tmc2209 / planner / app_main /
@@ -32,6 +33,8 @@
 #include "step_engine.h"
 #include "tmc2209.h"
 #include "settings.h"
+#include "sysctl.h"
+#include "esp_task_wdt.h"
 
 static const char *TAG = "monitor";
 
@@ -119,7 +122,7 @@ static int build_status_frame(char *buf, size_t len)
 
     /* Readings carry their own sync; read them close together so the
      * frame is as coherent a snapshot as the API allows. */
-    const char *state = step_engine_busy() ? "RUN" : "IDLE";
+    const char *state = sysctl_state_str();   /* T10: state machine source */
 
     /* C = EXECUTED position: the pulse ISR's step counter mapped into the
      * G92 coordinate frame.
@@ -200,8 +203,19 @@ static void monitor_task(void *arg)
     TickType_t last_wake = xTaskGetTickCount();
     uint32_t   ticks = 0;      /* 10 ms ticks accumulated since last frame */
 
+    /* Task watchdog (T10): fixed 10 ms cadence, so subscribe and kick the
+     * WDT every cycle.  A failed subscribe is not fatal — log and run on. */
+    bool wdt_ok = (esp_task_wdt_add(NULL) == ESP_OK);
+    if (!wdt_ok) {
+        ESP_LOGW(TAG, "task WDT subscribe failed — monitor_task not monitored");
+    }
+
     for (;;) {
         vTaskDelayUntil(&last_wake, pdMS_TO_TICKS(MONITOR_TICK_MS));
+
+        if (wdt_ok) {
+            esp_task_wdt_reset();
+        }
 
         if (!step_engine_busy()) {
             ticks = 0;         /* idle → nothing spontaneous (D12) */

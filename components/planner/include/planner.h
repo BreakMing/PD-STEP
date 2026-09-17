@@ -96,6 +96,22 @@ planner_status_t planner_enqueue(float target_mm, float feed_mm_min,
  */
 void planner_set_origin(float new_pos_mm);
 
+/**
+ * @brief Rebase the commanded position onto the actually executed position.
+ *
+ * Called after an immediate stop ('!' — step_engine_stop() has already
+ * cleared the queue and frozen the step counter): the commanded position is
+ * recomputed from the executed step count so the next G command starts from
+ * where the axis really stopped, not from the cancelled target (PLAN §4.4:
+ * "commanded position counter stops at the executed steps").
+ *
+ * The engine counts *physical* steps (dir ^ $10), so $10 inversion is
+ * accounted for.  The G92 origin is preserved: planner_set_origin()
+ * re-anchors the executed↔commanded reference pair, so a G92 followed by
+ * '!' leaves the declared coordinate untouched.
+ */
+void planner_rebase_to_executed(void);
+
 /* ================================================================
  * Telemetry (T9 monitor consumes these)
  * ================================================================ */

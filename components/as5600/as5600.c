@@ -38,6 +38,7 @@
 #include "freertos/task.h"
 #include "esp_log.h"
 #include "esp_check.h"
+#include "esp_task_wdt.h"
 #include "driver/i2c_master.h"
 
 static const char *TAG = "as5600";
@@ -192,6 +193,14 @@ static void as5600_task(void *arg)
     TickType_t last_wake = xTaskGetTickCount();
     int        fail_streak = 0;
 
+    /* Task watchdog (T10): the 1 kHz cadence is far shorter than the 30 s
+     * timeout, so subscribe and kick the WDT every cycle.  A failed
+     * subscribe is not fatal — log it and keep sampling. */
+    bool wdt_ok = (esp_task_wdt_add(NULL) == ESP_OK);
+    if (!wdt_ok) {
+        ESP_LOGW(TAG, "task WDT subscribe failed — sampling task not monitored");
+    }
+
     while (1) {
         uint16_t raw = 0;
 
@@ -212,6 +221,10 @@ static void as5600_task(void *arg)
                 ESP_LOGE(TAG, "I2C read failed %d times in a row — encoder marked NOT OK",
                          fail_streak);
             }
+        }
+
+        if (wdt_ok) {
+            esp_task_wdt_reset();
         }
 
         /* Fixed 1 kHz cadence; never busy-wait (watchdog). */

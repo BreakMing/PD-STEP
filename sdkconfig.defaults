@@ -44,6 +44,12 @@ CONFIG_ESP_TASK_WDT_INIT=y
 CONFIG_ESP_TASK_WDT_TIMEOUT_S=30
 CONFIG_ESP_TASK_WDT_CHECK_IDLE_TASK_CPU0=y
 CONFIG_ESP_TASK_WDT_CHECK_IDLE_TASK_CPU1=y
+# Panic on task-WDT timeout (T10, decided 2026-09-17): a hung task cannot
+# answer '!', so reboot instead of running on with the motor live.  On
+# reboot EN is high (driver disabled) and the queue is empty => the motor
+# stops.  Known trade-off: the position reference is lost — the host must
+# re-issue G92 after a panic reboot.
+CONFIG_ESP_TASK_WDT_PANIC=y
 
 # ---- Logging ----
 # Default log level: Info (can be overridden per-component at runtime)

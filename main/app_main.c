@@ -30,6 +30,7 @@
 #include "planner.h"
 #include "as5600.h"
 #include "monitor.h"
+#include "sysctl.h"
 #include "driver/uart.h"
 
 #ifdef CONFIG_APP_JOINT_TEST
@@ -59,7 +60,8 @@ static gcode_parser_t *s_parser = NULL;
     defined(CONFIG_APP_M3_TEST) || \
     defined(CONFIG_AS5600_SELF_TEST) || \
     defined(CONFIG_PLANNER_SELF_TEST) || \
-    defined(CONFIG_MONITOR_SELF_TEST)
+    defined(CONFIG_MONITOR_SELF_TEST) || \
+    defined(CONFIG_SYSCTL_SELF_TEST)
 static int log_mirror_vprintf(const char *fmt, va_list ap)
 {
     char buf[384];
@@ -86,7 +88,7 @@ static void install_log_mirror(void)
  *
  * on_move / on_set_origin        → planner (T7 done here).
  * on_motor_enable                → TMC2209 (T5 done).
- * on_stop (protocol)             → step_engine (T6 done below).
+ * on_stop (protocol)             → sysctl (T10: stop engine + rebase + IDLE).
  * on_list_params / on_set_param /
  * on_restore_defaults            → settings (T11 done).
  *
@@ -139,12 +141,15 @@ static void cb_on_motor_enable(void *ctx, bool enable)
     tmc2209_enable(enable);
 }
 
-/* --- T6 step_engine: immediate stop callback ---
+/* --- T6 step_engine + T10 sysctl: immediate stop callback ---
  * Registered as protocol stop_cb; replaces the default "log only"
- * placeholder with actual step_engine_stop() (PLAN T6 spec). */
+ * placeholder.  T10 routes it through sysctl so the commanded position
+ * is rebased onto the executed position (PLAN §4.4) — the raw
+ * step_engine_stop() would leave the planner holding the cancelled
+ * target. */
 static void cb_on_stop(void)
 {
-    step_engine_stop();
+    sysctl_stop();
 }
 
 /* --- T11 real: list all parameters ($$ / M503) ---
@@ -269,7 +274,8 @@ void app_main(void)
     defined(CONFIG_APP_M3_TEST) || \
     defined(CONFIG_AS5600_SELF_TEST) || \
     defined(CONFIG_PLANNER_SELF_TEST) || \
-    defined(CONFIG_MONITOR_SELF_TEST)
+    defined(CONFIG_MONITOR_SELF_TEST) || \
+    defined(CONFIG_SYSCTL_SELF_TEST)
     if (bsp_err == ESP_OK) {
         install_log_mirror();
     }
@@ -403,15 +409,24 @@ void app_main(void)
         }
     }
 
+    /* ---- T10 system state machine (needs step_engine + planner) ---- */
+    esp_err_t sc_err = sysctl_init();
+    if (sc_err != ESP_OK) {
+        ESP_LOGE(TAG, "sysctl init failed: %s", esp_err_to_name(sc_err));
+    }
+
     /* ---- T9 telemetry (needs planner + as5600 + step_engine + tmc2209) ---- */
     esp_err_t mon_err = monitor_init();
     if (mon_err != ESP_OK) {
         ESP_LOGE(TAG, "Monitor init failed: %s", esp_err_to_name(mon_err));
     }
 
-    /* ---- Monitor self-test (late position: reads the components above) ---- */
+    /* ---- Late self-tests (read the components above) ---- */
 #ifdef CONFIG_MONITOR_SELF_TEST
     monitor_self_test_run();
+#endif
+#ifdef CONFIG_SYSCTL_SELF_TEST
+    sysctl_self_test_run();
 #endif
 
     /* ---- Joint motion test (T5+T6, gated by Kconfig) ---- */
