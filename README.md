@@ -1,74 +1,94 @@
-# PD-STEP · ESP32-S3 单轴 G-code 运动控制器
+# cartpole 固件 · ESP32-S3 倒立摆小车控制器
 
-基于 ESP32-S3 + TMC2209 + AS5600 的单轴步进运动控制器。上位机通过串口流式下发 G-code 子集，固件完成梯形加减速运动规划、精确步数控制与编码器位置遥测。协议风格兼容 GRBL 子集，便于用现成上位机软件联调。
+cartpole 实验台的运动端固件：ESP32-S3 + TMC2209 步进驱动 +
+AS5600 小车位置编码器 + MT6835 摆角编码器。上端（Hi3516CV610 或
+PC 联调机）通过串口以 **protocol.md 线协议** 驱动：200 Hz 状态流、
+`VEL` 速度模式跟踪、StallGuard 堵转回零、四态模式机与参数注册表。
 
-## 硬件配置
+**线协议唯一权威：本仓库之外的项目主仓库
+`deploy/v2/protocol.md`**（命令词法、模式转换表、参数注册表、
+符号约定、时序）。
 
-| 模块 | 器件 | 职责 |
-|---|---|---|
-| 主控 | ESP32-S3-WROOM-1-N16R8 | 16MB Flash + 8MB PSRAM |
-| 驱动 | TMC2209 ×1 | 步进电机驱动，单线 UART 配置 + STEP/DIR 控制 |
-| 反馈 | AS5600 ×1（电机尾部直装） | 12bit 磁编码器，I2C，多圈计圈 → mm 遥测 |
-| 供电 | CH224K PD 诱骗模块 | 从 USB-PD 取 12V 供电机驱动 |
-| 烧录 | CH340K 板载串口 | 仅固件烧录与日志（UART0） |
-| 上位机通道 | 飞线 USB 转串口 → UART1（GPIO41/42） | 协议通道，与烧录口完全隔离 |
+## 硬件
 
-## 功能
+| 模块 | 器件 | 引脚 | 职责 |
+|---|---|---|---|
+| 主控 | ESP32-S3-WROOM-1-N16R8 | — | 16MB Flash + 8MB PSRAM，240 MHz |
+| 步进驱动 | TMC2209 | EN=21（低有效）、STEP=5、DIR=6、DIAG1=16、UART TX=17/RX=18 | 42 步进电机驱动，单线 UART 配置 + StallGuard |
+| 小车编码器 | AS5600（电机尾部直装） | I2C SDA=8 / SCL=9 @400 kHz | 12 bit 多圈 → x_um 遥测与丢步判定 |
+| 摆角编码器 | MT6835（21 bit） | SPI MISO=46、MOSI=40、SCK=39、CS=7 | ±π µrad 摆角与角速度遥测 |
+| 主机通道 | UART1 | TX=41 / RX=42 @460800 8N1 | protocol.md 线协议（经 CH343P USB） |
+| 供电 | CH224K PD | — | USB-PD 12V 供电机 |
+| 烧录/日志 | UART0 | 板载 CH340K | 烧录与 ESP_LOG 控制台 |
 
-- **G-code 子集**：`G0`/`G1`（X 目标位置，F 速度 / A 加速度均为模态）、`G92` 建零（坐标偏移，同时作用于指令位置与编码器上报位置）
-- **梯形加减速**点到点运动，位置以步数精确控制
-- **实时命令**：`?` 状态查询（任意时刻、行中可打断）、`!` 立即停止（丢队列即停）
-- **遥测**：运动中周期上报状态帧 `<STATE|C:x|E:x|V:x|T:flags>`（默认 10Hz），C=指令执行位置，E=编码器实测位置
-- **参数持久化**：`$0`–`$13` 共 14 项参数（细分、电流、传动比、速度/加速度上限等）NVS 存储、断电保持、运行时可改；`$$`/`M503` 查看，`M502` 恢复默认
-- **软限位**：默认 0–600mm，越界返回 `error:2`
-- **流控**：逐行 `ok` 应答，队列满时自然背压
-
-## 协议要点
-
-- UART1，115200-8N1，行结尾 `\r\n`
-- 错误码：`error:1` 未知命令 / `error:2` 越界 / `error:3` 行超时（100ms）/ `error:4` 参数错误 / `error:5` 队列或存储异常
-- 空行与 `;` 注释行返回 `ok`；括号注释 `(...)` 在数值位合法
+机械：2GT 20T 同步带，40 mm/圈；细分 8（settings `$0`，NVS
+namespace `cart`）→ 1600 steps/圈 = 40 steps/mm = 25 µm/step。
 
 ## 工程结构
 
 ```
 components/
-  bsp/          引脚与外设初始化
-  protocol/     UART1 驱动、行组装、实时命令、应答
-  gcode_parser/ G-code / $ 命令解析
-  planner/      梯形运动规划、软限位、mm→steps 换算
-  step_engine/  定时器 ISR 步脉冲发生、位置计数
-  tmc2209/      驱动器寄存器配置与状态读取
-  as5600/       磁编码器驱动、多圈跟踪
-  monitor/      遥测状态帧组帧
-  sysctl/       系统状态机（BOOT→IDLE↔RUN）、立即停
-  settings/     NVS 参数表、订阅分发、自测
-main/           应用入口与测试载体
-tools/          上位机测试脚本（host_sim.py 端到端验收等）
-docs/           硬件定案、验收记录（reviews/）、开发计划 PLAN.md
+  bsp/          引脚与外设初始化（UART1/GPIO/I2C/SPI）
+  cartproto/    线协议载体：行组装、命令解析（纯函数）、MODE/OK/ERR 应答
+  cartfsm/      四态模式机：纯核心（转换表/软限位/丢步）+ 参数注册表
+                + 1 kHz 监督任务（回零/编码器失联/丢步/软限位/FAULT 次序）
+  step_engine/  GPTimer ISR 速度模式：vel_ramp 每步递推（纯函数）+
+                带符号目标 + 命令看门狗 + 换向经零速
+  as5600/       小车编码器 1 kHz 采样（多圈计数 + 16 ms 速度窗）
+  mt6835/       摆角编码器 1 kHz SPI 采样（帧格式抄录见
+                docs/reviews/T4-brief.md）+ ±π 环绕换算（纯函数）
+  telemetry/    200 Hz STATE 组帧（纯函数 + 常开任务）
+  settings/     NVS 机械参数（$0–$4：细分/整步/每转行程/电流）
+  tmc2209/      驱动配置（电流/细分/StallGuard 阈值）
+main/app_main.c 启动接线（含 Kconfig 门控自测入口）
+host_tests/     宿主可跑的纯逻辑测试（gcc，无 ESP 依赖）
+tools/          cartpole_host.py 联调工具、自测构建片段
+docs/reviews/   抄录与上板验收记录
 ```
 
-## 构建与烧录
+任务/CPU 布局：CPU0 = cartproto 通讯（prio 5）+ STEP ISR；
+CPU1 = as5600/mt6835 采样（prio 3）、cartfsm 监督（prio 4）、
+telemetry 组帧（prio 2）。全部订阅任务看门狗。
 
-开发环境：ESP-IDF v6.0.2（原生，非 Arduino）。
+## 构建
+
+需要 ESP-IDF v6.1（`C:\esp\v6.1\esp-idf`，PowerShell）：
 
 ```powershell
-idf.py build          # Debug 构建
-idf.py -B build flash monitor
+. C:\esp\v6.1\esp-idf\export.ps1
+idf.py -B build build                    # 正式固件
+idf.py -B build flash monitor            # 烧录 + 日志
 ```
 
-- Release 构建：`idf.py -B build_release -D SDKCONFIG=sdkconfig.release build`（裁剪后体积 -29.5%）
-- 修改 Kconfig（如引脚）后需删除 `sdkconfig` 重新配置
-- 烧录用 UART0；上电自检日志镜像、自测固件等由 Kconfig 开关门控，正常固件零残留
+自测构建（Kconfig 门控，见各组件 Kconfig）：
 
-## 测试与验收
+```powershell
+idf.py -B build-selftest -DSDKCONFIG=build-selftest/sdkconfig `
+      -DSDKCONFIG_DEFAULTS="sdkconfig.defaults;tools/selftest.defaults" build
+idf.py -B build-flowtest -DSDKCONFIG=build-flowtest/sdkconfig `
+      -DSDKCONFIG_DEFAULTS="sdkconfig.defaults;tools/flowtest.defaults" build
+```
 
-- 每组件 `test/` 目录含单元测试（编入固件 + Kconfig 开关，上板真实执行）
-- `tools/host_sim.py`：纯上位机端到端验收脚本（流控、1000 段流式、失步判据、立即停、模态、G92、断电持久性、遥测）
-- 开发任务 T0–T12 全部闭环，里程碑 M1–M5（通信闭环 / 电机受控 / G-code 运动 / 位置可信 / 整机交付）全部达成，验收记录见 `docs/reviews/` 与 `docs/acceptance.md`
+- **selftest**：各组件向量自测（不驱动电机），上电自运行，
+  每组件结束行 `SELF-TEST DONE: <n>/<total> PASS`。
+- **flowtest**：在 selftest 之上加 cartfsm 注入式流程自测
+  （会开 EN；有 12V 时小车会真实运动）。
 
-## 文档
+宿主纯逻辑测试（无需硬件）：
 
-- [PLAN.md](PLAN.md) — 开发计划与协议规范（含全部设计决策记录）
-- [docs/hardware.md](docs/hardware.md) — 硬件定案与引脚表
-- [docs/acceptance.md](docs/acceptance.md) — 整机验收数据
+```
+wsl gcc -std=c11 -Wall -Wextra -Werror \
+  -Ihost_tests/stub -Icomponents/<c>/include ... host_tests/<t>.c ...
+```
+
+## 联调
+
+`tools/cartpole_host.py`（`pip install pyserial`）：
+
+```
+python tools/cartpole_host.py --port COM7 query|home|vel|config|dump|state|wdt-test|console
+```
+
+上板验收按 `docs/reviews/T8-acceptance.md`（回零散布/StallGuard
+标定/DIAG 极性）与 `docs/reviews/T10-acceptance.md`（端到端五用例）
+执行并回填。
