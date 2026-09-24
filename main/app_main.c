@@ -15,6 +15,7 @@
 #include "step_engine.h"
 #include "as5600.h"
 #include "mt6835.h"
+#include "telemetry.h"
 #include "cartproto.h"
 
 void app_main(void)
@@ -42,6 +43,10 @@ void app_main(void)
         ESP_ERROR_CHECK(tmc2209_init(&tmc));
         ESP_ERROR_CHECK(cartproto_start());
         ESP_ERROR_CHECK(step_engine_init(CONFIG_BSP_STEP_GPIO, CONFIG_BSP_DIR_GPIO));
+#ifdef CONFIG_TELEMETRY_SELF_TEST
+        telemetry_self_test_run();
+#endif
+        ESP_ERROR_CHECK(telemetry_start());
 #ifdef CONFIG_STEP_ENGINE_SELF_TEST
         step_engine_self_test_run();
 #endif

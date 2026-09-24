@@ -97,6 +97,23 @@ float    as5600_position_mm(void);
 /** Continuous position in counts (multi-turn, signed) — the truth value. */
 int32_t  as5600_position_counts(void);
 
+/**
+ * @brief 位置换算 counts → µm（整数精确：40 mm ÷ 4096 = 625/64 µm/count）。
+ *
+ * 纯换算，不含原点偏移；头文件内联，宿主可测。
+ */
+static inline int64_t as5600_counts_to_um(int32_t counts)
+{
+    return (int64_t)counts * 625 / 64;
+}
+
+/**
+ * @brief 连续位置（µm，整数精确，含回零原点偏移）。
+ *
+ * = counts × 625/64 − round(offset_mm × 1000)。不经 mm 浮点域。
+ */
+int64_t  as5600_position_um(void);
+
 /** Smoothed velocity in mm/s (16 ms window); ≈0 when at standstill. */
 float    as5600_velocity_mm_s(void);
 

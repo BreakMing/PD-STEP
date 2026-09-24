@@ -324,6 +324,18 @@ int32_t as5600_position_counts(void)
     return counts;
 }
 
+int64_t as5600_position_um(void)
+{
+    portENTER_CRITICAL(&s_lock);
+    int32_t counts = s_state.pos_counts;
+    float offset_mm = s_state.offset_mm;
+    portEXIT_CRITICAL(&s_lock);
+
+    /* 原点偏移取整到 µm：调用方（回零）传入整数 mm，转换精确 */
+    int64_t offset_um = (int64_t)llround((double)offset_mm * 1000.0);
+    return as5600_counts_to_um(counts) - offset_um;
+}
+
 float as5600_velocity_mm_s(void)
 {
     float v;
