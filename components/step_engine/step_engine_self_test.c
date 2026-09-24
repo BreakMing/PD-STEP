@@ -93,12 +93,25 @@ static bool test_accel_converge(void)
 
     int n = cnt;
     CHECK(n >= 100 && n <= STEP_SELFTEST_MAX_SAMPLES, "样本数合理");
-    /* 首个采样是第 1→2 拍间隔（v1≈63 steps/s → ≈15812 µs）；
-     * kick-start 到第 1 拍的 dt0 不产生采样（首拍只置基准） */
-    ESP_LOGI(TAG, "  采样前 6 项：%u %u %u %u %u %u（n=%d）",
+    /* 首个采样是第 1→2 拍间隔（首拍只置基准，dt0 不产生采样）。
+     * 期望值用递推自身两步推导：v1 = a·dt0，v2 = v1 + a/v1，
+     * 首间隔 = 1/v2。一阶递推在低速段比闭式 sqrt 剖面系统性偏快
+     * （a=2000 时 ≈10.5 ms，闭式 1/v1 ≈ 15.8 ms，闭式两步间
+     * 13.1 ms）——引擎以递推契约为准（vel_ramp 宿主测试锚定）。 */
+    uint64_t v;
+    uint32_t dt;
+    bool     dchg;
+    (void)vel_ramp_next(0, false, STEPS(200), true, 2000, 2000, false,
+                        &v, &dt, &dchg);
+    (void)vel_ramp_next(v, true, STEPS(200), true, 2000, 2000, false,
+                        &v, &dt, &dchg);
+    uint32_t expect = dt;
+    ESP_LOGI(TAG, "  采样前 6 项：%u %u %u %u %u %u（n=%d，期望首拍 %u µs）",
              n > 0 ? buf[0] : 0, n > 1 ? buf[1] : 0, n > 2 ? buf[2] : 0,
-             n > 3 ? buf[3] : 0, n > 4 ? buf[4] : 0, n > 5 ? buf[5] : 0, n);
-    CHECK(buf[0] >= 12000 && buf[0] <= 20000, "首采样应为 1/v1 量级（≈15.8 ms）");
+             n > 3 ? buf[3] : 0, n > 4 ? buf[4] : 0, n > 5 ? buf[5] : 0,
+             n, expect);
+    CHECK(buf[0] >= expect - expect / 10 && buf[0] <= expect + expect / 10,
+          "首采样应为 1/v2 量级");
 
     for (int i = 1; i < n; i++) {
         CHECK(buf[i] <= buf[i - 1] + 3, "加速期间间隔应单调不增（容 3 µs 抖动）");
@@ -282,18 +295,26 @@ static bool test_dir_invert(void)
     step_selftest_reset_isr_cycles(); \
     if (name()) { \
         s_pass++; \
-        ESP_LOGI(TAG, "  PASS  %s（ISR 总 %u：脉冲 %u / 递推 %u / 排拍 %u cycles）", \
+        ESP_LOGI(TAG, "  PASS  %s（ISR max %u：脉冲 %u / 递推 %u / 排拍 %u；" \
+                 "avg：脉冲 %u / 递推 %u / 排拍 %u cycles）", \
                  #name, step_selftest_max_isr_cycles(), \
                  step_selftest_max_cycles_pulse(), \
                  step_selftest_max_cycles_ramp(), \
-                 step_selftest_max_cycles_alarm()); \
+                 step_selftest_max_cycles_alarm(), \
+                 step_selftest_avg_cycles_pulse(), \
+                 step_selftest_avg_cycles_ramp(), \
+                 step_selftest_avg_cycles_alarm()); \
     } else { \
         s_fail++; \
-        ESP_LOGE(TAG, "  FAIL %s（ISR 总 %u：脉冲 %u / 递推 %u / 排拍 %u cycles）", \
+        ESP_LOGE(TAG, "  FAIL %s（ISR max %u：脉冲 %u / 递推 %u / 排拍 %u；" \
+                 "avg：脉冲 %u / 递推 %u / 排拍 %u cycles）", \
                  #name, step_selftest_max_isr_cycles(), \
                  step_selftest_max_cycles_pulse(), \
                  step_selftest_max_cycles_ramp(), \
-                 step_selftest_max_cycles_alarm()); \
+                 step_selftest_max_cycles_alarm(), \
+                 step_selftest_avg_cycles_pulse(), \
+                 step_selftest_avg_cycles_ramp(), \
+                 step_selftest_avg_cycles_alarm()); \
     } \
 } while (0)
 

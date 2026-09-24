@@ -113,6 +113,12 @@ static volatile uint32_t s_max_isr_cycles = 0;
 static volatile uint32_t s_max_cyc_pulse = 0;
 static volatile uint32_t s_max_cyc_ramp = 0;
 static volatile uint32_t s_max_cyc_alarm = 0;
+/* 分段累计与计数：求均值（典型耗时决定可持续步频上限，
+ * 最大值只反映离群值——缓存未命中/跨核竞争） */
+static volatile uint64_t s_sum_cyc_pulse = 0;
+static volatile uint64_t s_sum_cyc_ramp = 0;
+static volatile uint64_t s_sum_cyc_alarm = 0;
+static volatile uint32_t s_isr_pulse_count = 0;
 #endif /* CONFIG_STEP_ENGINE_SELF_TEST */
 
 /* ================================================================
@@ -275,6 +281,10 @@ static bool gptimer_alarm_cb(gptimer_handle_t timer,
         if (alarm_span > s_max_cyc_alarm) {
             s_max_cyc_alarm = alarm_span;
         }
+        s_sum_cyc_pulse += pulse_span;
+        s_sum_cyc_ramp += ramp_span;
+        s_sum_cyc_alarm += alarm_span;
+        s_isr_pulse_count++;
 #endif
         return false;
     }
@@ -299,6 +309,10 @@ static bool gptimer_alarm_cb(gptimer_handle_t timer,
     if (alarm_span3 > s_max_cyc_alarm) {
         s_max_cyc_alarm = alarm_span3;
     }
+    s_sum_cyc_pulse += pulse_span3;
+    s_sum_cyc_ramp += ramp_span3;
+    s_sum_cyc_alarm += alarm_span3;
+    s_isr_pulse_count++;
 #endif
 
     return false;
@@ -541,12 +555,31 @@ uint32_t step_selftest_max_cycles_alarm(void)
     return s_max_cyc_alarm;
 }
 
+uint32_t step_selftest_avg_cycles_pulse(void)
+{
+    return s_isr_pulse_count ? (uint32_t)(s_sum_cyc_pulse / s_isr_pulse_count) : 0;
+}
+
+uint32_t step_selftest_avg_cycles_ramp(void)
+{
+    return s_isr_pulse_count ? (uint32_t)(s_sum_cyc_ramp / s_isr_pulse_count) : 0;
+}
+
+uint32_t step_selftest_avg_cycles_alarm(void)
+{
+    return s_isr_pulse_count ? (uint32_t)(s_sum_cyc_alarm / s_isr_pulse_count) : 0;
+}
+
 void step_selftest_reset_isr_cycles(void)
 {
     s_max_isr_cycles = 0;
     s_max_cyc_pulse = 0;
     s_max_cyc_ramp = 0;
     s_max_cyc_alarm = 0;
+    s_sum_cyc_pulse = 0;
+    s_sum_cyc_ramp = 0;
+    s_sum_cyc_alarm = 0;
+    s_isr_pulse_count = 0;
 }
 
 #endif /* CONFIG_STEP_ENGINE_SELF_TEST */

@@ -4,9 +4,10 @@
  * CONFIG_MT6835_SELF_TEST=y 时编入，mt6835_init 完成后由 app_main
  * 调用。结束行 "SELF-TEST DONE: <n>/<total> PASS"。
  *
- * 覆盖：静止稳定性、读数连续有效与环绕合法域、is_ok、纯函数向量。
- * 「手转一圈的圈数守恒」与「拔线 10 ms 内 NOT OK」为人工上板项，
- * 记录在最终上板清单，不在本自测内自动化。
+ * 覆盖：静止稳定性、读数连续有效与环绕合法域、is_ok、纯函数向量，
+ * 以及末尾的手转一圈圈数守恒段（提示 + 时间窗 + 自动判定，不计入
+ * PASS 总数）。「拔线 10 ms 内 NOT OK」为人工上板项，记录在最终
+ * 上板清单，不在本自测内自动化。
  */
 
 #include "mt6835.h"
@@ -95,7 +96,11 @@ static bool test_pure_vectors(void)
 }
 
 /* ---- A10：手转摆杆一整圈（提示 + 时间窗 + 自动判定，不计入 PASS 总数） ----
- * 圈数守恒：行程 ≥ 0.9 圈且净变化 ≤ 0.1 圈（转满一圈回到出发点）。 */
+ * 圈数守恒判据：行程 ≥ 0.9 圈（确实扫过整圈范围），且净变化与最近
+ * 整数圈之差 ≤ 3°（转满一圈后停在出发点角度）。注意转恰整数圈时
+ * 多圈计数的净变化本就是 ±k 圈，不能按「净变化 ≈ 0」判定；检测到
+ * 的整圈数 k 随结果打印，供与实际转动圈数人工核对（丢圈/多圈会
+ * 表现为 k 不符；行程不足会表现为行程 < 0.9 圈）。 */
 static void run_manual_circle_check(void)
 {
     const int secs = 15;
@@ -118,17 +123,24 @@ static void run_manual_circle_check(void)
 
     int32_t net = mt6835_position_counts() - start;
     int32_t excursion = hi - lo;
+    int32_t k = (net >= 0) ? (net + REV / 2) / REV : (net - REV / 2) / REV;
+    int32_t resid = net - k * REV;              /* 距整数圈的残余 */
+    int32_t resid_deg = resid * 360 / REV;
 
-    ESP_LOGI(TAG, "MANUAL RESULT: 行程 %d counts（%.2f 圈），净变化 %d counts",
-             excursion, (double)excursion / (double)REV, net);
+    ESP_LOGI(TAG, "MANUAL RESULT: 行程 %d counts（%.2f 圈），净变化 %d counts"
+             "（%d 圈 + 残余 %+d counts ≈ %+d°）",
+             excursion, (double)excursion / (double)REV, net, k, resid, resid_deg);
 
-    if (excursion >= REV - REV / 10 && (net <= REV / 10 && net >= -REV / 10)) {
-        ESP_LOGI(TAG, "A10 判定：圈数守恒 OK");
-    } else if (excursion < REV / 10) {
+    if (excursion < REV / 10) {
         ESP_LOGI(TAG, "A10 判定：未检测到整圈转动（没转属正常——重跑自测时转即可）");
+    } else if (excursion < REV - REV / 10) {
+        ESP_LOGW(TAG, "A10 判定：行程 %.2f 圈不足（需 ≥ 0.9 圈）——请转满一圈再试",
+                 (double)excursion / (double)REV);
+    } else if (resid > REV / 120 || resid < -REV / 120) {
+        ESP_LOGW(TAG, "A10 判定：未回到出发点角度（残余 %+d° 超过 ±3°）——"
+                 "请转满整数圈后停在同一位置再试", resid_deg);
     } else {
-        ESP_LOGW(TAG, "A10 判定：行程够了但净变化 %d 超差——请转满一圈后停在同一位置再试",
-                 net);
+        ESP_LOGI(TAG, "A10 判定：圈数守恒 OK（检测到 %d 圈，残余 %+d°）", k, resid_deg);
     }
 }
 

@@ -309,20 +309,15 @@ static void comm_task(void *pvParameters)
  * UART1 事件队列重初始化
  *
  * bsp 安装的 UART1 驱动不带事件队列（queue_size=0）；这里删除后
- * 重装。引脚与波特率来源：BSP Kconfig 引脚 + CONFIG_CARTPROTO_UART_BAUD。
+ * 重装带事件队列的驱动。引脚与波特率由 bsp 用同一套 Kconfig
+ * （BSP 引脚 + CONFIG_CARTPROTO_UART_BAUD）配置且驱动卸载不触碰
+ * 硬件配置，此处不得重复 uart_param_config/uart_set_pin——第二次
+ * uart_set_pin 会对引脚做第二次 esp_gpio_reserve 登记，触发
+ * 「GPIO not usable, maybe used by others」警告。
  * ================================================================ */
 static esp_err_t uart1_reinit_with_queue(void)
 {
     uart_driver_delete(UART_PORT_NUM);
-
-    uart_config_t uart_cfg = {
-        .baud_rate = CONFIG_CARTPROTO_UART_BAUD,
-        .data_bits = UART_DATA_8_BITS,
-        .parity = UART_PARITY_DISABLE,
-        .stop_bits = UART_STOP_BITS_1,
-        .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
-        .source_clk = UART_SCLK_DEFAULT,
-    };
 
     esp_err_t err = uart_driver_install(
         UART_PORT_NUM,
@@ -333,23 +328,6 @@ static esp_err_t uart1_reinit_with_queue(void)
         0);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "uart_driver_install 失败：%s", esp_err_to_name(err));
-        return err;
-    }
-
-    err = uart_param_config(UART_PORT_NUM, &uart_cfg);
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "uart_param_config 失败：%s", esp_err_to_name(err));
-        return err;
-    }
-
-    err = uart_set_pin(
-        UART_PORT_NUM,
-        CONFIG_BSP_UART1_TX_GPIO,
-        CONFIG_BSP_UART1_RX_GPIO,
-        UART_PIN_NO_CHANGE,
-        UART_PIN_NO_CHANGE);
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "uart_set_pin 失败：%s", esp_err_to_name(err));
         return err;
     }
 

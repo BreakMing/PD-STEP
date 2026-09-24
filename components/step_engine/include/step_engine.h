@@ -118,6 +118,12 @@ uint32_t step_selftest_max_cycles_pulse(void);
 uint32_t step_selftest_max_cycles_ramp(void);
 uint32_t step_selftest_max_cycles_alarm(void);
 
+/** ISR 分段平均周期数（发步调用次数上的均值；典型耗时，用于估算
+ *  可持续步频上限，与上面的最大值对照）。 */
+uint32_t step_selftest_avg_cycles_pulse(void);
+uint32_t step_selftest_avg_cycles_ramp(void);
+uint32_t step_selftest_avg_cycles_alarm(void);
+
 /** 复位 ISR 周期计数。 */
 void step_selftest_reset_isr_cycles(void);
 
