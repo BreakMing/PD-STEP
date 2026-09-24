@@ -40,6 +40,13 @@ static const char *TAG = "cartfsm";
 /* 回零完成点（protocol.md 模式转换表：触发点记为 x = −265000 µm） */
 #define HOME_ORIGIN_MM   (-265.0f)
 
+/* DIAG 堵转有效电平（Kconfig 为 n 时 CONFIG 宏不定义，须 #ifdef 归一） */
+#ifdef CONFIG_CARTFSM_DIAG_ACTIVE_HIGH
+#define DIAG_ACTIVE_HIGH 1
+#else
+#define DIAG_ACTIVE_HIGH 0
+#endif
+
 /* ---- 共享状态 ---- */
 static portMUX_TYPE s_lock = portMUX_INITIALIZER_UNLOCKED;
 static volatile cm_mode_t   s_mode = CM_DISABLED;
@@ -308,8 +315,7 @@ static void fsm_task(void *arg)
         bool diag_stall = false;
         if (mode == CM_HOMING || mode == CM_READY) {
             int lvl = gpio_get_level(CONFIG_BSP_DIAG_GPIO);
-            bool high = CONFIG_CARTFSM_DIAG_ACTIVE_HIGH ? (lvl == 1)
-                                                         : (lvl == 0);
+            bool high = DIAG_ACTIVE_HIGH ? (lvl == 1) : (lvl == 0);
             s_diag_high_run = high ? s_diag_high_run + 1 : 0;
             if (s_diag_high_run >= DIAG_DEBOUNCE) {
                 diag_stall = true;
@@ -388,7 +394,7 @@ static void fsm_task(void *arg)
                                  "TSTEP=%d",
                                  gpio_get_level(CONFIG_BSP_DIAG_GPIO),
                                  s_diag_high_run,
-                                 CONFIG_CARTFSM_DIAG_ACTIVE_HIGH
+                                 DIAG_ACTIVE_HIGH
                                      ? "高有效" : "低有效",
                                  tmc2209_sg_result(), tmc2209_tstep());
                     }
