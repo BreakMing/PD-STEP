@@ -20,6 +20,9 @@ void app_main(void)
 {
     bsp_early_init();                    /* EN 高 = 电机不使能 */
     ESP_ERROR_CHECK(settings_init());
+#ifdef CONFIG_SETTINGS_SELF_TEST
+    settings_self_test_run();
+#endif
     esp_err_t bsp_err = bsp_init();
     if (bsp_err == ESP_OK) {
         ESP_ERROR_CHECK(as5600_init());
@@ -34,6 +37,9 @@ void app_main(void)
         ESP_ERROR_CHECK(tmc2209_init(&tmc));
         ESP_ERROR_CHECK(cartproto_start());
         ESP_ERROR_CHECK(step_engine_init(CONFIG_BSP_STEP_GPIO, CONFIG_BSP_DIR_GPIO));
+#ifdef CONFIG_STEP_ENGINE_SELF_TEST
+        step_engine_self_test_run();
+#endif
     }
     ESP_LOGI("app_main", "cartpole 固件已启动（协议骨架）");
 }
