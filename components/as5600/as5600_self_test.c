@@ -431,8 +431,9 @@ static void run_manual_check(void)
     const int   secs = 15;
     const float upr  = test_upr();
 
-    ESP_LOGI(TAG, "============ MANUAL CHECK ============");
+    ESP_LOGI(TAG, "============ MANUAL CHECK（= 上板清单 A9）===========");
     ESP_LOGI(TAG, "Turn the motor shaft 3 FULL TURNS by hand (either direction), now.");
+    ESP_LOGI(TAG, "(电机轴经同步带连着小车——转轴即移动小车)");
     ESP_LOGI(TAG, "Sampling for %d s — position will be logged every second.", secs);
 
     float start = as5600_position_mm();
@@ -448,6 +449,8 @@ static void run_manual_check(void)
 
     ESP_LOGI(TAG, "MANUAL RESULT: delta = %+.3f mm  (expect ~±%.1f for 3 turns; 1 turn = %.1f mm)",
              (double)delta, (double)(3.0f * upr), (double)upr);
+    ESP_LOGI(TAG, "A9 记录：x_um 随转轴变化 %s——记下你转动的方向与此符号的关系（+/-），"
+                  "留待 C4 符号约定标定时交叉核对", delta >= 0 ? "为 +" : "为 −");
 
     if (fabsf(delta) < 1.0f) {
         ESP_LOGI(TAG, "(no rotation detected — normal if you did not turn the shaft)");

@@ -49,6 +49,11 @@ bool mt6835_is_ok(void);
  */
 uint32_t mt6835_last_raw(void);
 
+/**
+ * @brief 多圈连续位置（counts，自上电累计；调试/自测）。
+ */
+int32_t mt6835_position_counts(void);
+
 /* ---- 上板自测（CONFIG_MT6835_SELF_TEST=y） ---- */
 #ifdef CONFIG_MT6835_SELF_TEST
 /**

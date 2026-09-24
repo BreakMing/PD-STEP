@@ -94,6 +94,44 @@ static bool test_pure_vectors(void)
     return true;
 }
 
+/* ---- A10：手转摆杆一整圈（提示 + 时间窗 + 自动判定，不计入 PASS 总数） ----
+ * 圈数守恒：行程 ≥ 0.9 圈且净变化 ≤ 0.1 圈（转满一圈回到出发点）。 */
+static void run_manual_circle_check(void)
+{
+    const int secs = 15;
+    const int32_t REV = 2097152;   /* 2^21 counts/圈 */
+
+    ESP_LOGI(TAG, "============ MANUAL CHECK（= 上板清单 A10）===========");
+    ESP_LOGI(TAG, "请将摆杆缓慢转一整圈后回到出发点，现在开始（采样 %d s）", secs);
+
+    int32_t start = mt6835_position_counts();
+    int32_t lo = start, hi = start;
+
+    for (int sec = 1; sec <= secs; sec++) {
+        vTaskDelay(pdMS_TO_TICKS(1000));
+        int32_t p = mt6835_position_counts();
+        if (p < lo) lo = p;
+        if (p > hi) hi = p;
+        ESP_LOGI(TAG, "  t=%2ds  pos=%+d counts（theta=%d µrad）",
+                 sec, p, mt6835_theta_urad());
+    }
+
+    int32_t net = mt6835_position_counts() - start;
+    int32_t excursion = hi - lo;
+
+    ESP_LOGI(TAG, "MANUAL RESULT: 行程 %d counts（%.2f 圈），净变化 %d counts",
+             excursion, (double)excursion / (double)REV, net);
+
+    if (excursion >= REV - REV / 10 && (net <= REV / 10 && net >= -REV / 10)) {
+        ESP_LOGI(TAG, "A10 判定：圈数守恒 OK");
+    } else if (excursion < REV / 10) {
+        ESP_LOGI(TAG, "A10 判定：未检测到整圈转动（没转属正常——重跑自测时转即可）");
+    } else {
+        ESP_LOGW(TAG, "A10 判定：行程够了但净变化 %d 超差——请转满一圈后停在同一位置再试",
+                 net);
+    }
+}
+
 #define RUN_TEST(name) do { \
     if (name()) { \
         s_pass++; \
@@ -115,6 +153,8 @@ int mt6835_self_test_run(void)
     RUN_TEST(test_pure_vectors);
     RUN_TEST(test_stationary_stability);
     RUN_TEST(test_theta_domain);
+
+    run_manual_circle_check();   /* A10：提示 + 自动判定，不计入总数 */
 
     int total = s_pass + s_fail;
     ESP_LOGI(TAG, "========================================");

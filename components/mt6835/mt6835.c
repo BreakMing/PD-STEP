@@ -314,3 +314,12 @@ uint32_t mt6835_last_raw(void)
     portEXIT_CRITICAL(&s_lock);
     return r;
 }
+
+int32_t mt6835_position_counts(void)
+{
+    int32_t p;
+    portENTER_CRITICAL(&s_lock);
+    p = s_state.pos_counts;
+    portEXIT_CRITICAL(&s_lock);
+    return p;
+}
