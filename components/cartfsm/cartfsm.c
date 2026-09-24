@@ -60,6 +60,7 @@ static bool s_started = false;
 /* DIAG1 堵转轮询去抖（连续高样本数；1 kHz 下 2 ms） */
 #define DIAG_DEBOUNCE 2
 static int s_diag_high_run = 0;
+static TickType_t s_last_sg_log = 0;   /* 回零中 SG 读数日志节流 */
 
 /* 流程自测注入（CONFIG_CARTFSM_FLOW_TEST）：0 无、1 AS5600、2 MT6835 */
 #ifdef CONFIG_CARTFSM_FLOW_TEST
@@ -309,16 +310,28 @@ static void fsm_task(void *arg)
         const fw_params_t *p = fw_params();
         cm_mode_t mode = s_mode;
 
-        /* DIAG1 堵转轮询：仅在使能的运动模式（HOMING/READY）下采样；
-         * 电平极性按 Kconfig（上板用低速手堵验证，见上板清单）。
-         * 2 ms 去抖。注入报告（任务 8 自测）与本轮询并联。 */
+        /* DIAG1 堵转轮询：仅在使能的运动模式（HOMING/READY）且真实
+         * 运动中采样——StallGuard 静止时读数无意义（SG_RESULT 恒低），
+         * 静止判定会在起步前即报警（实测：HOMING 后 2 ms 即"完成"，
+         * 随后 READY 存活 2 ms 即 FAULT STALL）。HOMING 限达到回零
+         * 速度 80% 后参与（加速斜坡早期同样不可信）。极性按 Kconfig，
+         * 2 ms 去抖；注入报告（自测）与本轮询并联。 */
         bool diag_stall = false;
         if (mode == CM_HOMING || mode == CM_READY) {
-            int lvl = gpio_get_level(CONFIG_BSP_DIAG_GPIO);
-            bool high = DIAG_ACTIVE_HIGH ? (lvl == 1) : (lvl == 0);
-            s_diag_high_run = high ? s_diag_high_run + 1 : 0;
-            if (s_diag_high_run >= DIAG_DEBOUNCE) {
-                diag_stall = true;
+            int64_t vnow = step_engine_vel_now_q16();
+            uint64_t mag = (vnow < 0) ? (uint64_t)(-vnow) : (uint64_t)vnow;
+            bool moving = (mode == CM_READY)
+                ? (mag > 0)
+                : (mag * 5 >= (uint64_t)mmps_to_q16((long)p->home_vel) * 4);
+            if (moving) {
+                int lvl = gpio_get_level(CONFIG_BSP_DIAG_GPIO);
+                bool high = DIAG_ACTIVE_HIGH ? (lvl == 1) : (lvl == 0);
+                s_diag_high_run = high ? s_diag_high_run + 1 : 0;
+                if (s_diag_high_run >= DIAG_DEBOUNCE) {
+                    diag_stall = true;
+                }
+            } else {
+                s_diag_high_run = 0;
             }
         } else {
             s_diag_high_run = 0;
@@ -347,6 +360,15 @@ static void fsm_task(void *arg)
                 step_engine_vel_target(mmps_to_q16(-(long)p->home_vel));
             }
             portEXIT_CRITICAL(&s_lock);
+
+            /* C2 标定辅助：回零途中周期读 SG_RESULT/TSTEP——空载读数
+             * 决定 SGTHRS 上限（须 2×SGTHRS+1 ≤ 空载读数），堵转读数
+             * （≈0）决定下限 */
+            if (xTaskGetTickCount() - s_last_sg_log >= pdMS_TO_TICKS(500)) {
+                s_last_sg_log = xTaskGetTickCount();
+                ESP_LOGI(TAG, "回零中：SG_RESULT=%d，TSTEP=%d",
+                         tmc2209_sg_result(), tmc2209_tstep());
+            }
 
             cm_mode_t m = mode;
             cm_reason_t r = s_reason;
