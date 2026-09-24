@@ -42,6 +42,9 @@ void app_main(void)
         };
         ESP_ERROR_CHECK(tmc2209_init(&tmc));
         ESP_ERROR_CHECK(cartproto_start());
+#ifdef CONFIG_CARTPROTO_SELF_TEST
+        cartproto_self_test_run();
+#endif
         ESP_ERROR_CHECK(step_engine_init(CONFIG_BSP_STEP_GPIO, CONFIG_BSP_DIR_GPIO));
 #ifdef CONFIG_TELEMETRY_SELF_TEST
         telemetry_self_test_run();

@@ -54,6 +54,51 @@ void cartproto_register_line_handler(cartproto_line_cb_t cb);
  */
 void cartproto_send_raw(const char *data, int len);
 
+/* ================================================================
+ * 命令解析与应答（任务 6）
+ * ================================================================ */
+
+typedef enum {
+    CART_CMD_VEL,            /* VEL <v_mm_s> */
+    CART_CMD_HOME,
+    CART_CMD_RESET,
+    CART_CMD_QUERY,
+    CART_CMD_CONFIG_SET,     /* CONFIG <NAME> <value> */
+    CART_CMD_CONFIG_DUMP,    /* CONFIG? */
+} cart_cmd_t;
+
+typedef struct {
+    cart_cmd_t cmd;
+    int32_t v_mm_s;          /* VEL：整数 mm/s；|v| > 32767 判非法丢弃
+                              *（防溢出，正常钳位 ±VEL_MAX 在 cartfsm） */
+    char name[16];           /* CONFIG：NAME ∈ [A-Z0-9_]{1,15} */
+    long value;              /* CONFIG：十进制 long */
+} cart_req_t;
+
+/**
+ * @brief 纯解析（自测目标）。合法行填充 *out 返回 true；非法返回
+ *        false（调用方静默丢弃，不影响后续行）。
+ *
+ * 词法契约（protocol.md §命令）：token 以单个空格分隔、命令词全
+ * 大写；行尾仅容空白（空格/制表符）；VEL 整数仅容负号；
+ * CONFIG 的 NAME ∈ [A-Z0-9_]{1,15}、value 为十进制 long。
+ */
+bool cartproto_parse_line(const char *line, cart_req_t *out);
+
+/** 应答原语（cartfsm/telemetry 共用；均经 TX 互斥） */
+void cartproto_send_mode(const char *mode, const char *reason);  /* "MODE <mode> <reason>\n" */
+void cartproto_send_ok(const char *name, long value);            /* "OK <name> <value>\n" */
+void cartproto_send_err(const char *name);                       /* "ERR <name>\n" */
+
+/** 命令执行回调（cartfsm 在任务 7 注册；未注册时合法行仅丢弃） */
+typedef void (*cartproto_exec_cb_t)(const cart_req_t *req);
+void cartproto_register_exec(cartproto_exec_cb_t cb);
+
+/* ---- 上板自测（CONFIG_CARTPROTO_SELF_TEST=y） ---- */
+#ifdef CONFIG_CARTPROTO_SELF_TEST
+void cartproto_self_test_run(void);
+#endif
+
 #ifdef __cplusplus
 }
 #endif

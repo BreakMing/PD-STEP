@@ -72,6 +72,68 @@ void cartproto_send_raw(const char *data, int len)
 }
 
 /* ================================================================
+ * 应答原语（任务 6）
+ * ================================================================ */
+
+void cartproto_send_mode(const char *mode, const char *reason)
+{
+    if (mode == NULL || reason == NULL) {
+        return;
+    }
+    char buf[48];
+    int n = snprintf(buf, sizeof(buf), "MODE %s %s\n", mode, reason);
+    if (n > 0 && n < (int)sizeof(buf)) {
+        cartproto_send_raw(buf, n);
+    }
+}
+
+void cartproto_send_ok(const char *name, long value)
+{
+    if (name == NULL) {
+        return;
+    }
+    char buf[48];
+    int n = snprintf(buf, sizeof(buf), "OK %s %ld\n", name, value);
+    if (n > 0 && n < (int)sizeof(buf)) {
+        cartproto_send_raw(buf, n);
+    }
+}
+
+void cartproto_send_err(const char *name)
+{
+    if (name == NULL) {
+        return;
+    }
+    char buf[24];
+    int n = snprintf(buf, sizeof(buf), "ERR %s\n", name);
+    if (n > 0 && n < (int)sizeof(buf)) {
+        cartproto_send_raw(buf, n);
+    }
+}
+
+/* ================================================================
+ * 命令分发（任务 6；执行语义由 cartfsm 在任务 7 注册）
+ * ================================================================ */
+
+static cartproto_exec_cb_t s_exec_cb = NULL;
+
+void cartproto_register_exec(cartproto_exec_cb_t cb)
+{
+    s_exec_cb = cb;
+}
+
+/* 内部行处理：解析合法行交给 exec；非法行静默丢弃 */
+static void internal_line_handler(const char *line)
+{
+    cart_req_t req;
+    if (cartproto_parse_line(line, &req)) {
+        if (s_exec_cb != NULL) {
+            s_exec_cb(&req);
+        }
+    }
+}
+
+/* ================================================================
  * 行组装
  * ================================================================ */
 
@@ -272,6 +334,11 @@ esp_err_t cartproto_start(void)
     }
 
     line_reset();
+
+    /* 默认行处理 = 解析 + 分发（未注册 exec 时等价于丢弃） */
+    if (s_line_cb == NULL) {
+        s_line_cb = internal_line_handler;
+    }
 
     BaseType_t ret = xTaskCreatePinnedToCore(
         comm_task,
