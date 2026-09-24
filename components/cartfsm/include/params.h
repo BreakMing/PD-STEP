@@ -1,0 +1,48 @@
+/*
+ * params — 参数注册表（protocol.md §参数注册表 十二项全量）
+ *
+ * 纯数据层（无 ESP 依赖，宿主可测）：默认值、合法范围、按名设置。
+ * 固件按注册表默认值上电；参数权威在端侧，会话开始时推送覆盖。
+ * 运行中收紧限制立即约束当前运动（外壳负责作用点）。
+ */
+
+#pragma once
+
+#include <stdint.h>
+#include <stdbool.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+typedef struct {
+    long vel_max, acc_max, wdt_ms, wdt_dec, home_vel, home_timeout_ms,
+         x_limit_um;
+    long pole_zero_urad, pole_inv, x_inv, sgthrs, step_loss_um;  /* 台位标定项 */
+} fw_params_t;
+
+/** 当前参数快照（静态存储；单字段 32 位读原子，跨核一致即可）。 */
+const fw_params_t *fw_params(void);
+
+/**
+ * @brief 按名设置参数（范围校验）。未知 NAME 或超范围返回 false。
+ *        成功即生效于后续读取；硬件作用点由外壳执行。
+ */
+bool fw_params_set(const char *name, long value);
+
+/** 注册表条目数（CONFIG? dump 用）。 */
+int fw_params_count(void);
+
+/**
+ * @brief 第 idx 个条目的 NAME（注册表顺序）；越界返回 NULL。
+ */
+const char *fw_params_name(int idx);
+
+/**
+ * @brief 第 idx 个条目的当前值；越界返回 0。
+ */
+long fw_params_value(int idx);
+
+#ifdef __cplusplus
+}
+#endif

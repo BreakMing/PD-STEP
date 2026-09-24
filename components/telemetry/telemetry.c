@@ -14,6 +14,7 @@
 #include "as5600.h"
 #include "mt6835.h"
 #include "cartproto.h"
+#include "cartfsm.h"
 
 static const char *TAG = "telemetry";
 
@@ -38,10 +39,19 @@ static void telemetry_task(void *arg)
     }
 
     for (;;) {
-        int64_t x_um = as5600_position_um();
-        int32_t theta = mt6835_theta_urad();
-        int32_t vx = (int32_t)lround(as5600_velocity_mm_s());
+        /* 摆角标定作用于组帧点（POLE_ZERO_URAD/POLE_INV，任务 7）：
+         * mt6835 保持纯传感器输出原始角；速度符号随角度翻转。 */
+        const fw_params_t *prm = fw_params();
+        int32_t theta = mt6835_raw_to_urad(mt6835_last_raw(),
+                                           (int32_t)prm->pole_zero_urad,
+                                           prm->pole_inv != 0);
         int32_t vth = mt6835_vth_mrad_s();
+        if (prm->pole_inv) {
+            vth = -vth;
+        }
+
+        int64_t x_um = as5600_position_um();
+        int32_t vx = (int32_t)lround(as5600_velocity_mm_s());
 
         int n = telemetry_format_state(buf, sizeof(buf),
                                        (int32_t)x_um, theta, vx, vth);

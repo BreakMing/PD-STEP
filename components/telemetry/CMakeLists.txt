@@ -1,7 +1,7 @@
 idf_component_register(
     SRCS "telemetry.c" "telemetry_format.c"
     INCLUDE_DIRS "include"
-    REQUIRES as5600 mt6835 cartproto freertos
+    REQUIRES as5600 mt6835 cartproto cartfsm freertos
 )
 
 if(CONFIG_TELEMETRY_SELF_TEST)

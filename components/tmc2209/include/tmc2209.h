@@ -105,6 +105,17 @@ esp_err_t tmc2209_set_microstep(int ms);
  */
 esp_err_t tmc2209_enable(bool en);
 
+/**
+ * @brief 写 StallGuard 堵转检测阈值 SGTHRS（REG 0x40）。
+ *
+ * 回零完成信号与 READY 堵转故障共用该阈值（CONFIG 注册表 SGTHRS）。
+ * 值越大检测越灵敏（SG_RESULT < 2×SGTHRS 触发）。
+ *
+ * @param sgthrs  阈值 0–255。
+ * @return ESP_OK 成功；ESP_FAIL UART 写失败。
+ */
+esp_err_t tmc2209_set_stall_threshold(uint8_t sgthrs);
+
 /* ================================================================
  * Status layer
  * ================================================================ */

@@ -1,0 +1,10 @@
+menu "cartfsm - 模式机"
+
+config CARTFSM_SELF_TEST
+    bool "上电运行 cartfsm 核心自测"
+    default n
+    help
+        启用后在启动时运行转换表/软限位/注册表向量自测
+        （不驱动电机）。结束行 "SELF-TEST DONE: <n>/<total> PASS"。
+
+endmenu

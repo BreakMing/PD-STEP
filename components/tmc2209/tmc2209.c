@@ -442,6 +442,18 @@ esp_err_t tmc2209_enable(bool en)
     return ESP_OK;
 }
 
+esp_err_t tmc2209_set_stall_threshold(uint8_t sgthrs)
+{
+    if (!s_initialized) return ESP_ERR_INVALID_STATE;
+
+    if (!tmc2209_write_reg(REG_SGTHRS, (uint32_t)sgthrs)) {
+        ESP_LOGE(TAG, "SGTHRS write failed (0x%02x)", sgthrs);
+        return ESP_FAIL;
+    }
+    ESP_LOGI(TAG, "SGTHRS = %u", sgthrs);
+    return ESP_OK;
+}
+
 /* ================================================================
  * Status layer
  * ================================================================ */

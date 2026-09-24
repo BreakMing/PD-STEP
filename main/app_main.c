@@ -17,6 +17,7 @@
 #include "mt6835.h"
 #include "telemetry.h"
 #include "cartproto.h"
+#include "cartfsm.h"
 
 void app_main(void)
 {
@@ -48,6 +49,10 @@ void app_main(void)
         ESP_ERROR_CHECK(step_engine_init(CONFIG_BSP_STEP_GPIO, CONFIG_BSP_DIR_GPIO));
 #ifdef CONFIG_TELEMETRY_SELF_TEST
         telemetry_self_test_run();
+#endif
+        ESP_ERROR_CHECK(cartfsm_start());
+#ifdef CONFIG_CARTFSM_SELF_TEST
+        cartfsm_self_test_run();
 #endif
         ESP_ERROR_CHECK(telemetry_start());
 #ifdef CONFIG_STEP_ENGINE_SELF_TEST

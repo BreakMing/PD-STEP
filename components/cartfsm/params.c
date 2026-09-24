@@ -1,0 +1,99 @@
+/*
+ * params — 参数注册表实现（默认值与范围：protocol.md §参数注册表）
+ *
+ * 纯数据层：fw_params_set 只做范围校验与写值；写硬件的作用点
+ * （引擎加速度/看门狗/方向反转/堵转阈值）由 cartfsm 外壳执行。
+ */
+
+#include "params.h"
+
+#include <stddef.h>
+
+/* 注册表顺序（CONFIG? dump 按此顺序） */
+static fw_params_t s_params = {
+    .vel_max        = 1000,     /* 1 – 2000 mm/s          */
+    .acc_max        = 5000,     /* 100 – 30000 mm/s²      */
+    .wdt_ms         = 100,      /* 10 – 1000 ms           */
+    .wdt_dec        = 5000,     /* 100 – 30000 mm/s²      */
+    .home_vel       = 50,       /* 5 – 200 mm/s           */
+    .home_timeout_ms = 30000,   /* 1000 – 120000 ms       */
+    .x_limit_um     = 260000,   /* 10000 – 265000 µm      */
+    .pole_zero_urad = 0,        /* ±3141592 µrad          */
+    .pole_inv       = 0,        /* 0 – 1                  */
+    .x_inv          = 0,        /* 0 – 1                  */
+    .sgthrs         = 40,       /* 0 – 255                */
+    .step_loss_um   = 3000,     /* 500 – 20000 µm         */
+};
+
+typedef struct {
+    const char *name;
+    long *field;
+    long min;
+    long max;
+} param_entry_t;
+
+static const param_entry_t s_entries[] = {
+    { "VEL_MAX",        &s_params.vel_max,         1,       2000    },
+    { "ACC_MAX",        &s_params.acc_max,         100,     30000   },
+    { "WDT_MS",         &s_params.wdt_ms,          10,      1000    },
+    { "WDT_DEC",        &s_params.wdt_dec,         100,     30000   },
+    { "HOME_VEL",       &s_params.home_vel,        5,       200     },
+    { "HOME_TIMEOUT",   &s_params.home_timeout_ms, 1000,    120000  },
+    { "X_LIMIT",        &s_params.x_limit_um,      10000,   265000  },
+    { "POLE_ZERO_URAD", &s_params.pole_zero_urad,  -3141592, 3141592 },
+    { "POLE_INV",       &s_params.pole_inv,        0,       1       },
+    { "X_INV",          &s_params.x_inv,           0,       1       },
+    { "SGTHRS",         &s_params.sgthrs,          0,       255     },
+    { "STEP_LOSS_UM",   &s_params.step_loss_um,    500,     20000   },
+};
+
+#define ENTRY_COUNT ((int)(sizeof(s_entries) / sizeof(s_entries[0])))
+
+const fw_params_t *fw_params(void)
+{
+    return &s_params;
+}
+
+bool fw_params_set(const char *name, long value)
+{
+    if (name == NULL) {
+        return false;
+    }
+    for (int i = 0; i < ENTRY_COUNT; i++) {
+        const char *a = s_entries[i].name;
+        const char *b = name;
+        while (*a && *b && *a == *b) {
+            a++;
+            b++;
+        }
+        if (*a == '\0' && *b == '\0') {
+            if (value < s_entries[i].min || value > s_entries[i].max) {
+                return false;
+            }
+            *s_entries[i].field = value;
+            return true;
+        }
+    }
+    return false;
+}
+
+int fw_params_count(void)
+{
+    return ENTRY_COUNT;
+}
+
+const char *fw_params_name(int idx)
+{
+    if (idx < 0 || idx >= ENTRY_COUNT) {
+        return NULL;
+    }
+    return s_entries[idx].name;
+}
+
+long fw_params_value(int idx)
+{
+    if (idx < 0 || idx >= ENTRY_COUNT) {
+        return 0;
+    }
+    return *s_entries[idx].field;
+}
