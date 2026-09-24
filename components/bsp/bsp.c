@@ -15,6 +15,7 @@
 #include "driver/gpio.h"
 #include "driver/uart.h"
 #include "driver/i2c_master.h"
+#include "driver/spi_master.h"
 #include "esp_check.h"
 
 static const char *TAG = "bsp";
@@ -38,6 +39,12 @@ static const char *TAG = "bsp";
 #define BSP_I2C_PORT_NUM      I2C_NUM_0
 #define BSP_AS5600_ADDR       CONFIG_BSP_AS5600_I2C_ADDR
 
+/* MT6835 SPI（MOSI=40 MISO=46 SCK=39，CS 由 mt6835 设备侧持有） */
+#define BSP_SPI_HOST          SPI3_HOST
+#define BSP_PIN_SPI_MOSI      CONFIG_BSP_SPI_MOSI_GPIO
+#define BSP_PIN_SPI_MISO      CONFIG_BSP_SPI_MISO_GPIO
+#define BSP_PIN_SPI_SCLK      CONFIG_BSP_SPI_SCLK_GPIO
+
 /* I2C scan range (7-bit addresses) */
 #define I2C_SCAN_ADDR_FIRST   0x08
 #define I2C_SCAN_ADDR_LAST    0x77
@@ -46,6 +53,7 @@ static const char *TAG = "bsp";
 /* ---- Internal state ---- */
 static i2c_master_bus_handle_t s_i2c_bus = NULL;
 static bool s_i2c_internal_pullup = false;
+static bool s_spi_initialized = false;
 
 /* ================================================================
  * bsp_early_init()
@@ -251,6 +259,33 @@ static esp_err_t bsp_i2c_init(void)
 }
 
 /* ================================================================
+ * SPI bus init (MT6835)
+ * ================================================================ */
+static esp_err_t bsp_spi_init(void)
+{
+    spi_bus_config_t bus_cfg = {
+        .mosi_io_num = BSP_PIN_SPI_MOSI,
+        .miso_io_num = BSP_PIN_SPI_MISO,
+        .sclk_io_num = BSP_PIN_SPI_SCLK,
+        .quadwp_io_num = -1,
+        .quadhd_io_num = -1,
+        .max_transfer_sz = 8,   /* 角度读取事务 6 字节 */
+    };
+
+    esp_err_t err = spi_bus_initialize(BSP_SPI_HOST, &bus_cfg, SPI_DMA_CH_AUTO);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "SPI 总线初始化失败（host=%d）：%s",
+                 BSP_SPI_HOST, esp_err_to_name(err));
+        return err;
+    }
+
+    s_spi_initialized = true;
+    ESP_LOGI(TAG, "SPI: host=%d MOSI=%d MISO=%d SCLK=%d",
+             BSP_SPI_HOST, BSP_PIN_SPI_MOSI, BSP_PIN_SPI_MISO, BSP_PIN_SPI_SCLK);
+    return ESP_OK;
+}
+
+/* ================================================================
  * bsp_init()
  * ================================================================ */
 esp_err_t bsp_init(void)
@@ -275,6 +310,12 @@ esp_err_t bsp_init(void)
         return err;
     }
 
+    /* SPI bus (MT6835) */
+    err = bsp_spi_init();
+    if (err != ESP_OK) {
+        return err;
+    }
+
     ESP_LOGI(TAG, "BSP initialization complete");
     return ESP_OK;
 }
@@ -285,6 +326,11 @@ esp_err_t bsp_init(void)
 i2c_master_bus_handle_t bsp_get_i2c_bus(void)
 {
     return s_i2c_bus;
+}
+
+spi_host_device_t bsp_get_spi_host(void)
+{
+    return s_spi_initialized ? BSP_SPI_HOST : (spi_host_device_t)-1;
 }
 
 /* ================================================================

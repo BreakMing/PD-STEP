@@ -1,0 +1,11 @@
+menu "mt6835 - 摆角编码器"
+
+config MT6835_SELF_TEST
+    bool "上电运行 mt6835 自测"
+    default n
+    help
+        启用后固件在启动时（mt6835_init 之后）运行自测：
+        静止稳定性（1 s 内 raw21 抖动 ≤ 2 count）、读数连续有效、
+        纯函数向量抽查。结束行 "SELF-TEST DONE: <n>/<total> PASS"。
+
+endmenu

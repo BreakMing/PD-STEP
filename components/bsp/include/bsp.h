@@ -12,7 +12,8 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include "esp_err.h"
-#include "driver/i2c_master.h"  // for i2c_master_bus_handle_t
+#include "driver/i2c_master.h"     // for i2c_master_bus_handle_t
+#include "driver/spi_master.h"     // for spi_host_device_t
 
 #ifdef __cplusplus
 extern "C" {
@@ -52,6 +53,13 @@ esp_err_t bsp_init(void);
  * @return Bus handle, or NULL if bus not initialized.
  */
 i2c_master_bus_handle_t bsp_get_i2c_bus(void);
+
+/**
+ * @brief Get the SPI host used by the MT6835 encoder.
+ *
+ * @return Host id (SPI3_HOST), or -1 if bus not initialized.
+ */
+spi_host_device_t bsp_get_spi_host(void);
 
 /**
  * @brief TMC2209 ENN control (active low).

@@ -14,6 +14,7 @@
 #include "tmc2209.h"
 #include "step_engine.h"
 #include "as5600.h"
+#include "mt6835.h"
 #include "cartproto.h"
 
 void app_main(void)
@@ -26,6 +27,10 @@ void app_main(void)
     esp_err_t bsp_err = bsp_init();
     if (bsp_err == ESP_OK) {
         ESP_ERROR_CHECK(as5600_init());
+        ESP_ERROR_CHECK(mt6835_init());
+#ifdef CONFIG_MT6835_SELF_TEST
+        mt6835_self_test_run();
+#endif
         tmc2209_config_t tmc = {
             .uart_num = UART_NUM_2,
             .tx_pin = CONFIG_BSP_TMC_UART_TX_GPIO,

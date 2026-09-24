@@ -97,4 +97,31 @@ menu "BSP - Board Support Package"
         help
             AS5600 default I2C address, per hardware.md §4 (0x36).
 
+    # ------------------------------------------------------------------
+    # SPI bus (MT6835 pole encoder)
+    # ------------------------------------------------------------------
+    config BSP_SPI_MOSI_GPIO
+        int "SPI MOSI GPIO (MT6835)"
+        default 40
+
+    config BSP_SPI_MISO_GPIO
+        int "SPI MISO GPIO (MT6835)"
+        default 46
+
+    config BSP_SPI_SCLK_GPIO
+        int "SPI SCLK GPIO (MT6835)"
+        default 39
+
+    config BSP_MT6835_CS_GPIO
+        int "MT6835 SPI CS GPIO"
+        default 7
+
+    config BSP_MT6835_SPI_HZ
+        int "MT6835 SPI clock (Hz)"
+        default 1000000
+        range 100000 16000000
+        help
+            手册上限 16 MHz；保守取 1 MHz（1 kHz 轮询下 48 µs/事务，
+            预算充足）。上板稳定后可提速。
+
 endmenu
