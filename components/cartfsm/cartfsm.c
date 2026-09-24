@@ -402,7 +402,11 @@ static void fsm_task(void *arg)
                 }
             }
         } else if (mode == CM_READY) {
-            if (stalled) {
+            /* 堵转仅在运动中判定：StallGuard 需要运动，静止读数无
+             * 意义——回零完成后小车抵着挡块由保持电流顶着，DIAG 持续
+             * 有效，若静止也判故障则 READY 存活 ~2 ms 即误报（实测） */
+            bool moving = step_engine_vel_now_q16() != 0;
+            if (stalled && moving) {
                 enter_fault(CR_STALL);
             } else if (!a5600_ok) {
                 enter_fault(CR_AS5600);
