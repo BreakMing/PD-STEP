@@ -20,12 +20,6 @@ menu "BSP - Board Support Package"
             GPIO for UART1 RX (host protocol channel via CH343P).
             See BSP_UART1_TX_GPIO help for rationale (was GPIO11).
 
-    config BSP_UART1_BAUD
-        int "UART1 baud rate"
-        default 115200
-        help
-            UART1 baud rate. Default 115200 8N1 per hardware.md §5.
-
     # ------------------------------------------------------------------
     # TMC2209 single-wire UART (for T5)
     # ------------------------------------------------------------------

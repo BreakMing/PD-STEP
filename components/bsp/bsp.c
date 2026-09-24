@@ -22,7 +22,7 @@ static const char *TAG = "bsp";
 /* ---- Kconfig pin/config constants ---- */
 #define BSP_PIN_UART1_TX      CONFIG_BSP_UART1_TX_GPIO
 #define BSP_PIN_UART1_RX      CONFIG_BSP_UART1_RX_GPIO
-#define BSP_UART1_BAUD        CONFIG_BSP_UART1_BAUD
+#define BSP_UART1_BAUD        CONFIG_CARTPROTO_UART_BAUD
 #define BSP_UART1_PORT_NUM    UART_NUM_1
 #define BSP_UART1_RX_BUF_SIZE 1024
 #define BSP_UART1_TX_BUF_SIZE 512
@@ -104,11 +104,6 @@ static esp_err_t bsp_uart1_init(void)
 
     ESP_LOGI(TAG, "UART1: TX=%d RX=%d @ %d baud 8N1",
              BSP_PIN_UART1_TX, BSP_PIN_UART1_RX, BSP_UART1_BAUD);
-
-    /* Optional: send a ready line so the host side can confirm
-     * the channel works as soon as power comes up. */
-    const char ready_line[] = "BSP UART1 ready\r\n";
-    uart_write_bytes(BSP_UART1_PORT_NUM, ready_line, sizeof(ready_line) - 1);
 
     return ESP_OK;
 }

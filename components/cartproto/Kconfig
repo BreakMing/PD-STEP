@@ -1,0 +1,19 @@
+menu "cartproto - cartpole 线协议通讯栈"
+
+    config CARTPROTO_UART_BAUD
+        int "UART1 波特率"
+        default 460800
+        range 9600 921600
+        help
+            与端侧（Hi3516CV610 / PC 联调）板对板链路的波特率，
+            8N1。protocol.md 定为 460800；联调若不过降 230400。
+
+    config CARTPROTO_LINE_TIMEOUT_MS
+        int "不完整行超时（ms）"
+        default 100
+        range 10 5000
+        help
+            行首字节到行结尾 '\n' 之间允许的最大间隔。超时的不完整
+            行被静默丢弃（protocol.md：非法行静默丢弃）。
+
+endmenu
