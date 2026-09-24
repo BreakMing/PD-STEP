@@ -306,18 +306,26 @@ static void comm_task(void *pvParameters)
 }
 
 /* ================================================================
- * UART1 事件队列重初始化
+ * UART1 初始化（cartproto 是 UART1 的唯一所有者）
  *
- * bsp 安装的 UART1 驱动不带事件队列（queue_size=0）；这里删除后
- * 重装带事件队列的驱动。引脚与波特率由 bsp 用同一套 Kconfig
- * （BSP 引脚 + CONFIG_CARTPROTO_UART_BAUD）配置且驱动卸载不触碰
- * 硬件配置，此处不得重复 uart_param_config/uart_set_pin——第二次
- * uart_set_pin 会对引脚做第二次 esp_gpio_reserve 登记，触发
- * 「GPIO not usable, maybe used by others」警告。
+ * 一次性完整初始化：驱动（带事件队列）→ 参数 → 引脚。引脚与波特率
+ * 来源：BSP Kconfig 引脚 + CONFIG_CARTPROTO_UART_BAUD，esp_gpio_reserve
+ * 只发生一次（无「not usable」告警）。
+ * 不得改为「别处预装驱动 + 此处 uart_driver_delete 重装」模式：
+ * uart_driver_delete 会 uart_release_pin 释放全部引脚（RX 输入信号
+ * 接常 1、TX 输出驱动关闭）并关模块时钟与时钟源，重装驱动不会
+ * 自动恢复——不重新 param_config/set_pin 则链路双向全断。
  * ================================================================ */
-static esp_err_t uart1_reinit_with_queue(void)
+static esp_err_t uart1_init(void)
 {
-    uart_driver_delete(UART_PORT_NUM);
+    uart_config_t uart_cfg = {
+        .baud_rate = CONFIG_CARTPROTO_UART_BAUD,
+        .data_bits = UART_DATA_8_BITS,
+        .parity = UART_PARITY_DISABLE,
+        .stop_bits = UART_STOP_BITS_1,
+        .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
+        .source_clk = UART_SCLK_DEFAULT,
+    };
 
     esp_err_t err = uart_driver_install(
         UART_PORT_NUM,
@@ -331,7 +339,24 @@ static esp_err_t uart1_reinit_with_queue(void)
         return err;
     }
 
-    ESP_LOGI(TAG, "UART1 已带事件队列重初始化（TX=%d RX=%d @ %d baud）",
+    err = uart_param_config(UART_PORT_NUM, &uart_cfg);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "uart_param_config 失败：%s", esp_err_to_name(err));
+        return err;
+    }
+
+    err = uart_set_pin(
+        UART_PORT_NUM,
+        CONFIG_BSP_UART1_TX_GPIO,
+        CONFIG_BSP_UART1_RX_GPIO,
+        UART_PIN_NO_CHANGE,
+        UART_PIN_NO_CHANGE);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "uart_set_pin 失败：%s", esp_err_to_name(err));
+        return err;
+    }
+
+    ESP_LOGI(TAG, "UART1 已初始化（事件队列驱动，TX=%d RX=%d @ %d baud）",
              CONFIG_BSP_UART1_TX_GPIO,
              CONFIG_BSP_UART1_RX_GPIO,
              CONFIG_CARTPROTO_UART_BAUD);
@@ -354,7 +379,7 @@ esp_err_t cartproto_start(void)
         return ESP_ERR_NO_MEM;
     }
 
-    esp_err_t err = uart1_reinit_with_queue();
+    esp_err_t err = uart1_init();
     if (err != ESP_OK) {
         return err;
     }

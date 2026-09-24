@@ -3,7 +3,10 @@
  *
  * Two-stage init:
  *   bsp_early_init() — pull EN HIGH (disable TMC2209), as first thing.
- *   bsp_init()       — UART1, GPIO, I2C bus + scan.
+ *   bsp_init()       — GPIO, I2C bus + scan, SPI.
+ *
+ * UART1（协议通道）不在此初始化：cartproto 是其唯一所有者
+ * （引脚与波特率 Kconfig 仍定义于 BSP）。
  */
 
 #include "bsp.h"
@@ -13,7 +16,6 @@
 
 #include "esp_log.h"
 #include "driver/gpio.h"
-#include "driver/uart.h"
 #include "driver/i2c_master.h"
 #include "driver/spi_master.h"
 #include "esp_check.h"
@@ -21,12 +23,6 @@
 static const char *TAG = "bsp";
 
 /* ---- Kconfig pin/config constants ---- */
-#define BSP_PIN_UART1_TX      CONFIG_BSP_UART1_TX_GPIO
-#define BSP_PIN_UART1_RX      CONFIG_BSP_UART1_RX_GPIO
-#define BSP_UART1_BAUD        CONFIG_CARTPROTO_UART_BAUD
-#define BSP_UART1_PORT_NUM    UART_NUM_1
-#define BSP_UART1_RX_BUF_SIZE 1024
-#define BSP_UART1_TX_BUF_SIZE 512
 
 #define BSP_PIN_STEP          CONFIG_BSP_STEP_GPIO
 #define BSP_PIN_DIR           CONFIG_BSP_DIR_GPIO
@@ -73,47 +69,6 @@ void bsp_early_init(void)
     };
     gpio_config(&en_cfg);
     gpio_set_level(BSP_PIN_EN, 1);  /* HIGH = disabled */
-}
-
-/* ================================================================
- * UART1 init
- * ================================================================ */
-static esp_err_t bsp_uart1_init(void)
-{
-    uart_config_t uart_cfg = {
-        .baud_rate = BSP_UART1_BAUD,
-        .data_bits = UART_DATA_8_BITS,
-        .parity = UART_PARITY_DISABLE,
-        .stop_bits = UART_STOP_BITS_1,
-        .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
-        .source_clk = UART_SCLK_DEFAULT,
-    };
-
-    ESP_RETURN_ON_ERROR(
-        uart_driver_install(
-            BSP_UART1_PORT_NUM,
-            BSP_UART1_RX_BUF_SIZE,
-            BSP_UART1_TX_BUF_SIZE,
-            0, NULL, 0),
-        TAG, "uart_driver_install failed");
-
-    ESP_RETURN_ON_ERROR(
-        uart_param_config(BSP_UART1_PORT_NUM, &uart_cfg),
-        TAG, "uart_param_config failed");
-
-    ESP_RETURN_ON_ERROR(
-        uart_set_pin(
-            BSP_UART1_PORT_NUM,
-            BSP_PIN_UART1_TX,
-            BSP_PIN_UART1_RX,
-            UART_PIN_NO_CHANGE,
-            UART_PIN_NO_CHANGE),
-        TAG, "uart_set_pin failed");
-
-    ESP_LOGI(TAG, "UART1: TX=%d RX=%d @ %d baud 8N1",
-             BSP_PIN_UART1_TX, BSP_PIN_UART1_RX, BSP_UART1_BAUD);
-
-    return ESP_OK;
 }
 
 /* ================================================================
@@ -296,12 +251,6 @@ static esp_err_t bsp_spi_init(void)
 esp_err_t bsp_init(void)
 {
     esp_err_t err;
-
-    /* UART1 (protocol channel) */
-    err = bsp_uart1_init();
-    if (err != ESP_OK) {
-        return err;
-    }
 
     /* GPIO (STEP / DIR / DIAG) */
     err = bsp_gpio_init();
