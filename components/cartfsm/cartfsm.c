@@ -380,12 +380,17 @@ static void fsm_task(void *arg)
                          * 拍数——堵转门限未开/接线断/极性反的区分依据
                          *（TMC2209 DIAG 堵转为高；持续撞墙期间电平
                          * 恒低=信号未产生，恒高而计数 0=极性配置反） */
+                        /* SG_RESULT：0=堵转/满载、~510=空载——撞墙中
+                         * 仍高=芯片未感知负载（提 SGTHRS/查电流），
+                         * 低但 DIAG 恒 0=DIAG 线断（查 GPIO16 接线） */
                         ESP_LOGW(TAG, "回零超时：DIAG 电平=%d，活跃电平"
-                                 "连续 %u 拍（极性=%s）",
+                                 "连续 %u 拍（极性=%s），SG_RESULT=%d，"
+                                 "TSTEP=%d",
                                  gpio_get_level(CONFIG_BSP_DIAG_GPIO),
                                  s_diag_high_run,
                                  CONFIG_CARTFSM_DIAG_ACTIVE_HIGH
-                                     ? "高有效" : "低有效");
+                                     ? "高有效" : "低有效",
+                                 tmc2209_sg_result(), tmc2209_tstep());
                     }
                     enter_fault(r);
                 }

@@ -455,6 +455,26 @@ esp_err_t tmc2209_set_stall_threshold(uint8_t sgthrs)
     return ESP_OK;
 }
 
+int tmc2209_sg_result(void)
+{
+    /* StallGuard 负载读数 = DRV_STATUS 低 10 位（0=满负载/堵转，
+     * ~510=空载）。诊断用：区分「芯片没看到负载」与「DIAG 线断」 */
+    if (!s_initialized) return -1;
+    uint32_t val;
+    if (!tmc2209_read_reg(REG_DRV_STATUS, &val)) return -1;
+    return (int)(val & 0x3FF);
+}
+
+int tmc2209_tstep(void)
+{
+    /* 当前步进周期读数（芯片时钟 tick/步）。诊断用：核对 TCOOLTHRS
+     * 堵转输出速度窗是否覆盖当前速度 */
+    if (!s_initialized) return -1;
+    uint32_t val;
+    if (!tmc2209_read_reg(REG_TSTEP, &val)) return -1;
+    return (int)(val & 0xFFFFF);
+}
+
 /* ================================================================
  * Status layer
  * ================================================================ */
