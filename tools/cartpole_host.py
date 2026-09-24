@@ -27,27 +27,25 @@ import serial
 
 class Rig:
     def __init__(self, port, baud=460800, timeout=0.2):
-        self.ser = serial.Serial()
-        self.ser.port = port
-        self.ser.baudrate = baud
-        self.ser.timeout = timeout
-        # Windows 下显式扩大驱动内部缓冲（SetupComm）：pyserial 默认
-        # 不调用 SetupComm，wch 驱动默认 RX 队列偏小，read 稳态积压
-        # （200 Hz STATE 流 ≈ 250 B）贴队列上限，读取间隙抖动即溢出
-        # 丢字节（实测 460800 下 ~2% 行被撕碎，大块读工具同口正常）
-        self.ser.set_buffer_size(rx_size=16384, tx_size=8192)
-        self.ser.open()
-        # 打开瞬间丢弃流内残余（到首个 \n）：mid-stream 半行与开串口
-        # 毛刺不是链路质量问题，不得计入 UNKNOWN 统计
-        t0 = time.time()
-        while time.time() - t0 < 0.5:
-            chunk = self.ser.read(256)
-            if chunk and b"\n" in chunk:
-                break
+        self.ser = serial.Serial(port, baud, timeout=timeout)
         self.last_mode = None      # (mode, reason)
         self.last_reply = None     # (kind, name, value)
         self.state_count = 0
         self.unknown_count = 0
+        # 跨 pump 调用持久的接收缓冲：未凑齐的半行必须留到下次继续，
+        # 不得随窗口丢弃——STATE 流近乎连续，0.2 s 窗口边界几乎必然
+        # 落在行中间（丢半行头 + 下一窗口把行尾记成 UNKNOWN）
+        self._rx_buf = b""
+        # 丢弃到首个 \n 的残余（mid-stream 半行/开串口毛刺不是链路
+        # 质量问题，不计入 UNKNOWN），保留 \n 之后已开始的行
+        t0 = time.time()
+        while time.time() - t0 < 0.5:
+            chunk = self.ser.read(256)
+            if chunk:
+                self._rx_buf += chunk
+                if b"\n" in self._rx_buf:
+                    self._rx_buf = self._rx_buf.split(b"\n", 1)[1]
+                    break
 
     def close(self):
         self.ser.close()
@@ -59,14 +57,13 @@ class Rig:
     def pump(self, duration):
         """读串口 duration 秒，解析 STATE/MODE/OK/ERR，统计 UNKNOWN。"""
         t0 = time.time()
-        buf = b""
         while time.time() - t0 < duration:
             chunk = self.ser.read(256)
             if not chunk:
                 continue
-            buf += chunk
-            while b"\n" in buf:
-                raw, buf = buf.split(b"\n", 1)
+            self._rx_buf += chunk
+            while b"\n" in self._rx_buf:
+                raw, self._rx_buf = self._rx_buf.split(b"\n", 1)
                 line = raw.decode("ascii", "replace").strip()
                 if not line:
                     continue
