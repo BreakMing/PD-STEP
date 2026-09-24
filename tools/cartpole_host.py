@@ -130,6 +130,18 @@ def cmd_query(rig, args):
     return 0
 
 
+def cmd_reset(rig, args):
+    rig.send_line("RESET")
+    rig.pump(0.3)
+    m = rig.last_mode
+    if m and m[0] == "DISABLED":
+        print("RESET → DISABLED")
+        return 0
+    print("RESET 未生效（当前 %s；RESET 仅 FAULT 时有效——READY 下可手推小车"
+          " ≥3 mm 制造 STEP_LOSS 故障后再 RESET）" % (m,))
+    return 1
+
+
 def cmd_home(rig, args):
     rig.send_line("HOME")
     m = rig.wait_mode("READY", args.timeout)
@@ -242,6 +254,7 @@ def main():
     p = sub.add_parser("state"); p.add_argument("--secs", type=float, default=10.0)
     sub.add_parser("wdt-test")
     sub.add_parser("console")
+    sub.add_parser("reset")
 
     args = ap.parse_args()
     rig = Rig(args.port, args.baud)
@@ -250,6 +263,7 @@ def main():
             "query": cmd_query, "home": cmd_home, "vel": cmd_vel,
             "config": cmd_config, "dump": cmd_dump, "state": cmd_state,
             "wdt-test": cmd_wdt_test, "console": cmd_console,
+            "reset": cmd_reset,
         }
         rc = table[args.cmd](rig, args)
     finally:
