@@ -43,3 +43,18 @@ int32_t mt6835_counts_to_mrad_s(int64_t delta_counts, uint32_t window_ms)
     return (int32_t)(delta_counts * MT6835_2PI_URAD
                      / (int64_t)MT6835_COUNTS_PER_REV / (int64_t)window_ms);
 }
+
+uint8_t mt6835_crc8(uint32_t angle21, uint8_t status)
+{
+    uint32_t payload = (angle21 << 3) | (status & 0x07);
+    uint8_t crc = 0x00;
+    for (int bit = 23; bit >= 0; bit--) {
+        uint8_t msb = (uint8_t)((crc & 0x80) ? 1 : 0);
+        uint8_t in = (uint8_t)((payload >> bit) & 1);
+        crc = (uint8_t)(crc << 1);
+        if (msb ^ in) {
+            crc ^= 0x07;
+        }
+    }
+    return crc;
+}

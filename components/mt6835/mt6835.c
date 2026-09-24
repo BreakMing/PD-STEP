@@ -90,9 +90,21 @@ static bool mt6835_read_raw(uint32_t *raw_out, uint8_t *status_out)
         return false;
     }
 
-    *raw_out = ((uint32_t)rx[2] << 13) | ((uint32_t)rx[3] << 5)
-             | ((uint32_t)rx[4] >> 3);
-    *status_out = rx[4] & 0x07;
+    uint32_t raw = ((uint32_t)rx[2] << 13) | ((uint32_t)rx[3] << 5)
+                 | ((uint32_t)rx[4] >> 3);
+    uint8_t status = rx[4] & 0x07;
+
+    /* 帧校验：拔线时 MISO 悬空常读全零——CRC 与全零帧一并拒绝，
+     * 失败计入 fail_streak（10 ms 内 is_ok 变 false → FAULT/MT6835） */
+    if (raw == 0 && status == 0 && rx[5] == 0) {
+        return false;
+    }
+    if (mt6835_crc8(raw, status) != rx[5]) {
+        return false;
+    }
+
+    *raw_out = raw;
+    *status_out = status;
     return true;
 }
 

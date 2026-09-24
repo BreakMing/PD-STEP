@@ -47,6 +47,8 @@ static bool test_config_matrix_spot(void)
     CHECK(!cm_config_set_allowed(CM_HOMING), "HOMING 拒绝");
     CHECK(fw_params_set("X_LIMIT", 10000), "收紧 X_LIMIT 合法");
     CHECK(!fw_params_set("X_LIMIT", 9999), "越界拒绝");
+    CHECK(fw_params_set("X_LIMIT", 260000), "恢复默认 X_LIMIT");
+    CHECK(fw_params()->x_limit_um == 260000, "恢复生效");
     return true;
 }
 

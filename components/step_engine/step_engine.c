@@ -237,13 +237,17 @@ static bool gptimer_alarm_cb(gptimer_handle_t timer,
         dt += 2;   /* DIR setup 2 µs，并入第一拍间隔 */
     }
     s_v_q16 = nv;
+    if (!moving) {
+        /* 停表标志并入持锁段：与 vel_target 的静止启动判定互斥，
+         * 避免「目标非零但引擎自停」的竞态窗口 */
+        s_stopped = true;
+    }
     portEXIT_CRITICAL_ISR(&s_spinlock);
 
     if (!moving) {
         /* 到零速且无换向目标：停表（模式语义由 cartfsm 负责） */
         gptimer_stop(s_timer);
         s_timer_running = false;
-        s_stopped = true;
 #ifdef CONFIG_STEP_ENGINE_SELF_TEST
         uint32_t cend2 = esp_cpu_get_cycle_count();
         if (cend2 - isr_start_ccount > s_max_isr_cycles) {
@@ -369,26 +373,32 @@ void step_engine_vel_target(int64_t v_q16)
     s_target_q16 = mag;
     s_target_dir = dir;
 
-    if (s_stopped && !s_timer_running && mag > 0) {
+    if (s_stopped && mag > 0) {
         /* 静止启动：冻结计数种子法排第一拍（此时定时器停止，
-         * 原始计数读数即精确基准；无 ISR 并发）。 */
-        uint64_t nv;
-        uint32_t dt;
-        bool     dchg;
+         * 原始计数读数即精确基准；无 ISR 并发）。ISR 的停表
+         * （gptimer_stop）与本次排布可能交错：释放锁后复查
+         * s_stopped，若被 ISR 置回真则重排一次。 */
+        for (int retry = 0; retry < 3 && s_stopped; retry++) {
+            uint64_t nv;
+            uint32_t dt;
+            bool     dchg;
 
-        (void)vel_ramp_next(0, s_dir, mag, dir, s_accel, s_decel, false,
-                            &nv, &dt, &dchg);
-        if (dchg) {
-            s_dir = !s_dir;
-            set_dir_physical(s_dir);
-            dt += 2;   /* DIR setup 并入第一拍 */
+            (void)vel_ramp_next(0, s_dir, mag, dir, s_accel, s_decel, false,
+                                &nv, &dt, &dchg);
+            if (dchg) {
+                s_dir = !s_dir;
+                set_dir_physical(s_dir);
+                dt += 2;   /* DIR setup 并入第一拍 */
+            }
+            s_v_q16 = nv;
+            s_stopped = false;
+
+            uint64_t base = 0;
+            gptimer_get_raw_count(s_timer, &base);
+            s_cb_alarm_base = base;
+            s_cb_guard_floor = base + ALARM_GUARD_US;
+            isr_set_alarm(dt);
         }
-        s_v_q16 = nv;
-        s_stopped = false;
-
-        s_cb_alarm_base = now;
-        s_cb_guard_floor = now + ALARM_GUARD_US;
-        isr_set_alarm(dt);
     }
 
     portEXIT_CRITICAL(&s_spinlock);
@@ -403,10 +413,14 @@ void step_engine_vel_halt(void)
 
 int64_t step_engine_vel_now_q16(void)
 {
+    /* 持锁快照：64 位 s_v_q16 在 32 位总线上无锁读可撕裂出假零，
+     * 会令 FAULT 停机次序提前关 EN */
+    portENTER_CRITICAL(&s_spinlock);
     bool stopped = s_stopped;
     uint64_t v = s_v_q16;
     bool dir = s_dir;
     bool invert = s_dir_invert;
+    portEXIT_CRITICAL(&s_spinlock);
 
     if (stopped || v == 0) {
         return 0;
@@ -439,7 +453,12 @@ int32_t step_engine_position_steps(void)
 
 void step_engine_set_dir_invert(bool invert)
 {
+    /* 立即刷新 DIR 引脚电平：只改标志会留陈旧电平，首个同向运动
+     * （如 X_INV=1 台位上电即 HOME）实际转向与位置计数相反。 */
+    portENTER_CRITICAL(&s_spinlock);
     s_dir_invert = invert;
+    set_dir_physical(s_dir);
+    portEXIT_CRITICAL(&s_spinlock);
 }
 
 /* ================================================================

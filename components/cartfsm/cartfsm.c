@@ -132,8 +132,21 @@ static void params_apply_one(const char *name)
         step_engine_set_dir_invert(p->x_inv != 0);
     } else if (strcmp(name, "SGTHRS") == 0) {
         tmc2209_set_stall_threshold((uint8_t)p->sgthrs);
+    } else if (strcmp(name, "VEL_MAX") == 0) {
+        /* 运行中收紧 VEL_MAX 立即约束当前运动（protocol.md 收紧语义） */
+        portENTER_CRITICAL(&s_lock);
+        long cur = s_last_cmd_v;
+        portEXIT_CRITICAL(&s_lock);
+        if (cur > p->vel_max || cur < -p->vel_max) {
+            long v = (cur > p->vel_max) ? p->vel_max
+                    : (cur < -p->vel_max) ? -p->vel_max : cur;
+            long eff = cm_soft_limit_clamp((long)as5600_position_um(),
+                                           p->x_limit_um, v);
+            s_last_cmd_v = eff;
+            step_engine_vel_target(mmps_to_q16(eff));
+        }
     }
-    /* 其余参数（VEL_MAX/HOME_* /X_LIMIT/标定量）为读取点即时生效 */
+    /* 其余参数（HOME_* /X_LIMIT/标定量）为读取点即时生效 */
 }
 
 /* ---- 模式转换辅助 ---- */
@@ -219,8 +232,11 @@ static void exec_cmd(const cart_req_t *req)
     }
 
     case CART_CMD_VEL: {
-        if (s_mode != CM_READY) {
-            return;   /* 仅 READY 执行，其余忽略 */
+        portENTER_CRITICAL(&s_lock);
+        cm_mode_t cur = s_mode;
+        portEXIT_CRITICAL(&s_lock);
+        if (cur != CM_READY) {
+            return;   /* 仅 READY 执行；持锁复查防 FAULT 进入瞬间的在途命令 */
         }
         const fw_params_t *p = fw_params();
         long v = req->v_mm_s;

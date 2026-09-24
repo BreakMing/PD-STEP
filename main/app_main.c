@@ -26,9 +26,14 @@ void app_main(void)
 #ifdef CONFIG_SETTINGS_SELF_TEST
     settings_self_test_run();
 #endif
-    esp_err_t bsp_err = bsp_init();
-    if (bsp_err == ESP_OK) {
+    /* bsp 任一外设初始化失败即 panic 重启：静默半启动表现为死链路，
+     * 可见可恢复优于带病存活 */
+    ESP_ERROR_CHECK(bsp_init());
+    {
         ESP_ERROR_CHECK(as5600_init());
+#ifdef CONFIG_AS5600_SELF_TEST
+        as5600_self_test_run();
+#endif
         ESP_ERROR_CHECK(mt6835_init());
 #ifdef CONFIG_MT6835_SELF_TEST
         mt6835_self_test_run();

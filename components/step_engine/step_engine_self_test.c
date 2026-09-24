@@ -13,6 +13,7 @@
 #include "vel_ramp.h"
 
 #include "esp_log.h"
+#include "driver/gpio.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
@@ -239,11 +240,17 @@ static bool test_emergency_stop(void)
     return true;
 }
 
-/* ---- 7. 方向反转（X_INV 作用点）：+200 命令位置应减少 ---- */
+/* ---- 7. 方向反转（X_INV 作用点）：开关立即翻转 DIR 电平（评审
+ *      Critical 回归锚点：陈旧电平使首个同向运动转向与计数相反），
+ *      且 +200 命令位置应减少 ---- */
 static bool test_dir_invert(void)
 {
     settle();
+    int lvl0 = gpio_get_level(CONFIG_BSP_DIR_GPIO);
     step_engine_set_dir_invert(true);
+    CHECK(gpio_get_level(CONFIG_BSP_DIR_GPIO) != lvl0,
+          "翻转 X_INV 应立即翻转 DIR 电平");
+
     step_engine_vel_set_accel(2000);
     step_engine_vel_target(STEPS(200));
     vTaskDelay(pdMS_TO_TICKS(400));
@@ -255,6 +262,7 @@ static bool test_dir_invert(void)
     step_engine_vel_halt();
     CHECK(wait_stopped(2000), "收尾停");
     step_engine_set_dir_invert(false);
+    CHECK(gpio_get_level(CONFIG_BSP_DIR_GPIO) == lvl0, "恢复 X_INV 电平复原");
     return true;
 }
 

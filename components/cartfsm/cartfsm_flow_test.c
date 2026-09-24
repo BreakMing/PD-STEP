@@ -60,11 +60,26 @@ static bool wait_fault_settled(int timeout_ms)
     return false;
 }
 
+/* 回到 DISABLED：RESET 仅在 FAULT 生效（READY 下被忽略），故先经
+ * 注入失联制造 FAULT（监督任务完成停机次序、EN 关）再 RESET。 */
 static void to_disabled(void)
 {
+    if (cartfsm_mode() == CM_READY || cartfsm_mode() == CM_HOMING) {
+        cartfsm_test_inject_encoder_fail(1);
+        if (!wait_fault_settled(2000)) {
+            ESP_LOGE(TAG, "to_disabled：FAULT 停机超时");
+        }
+        cartfsm_test_inject_encoder_fail(0);
+    } else if (cartfsm_mode() == CM_FAULT) {
+        if (!wait_fault_settled(2000)) {
+            ESP_LOGE(TAG, "to_disabled：FAULT 停机超时");
+        }
+    }
     cart_req_t req = { .cmd = CART_CMD_RESET };
     cartfsm_test_exec(&req);
-    vTaskDelay(pdMS_TO_TICKS(50));
+    for (int t = 0; t < 100 && cartfsm_mode() != CM_DISABLED; t += 5) {
+        vTaskDelay(pdMS_TO_TICKS(5));
+    }
 }
 
 /* 1. HOME → 注入堵转 → READY，原点重置 */

@@ -54,6 +54,13 @@ static char s_line_buf[LINE_BUF_SIZE];
 static int  s_line_len = 0;
 static TickType_t s_line_start_tick = 0;
 
+/* 行尾 \r\n 容忍：'\r' 仅在紧邻 '\n' 时剥离；行中 '\r' 按垃圾
+ * 注入缓冲，由解析层判非法 */
+static bool s_cr_pending = false;
+
+/* 超长行丢弃模式：丢到下一个 '\n' 重同步，防止残余字符拼出命令 */
+static bool s_discarding = false;
+
 /* 行处理器（NULL = 丢弃） */
 static cartproto_line_cb_t s_line_cb = NULL;
 
@@ -142,21 +149,59 @@ static void line_reset(void)
 {
     s_line_len = 0;
     s_line_start_tick = 0;
+    s_cr_pending = false;
 }
 
 /* 处理单个接收字符（RX 字节循环调用）。
  *
- * '\r' 静默剥离（'\n' 与 '\r\n' 都能正确分行）；'\n' 触发分发行。
+ * 超长行进入丢弃模式直到 '\n' 重同步；'\r' 仅在行尾（紧邻 '\n'）
+ * 时剥离，行中 '\r' 注入缓冲交解析层判非法。
  * 返回 true 表示该行已分发。 */
 static bool line_handle_char(char c)
 {
-    /* 行首记录 tick，用于超时判定 */
-    if (s_line_len == 0) {
-        s_line_start_tick = xTaskGetTickCount();
+    /* ---- 超长行丢弃模式 ---- */
+    if (s_discarding) {
+        if (c == '\n') {
+            s_discarding = false;
+            line_reset();
+        }
+        return false;
+    }
+
+    /* ---- 行尾 '\r' 容忍：暂挂，由下一字符裁决 ---- */
+    if (s_cr_pending) {
+        s_cr_pending = false;
+        if (c == '\n') {
+            /* "\r\n" 结尾：分发 */
+            s_line_buf[s_line_len] = '\0';
+            if (s_line_cb != NULL) {
+                s_line_cb(s_line_buf);
+            }
+            line_reset();
+            return true;
+        }
+        /* '\r' 在行中：作为垃圾字符入缓冲（解析层将判非法） */
+        if (s_line_len == 0) {
+            s_line_start_tick = xTaskGetTickCount();
+        }
+        if (s_line_len < LINE_MAX_CHARS) {
+            s_line_buf[s_line_len++] = '\r';
+        } else {
+            ESP_LOGW(TAG, "行超长（>%d 字符），丢弃至行尾", LINE_MAX_CHARS);
+            s_discarding = true;
+            line_reset();
+            return false;
+        }
     }
 
     if (c == '\r') {
+        s_cr_pending = true;
         return false;
+    }
+
+    /* 行首记录 tick，用于超时判定 */
+    if (s_line_len == 0) {
+        s_line_start_tick = xTaskGetTickCount();
     }
 
     if (c == '\n') {
@@ -168,9 +213,10 @@ static bool line_handle_char(char c)
         return true;
     }
 
-    /* 超长行：静默丢弃并复位（protocol.md：非法行静默丢弃） */
+    /* 超长行：丢弃整行到行尾（protocol.md：非法行静默丢弃） */
     if (s_line_len >= LINE_MAX_CHARS) {
-        ESP_LOGW(TAG, "行超长（>%d 字符），静默丢弃", LINE_MAX_CHARS);
+        ESP_LOGW(TAG, "行超长（>%d 字符），丢弃至行尾", LINE_MAX_CHARS);
+        s_discarding = true;
         line_reset();
         return false;
     }
@@ -239,10 +285,11 @@ static void comm_task(void *pvParameters)
 
         case UART_BUFFER_FULL:
         case UART_FIFO_OVF: {
-            /* RX 溢出：冲掉全部输入并复位行组装，静默处理 */
+            /* RX 溢出：冲掉全部输入并复位行组装与丢弃模式，静默处理 */
             ESP_LOGW(TAG, "UART RX 溢出（type=%d），冲刷输入", event.type);
             uart_flush_input(UART_PORT_NUM);
             xQueueReset(s_uart_queue);
+            s_discarding = false;
             line_reset();
             break;
         }

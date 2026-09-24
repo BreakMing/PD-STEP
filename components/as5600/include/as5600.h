@@ -3,7 +3,7 @@
  *
  * Scope (PLAN T8): sensor layer only — I2C angle read → multi-turn
  * counting → continuous position (counts / mm) + velocity estimate +
- * G92 origin shift.  NO loss-of-step detection and NO closed-loop
+ * origin shift.  NO loss-of-step detection and NO closed-loop
  * compensation (D6 explicitly defers both to phase 2), no status-frame
  * packing (T9).
  *
@@ -91,7 +91,7 @@ esp_err_t as5600_init(void);
  * Telemetry (consumed by T9 monitor)
  * ================================================================ */
 
-/** Continuous position in mm, including the G92 origin shift. */
+/** 连续位置（mm，含回零建立的原点偏移）。 */
 float    as5600_position_mm(void);
 
 /** Continuous position in counts (multi-turn, signed) — the truth value. */
@@ -124,7 +124,7 @@ uint16_t as5600_last_raw(void);
 bool     as5600_is_ok(void);
 
 /* ================================================================
- * G92 origin shift (D10: moves together with the commanded position)
+ * 原点偏移（回零触发点重置时建立）
  * ================================================================ */
 
 /**

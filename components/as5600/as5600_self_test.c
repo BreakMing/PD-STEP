@@ -357,7 +357,7 @@ static bool case_b16_static_velocity(void)
     return true;
 }
 
-/* B17: position/scale consistency — with no G92 issued yet the origin
+/* B17: position/scale consistency — no origin shift issued yet, the
  * offset is 0 (D10), so E = counts × units_per_rev / 4096. */
 static bool case_b17_scale_consistency(void)
 {
@@ -372,7 +372,7 @@ static bool case_b17_scale_consistency(void)
     return true;
 }
 
-/* B18: G92 origin shift — the reported position follows set_origin()
+/* B18: origin shift — the reported position follows set_origin()
  * (this is the interface D10 uses to keep C and E comparable). */
 static bool case_b18_origin_shift(void)
 {
@@ -418,7 +418,7 @@ static const as5600_case_t s_cases[] = {
     { "B15 standstill noise p-p ≤2 counts",                   case_b15_noise },
     { "B16 standstill velocity |v| ≤5 mm/s",                  case_b16_static_velocity },
     { "B17 E == counts × units_per_rev / 4096",               case_b17_scale_consistency },
-    { "B18 G92 origin shift (set 100 / back to 0)",           case_b18_origin_shift },
+    { "B18 origin shift (set 100 / back to 0)",               case_b18_origin_shift },
 };
 
 #define AS5600_CASE_COUNT  (int)(sizeof(s_cases) / sizeof(s_cases[0]))

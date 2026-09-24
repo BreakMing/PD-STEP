@@ -1,6 +1,6 @@
 # ============================================================
-# ESP32-S3 Single-Axis Motion Controller - SDK Config Defaults
-# Target: ESP32-S3-WROOM-1-N16R8 (16MB Quad Flash + 8MB Octal PSRAM)
+# cartpole 固件 SDK 配置默认值
+# 目标：ESP32-S3-WROOM-1-N16R8（16MB Quad Flash + 8MB Octal PSRAM）
 # ============================================================
 
 # ---- Target Chip ----
@@ -44,11 +44,9 @@ CONFIG_ESP_TASK_WDT_INIT=y
 CONFIG_ESP_TASK_WDT_TIMEOUT_S=30
 CONFIG_ESP_TASK_WDT_CHECK_IDLE_TASK_CPU0=y
 CONFIG_ESP_TASK_WDT_CHECK_IDLE_TASK_CPU1=y
-# Panic on task-WDT timeout (T10, decided 2026-09-17): a hung task cannot
-# answer '!', so reboot instead of running on with the motor live.  On
-# reboot EN is high (driver disabled) and the queue is empty => the motor
-# stops.  Known trade-off: the position reference is lost — the host must
-# re-issue G92 after a panic reboot.
+# Panic on task-WDT timeout：卡死任务无法再喂狗，带电机带电继续运行不可
+# 接受，重启使故障可见可恢复。重启后 EN 为高（驱动不使能）、无运动目标。
+# 代价：位置基准丢失，回零原点需重新建立（重新 HOME）。
 CONFIG_ESP_TASK_WDT_PANIC=y
 
 # ---- Logging ----

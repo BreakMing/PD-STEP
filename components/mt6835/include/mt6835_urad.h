@@ -42,6 +42,15 @@ int32_t mt6835_unwrap_diff(uint32_t a, uint32_t b);
  */
 int32_t mt6835_counts_to_mrad_s(int64_t delta_counts, uint32_t window_ms);
 
+/**
+ * @brief 角度帧 CRC8（T4-brief：poly X⁸+X²+X+1 = 0x07、init 0x00、
+ *        输入 24 bit = ANGLE[20:0]<<3 | STATUS[2:0]，MSB 先行）。
+ *
+ * 与器件回传的寄存器 0x006 比较，不等视为读失败（拔线时 MISO
+ * 悬空常读 0x00，全零帧一并拒绝）。
+ */
+uint8_t mt6835_crc8(uint32_t angle21, uint8_t status);
+
 #ifdef __cplusplus
 }
 #endif

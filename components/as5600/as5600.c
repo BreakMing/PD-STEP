@@ -75,7 +75,7 @@ typedef struct {
     int      hist_head;                     /* newest sample index */
     int      hist_fill;                     /* valid samples, saturates at LEN */
     float    vel_mm_s;                      /* smoothed velocity */
-    float    offset_mm;                     /* G92 origin shift (D10) */
+    float    offset_mm;                     /* 原点偏移（回零建立） */
     float    mm_per_count;                  /* $2 / 4096 */
     uint16_t last_raw;                      /* newest raw angle */
 } as5600_state_t;
@@ -360,7 +360,7 @@ bool as5600_is_ok(void)
 }
 
 /* ================================================================
- * G92 origin shift (D10)
+ * 原点偏移（回零建立）
  * ================================================================ */
 void as5600_set_origin(float new_pos_mm)
 {
@@ -373,6 +373,6 @@ void as5600_set_origin(float new_pos_mm)
     offset = s_state.offset_mm;
     portEXIT_CRITICAL(&s_lock);
 
-    ESP_LOGI(TAG, "G92: encoder position set to %.3f mm (raw %.3f mm, offset %.3f mm)",
+    ESP_LOGI(TAG, "原点已重置：%.3f mm（原始 %.3f mm，偏移 %.3f mm）",
              (double)new_pos_mm, (double)raw_mm, (double)offset);
 }
