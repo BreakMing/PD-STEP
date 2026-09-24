@@ -125,10 +125,10 @@ static void run_manual_circle_check(void)
     int32_t excursion = hi - lo;
     int32_t k = (net >= 0) ? (net + REV / 2) / REV : (net - REV / 2) / REV;
     int32_t resid = net - k * REV;              /* 距整数圈的残余 */
-    int32_t resid_deg = resid * 360 / REV;
+    double resid_deg = (double)resid * 360.0 / (double)REV;
 
     ESP_LOGI(TAG, "MANUAL RESULT: 行程 %d counts（%.2f 圈），净变化 %d counts"
-             "（%d 圈 + 残余 %+d counts ≈ %+d°）",
+             "（%d 圈 + 残余 %+d counts ≈ %+.2f°）",
              excursion, (double)excursion / (double)REV, net, k, resid, resid_deg);
 
     if (excursion < REV / 10) {
@@ -137,10 +137,10 @@ static void run_manual_circle_check(void)
         ESP_LOGW(TAG, "A10 判定：行程 %.2f 圈不足（需 ≥ 0.9 圈）——请转满一圈再试",
                  (double)excursion / (double)REV);
     } else if (resid > REV / 120 || resid < -REV / 120) {
-        ESP_LOGW(TAG, "A10 判定：未回到出发点角度（残余 %+d° 超过 ±3°）——"
+        ESP_LOGW(TAG, "A10 判定：未回到出发点角度（残余 %+.2f° 超过 ±3°）——"
                  "请转满整数圈后停在同一位置再试", resid_deg);
     } else {
-        ESP_LOGI(TAG, "A10 判定：圈数守恒 OK（检测到 %d 圈，残余 %+d°）", k, resid_deg);
+        ESP_LOGI(TAG, "A10 判定：圈数守恒 OK（检测到 %d 圈，残余 %+.2f°）", k, resid_deg);
     }
 }
 
