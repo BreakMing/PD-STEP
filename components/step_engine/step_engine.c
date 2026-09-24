@@ -500,6 +500,13 @@ int32_t step_engine_position_steps(void)
     return s_position;
 }
 
+void step_engine_set_position(int32_t steps)
+{
+    /* 调用约定：引擎停止时调用（回零完成路径），无 ISR 竞争；
+     * 32 位对齐写本身原子 */
+    s_position = steps;
+}
+
 void step_engine_set_dir_invert(bool invert)
 {
     /* 立即刷新 DIR 引脚电平：只改标志会留陈旧电平，首个同向运动

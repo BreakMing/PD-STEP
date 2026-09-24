@@ -108,6 +108,13 @@ static long cmd_steps_to_um(int32_t steps)
     return (long)llround((double)steps * 1000.0 / spm);
 }
 
+/* µm → 指令位置 steps（cmd_steps_to_um 的逆；回零重定基用） */
+static int32_t um_to_cmd_steps(long um)
+{
+    double spm = (double)settings_steps_per_mm();
+    return (int32_t)llround((double)um * spm / 1000.0);
+}
+
 /* ---- 参数作用点 ---- */
 
 static void params_apply_engine(void)
@@ -342,9 +349,13 @@ static void fsm_task(void *arg)
 
             if (ev != 0 && cm_step(&m, &r, ev)) {
                 if (m == CM_READY) {
-                    /* 堵转 = 完成：急停 + 原点重置 */
+                    /* 堵转 = 完成：急停 + E/C 同帧重定基到 HOME 原点
+                     *（E、C 必须同时换到新坐标系，否则 READY 首拍
+                     *   |E−C| 丢步判定立即误报 FAULT/STEP_LOSS） */
                     step_engine_stop();
                     as5600_set_origin(HOME_ORIGIN_MM);
+                    step_engine_set_position(
+                        um_to_cmd_steps((long)(HOME_ORIGIN_MM * 1000.0)));
                     portENTER_CRITICAL(&s_lock);
                     s_mode = CM_READY;
                     s_reason = CR_NONE;

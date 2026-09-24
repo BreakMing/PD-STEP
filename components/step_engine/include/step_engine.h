@@ -90,6 +90,15 @@ int64_t step_engine_vel_now_q16(void);
 int32_t step_engine_position_steps(void);
 
 /**
+ * @brief 重定基指令位置（带符号累计 steps，物理域）。
+ *
+ * 供回零完成时与 AS5600 原点（as5600_set_origin）同帧重定基：
+ * E/C 域对齐后 |E−C| 丢步判定才有意义。必须在引擎停止
+ * （step_engine_stop 之后、无脉冲）时调用。
+ */
+void step_engine_set_position(int32_t steps);
+
+/**
  * @brief 设置方向反转（X_INV）。
  *
  * 输出层 XOR 生效：DIR 物理电平与位置计数同时翻转。

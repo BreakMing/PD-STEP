@@ -240,6 +240,11 @@ static bool test_halt(void)
     int32_t p = step_engine_position_steps();
     vTaskDelay(pdMS_TO_TICKS(200));
     CHECK(step_engine_position_steps() == p, "halt 后位置应冻结");
+
+    /* 重定基 API（回零完成路径 E/C 同帧）：停止时可整定位置 */
+    step_engine_set_position(p + 1234);
+    CHECK(step_engine_position_steps() == p + 1234, "set_position 应整定指令位置");
+    step_engine_set_position(p);
     return true;
 }
 
