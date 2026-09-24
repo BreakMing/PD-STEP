@@ -45,10 +45,11 @@ static const char *TAG = "tmc2209";
 #define REG_TPOWERDOWN      0x11
 #define REG_TSTEP           0x12
 #define REG_TPWMTHRS        0x13
+#define REG_TCOOLTHRS       0x14
 #define REG_VACTUAL         0x22
-#define REG_SGTHRS          0x40
-#define REG_SG_RESULT       0x41
-#define REG_COOLCONF        0x42
+/* SGTHRS=0x74（写入其他地址芯片同样回 ACK，值不会生效）；SG_RESULT
+ * 不是独立寄存器——为 DRV_STATUS(0x6F) 的低 10 位 */
+#define REG_SGTHRS          0x74
 #define REG_MSCNT           0x6A
 #define REG_CHOPCONF        0x6C
 #define REG_DRV_STATUS      0x6F
@@ -561,8 +562,11 @@ esp_err_t tmc2209_init(const tmc2209_config_t *cfg)
     /* ---- Apply default register configuration ---- */
 
     /* GCONF: pdn_disable=1 (UART mode), mstep_reg_select=1,
-     * en_spreadcycle=0 (StealthChop), shaft=0 */
-    uint32_t gconf = GCONF_PDN_DISABLE | GCONF_MSTEP_REG_SELECT;
+     * en_spreadcycle=1（StallGuard2 仅在 SpreadCycle 下有效，
+     * 强制后 TPWMTHRS 不再参与模式切换；静音让位于堵转检测）,
+     * shaft=0 */
+    uint32_t gconf = GCONF_PDN_DISABLE | GCONF_MSTEP_REG_SELECT
+                   | GCONF_EN_SPREADCYCLE;
     if (!tmc2209_write_reg(REG_GCONF, gconf)) {
         ESP_LOGW(TAG, "init: GCONF write failed (check wiring?)");
     }
@@ -602,8 +606,15 @@ esp_err_t tmc2209_init(const tmc2209_config_t *cfg)
     /* TPOWERDOWN: default delay */
     tmc2209_write_reg(REG_TPOWERDOWN, 20);
 
-    /* TPWMTHRS: 0 = always StealthChop (no auto-switch to SpreadCycle) */
+    /* TPWMTHRS: en_spreadCycle 已强制 SpreadCycle，此值不参与
+     * 模式切换（保留写 0 = 寄存器确定状态） */
     tmc2209_write_reg(REG_TPWMTHRS, 0);
+
+    /* TCOOLTHRS: 堵转输出仅在 TSTEP ≤ TCOOLTHRS（速度足够快）时
+     * 启用，0 = 永不启用。f_clk≈12 MHz，50 mm/s = 2000 steps/s →
+     * TSTEP≈6000；60000 对应 ≥~200 steps/s（约 5 mm/s），覆盖回零
+     * 与全部运行速度，低速爬行时自动关闭防误报 */
+    tmc2209_write_reg(REG_TCOOLTHRS, 60000);
 
     /* PWMCONF: StealthChop2 default parameters
      * pwm_autoscale=1, pwm_autograd=1, freewheel=0, pwm_freq=1 */

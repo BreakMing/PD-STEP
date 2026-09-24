@@ -39,8 +39,13 @@ bool cm_step(cm_mode_t *mode, cm_reason_t *reason, cm_event_t ev)
             *mode = CM_FAULT;
             *reason = CR_MT6835;
             return true;
+        case CE_CMD_RESET:          /* 回零中止：用户逃生口（撞墙不停/
+                                     * 异响时立即停下），EN 由外壳关闭 */
+            *mode = CM_DISABLED;
+            *reason = CR_NONE;
+            return true;
         default:
-            return false;           /* HOME/RESET/STEP_LOSS 忽略 */
+            return false;           /* HOME/STEP_LOSS 忽略 */
         }
 
     case CM_READY:

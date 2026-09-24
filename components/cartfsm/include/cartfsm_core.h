@@ -24,7 +24,7 @@ typedef enum {
 
 typedef enum {
     CE_CMD_HOME = 1,      /* DISABLED 才生效 */
-    CE_CMD_RESET,         /* FAULT 才生效 */
+    CE_CMD_RESET,         /* FAULT 清除；HOMING 中止（逃生口） */
     CE_STALL,             /* HOMING=完成；READY=故障 */
     CE_HOME_TIMEOUT,
     CE_AS5600_FAIL,

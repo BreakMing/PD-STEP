@@ -61,10 +61,14 @@ static void test_transitions(void)
     CHECK(step(CE_MT6835_FAIL) && m == CM_FAULT && r == CR_MT6835,
           "HOMING+MT6835→FAULT/MT6835");
 
-    /* HOMING 忽略 HOME/RESET/STEP_LOSS */
+    /* HOMING + RESET → DISABLED（回零中止逃生口） */
+    m = CM_HOMING;
+    CHECK(step(CE_CMD_RESET) && m == CM_DISABLED && r == CR_NONE,
+          "HOMING+RESET→DISABLED");
+
+    /* HOMING 忽略 HOME/STEP_LOSS */
     m = CM_HOMING;
     CHECK(!step(CE_CMD_HOME), "HOMING+HOME 忽略");
-    CHECK(!step(CE_CMD_RESET), "HOMING+RESET 忽略");
     CHECK(!step(CE_STEP_LOSS), "HOMING+STEP_LOSS 忽略");
 
     /* READY 故障四源 */

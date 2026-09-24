@@ -61,11 +61,18 @@ static bool wait_fault_settled(int timeout_ms)
     return false;
 }
 
-/* 回到 DISABLED：RESET 仅在 FAULT 生效（READY 下被忽略），故先经
- * 注入失联制造 FAULT（监督任务完成停机次序、EN 关）再 RESET。 */
+/* 回到 DISABLED：HOMING 直接 RESET（中止逃生口）；READY 下 RESET
+ * 被忽略，先经注入失联制造 FAULT（监督任务完成停机次序、EN 关）
+ * 再 RESET。 */
 static void to_disabled(void)
 {
-    if (cartfsm_mode() == CM_READY || cartfsm_mode() == CM_HOMING) {
+    if (cartfsm_mode() == CM_HOMING) {
+        cart_req_t req = { .cmd = CART_CMD_RESET };
+        cartfsm_test_exec(&req);
+        for (int t = 0; t < 100 && cartfsm_mode() != CM_DISABLED; t += 5) {
+            vTaskDelay(pdMS_TO_TICKS(5));
+        }
+    } else if (cartfsm_mode() == CM_READY) {
         cartfsm_test_inject_encoder_fail(1);
         if (!wait_fault_settled(2000)) {
             ESP_LOGE(TAG, "to_disabled：FAULT 停机超时");

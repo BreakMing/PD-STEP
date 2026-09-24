@@ -31,6 +31,9 @@ static bool test_transitions_spot(void)
     CHECK(cm_step(&m, &r, CE_STEP_LOSS) && m == CM_FAULT && r == CR_STEP_LOSS,
           "丢步→FAULT");
     CHECK(cm_step(&m, &r, CE_CMD_RESET) && m == CM_DISABLED, "RESET→DISABLED");
+    CHECK(cm_step(&m, &r, CE_CMD_HOME) && m == CM_HOMING, "HOME→HOMING");
+    CHECK(cm_step(&m, &r, CE_CMD_RESET) && m == CM_DISABLED,
+          "HOMING+RESET→DISABLED（中止逃生口）");
     return true;
 }
 

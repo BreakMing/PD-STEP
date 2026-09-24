@@ -333,8 +333,14 @@ static void fsm_task(void *arg)
             /* 回零速度按拍续喂：引擎看门狗按命令流设计（WDT_MS 窗口
              * 断流即减速），HOME 是单条命令，不续喂则 100 ms 后运动
              * 停止、HOMING 干等超时。回零是固件自主运动，由监督任务
-             * 承担命令流角色；总时长上限仍由 HOME_TIMEOUT 把关 */
-            step_engine_vel_target(mmps_to_q16(-(long)p->home_vel));
+             * 承担命令流角色；总时长上限仍由 HOME_TIMEOUT 把关。
+             * 持锁复查：与 exec 的 HOMING 中止（RESET→DISABLED）
+             * 交错时不得再喂，否则中止后引擎被重新起步 */
+            portENTER_CRITICAL(&s_lock);
+            if (s_mode == CM_HOMING) {
+                step_engine_vel_target(mmps_to_q16(-(long)p->home_vel));
+            }
+            portEXIT_CRITICAL(&s_lock);
 
             cm_mode_t m = mode;
             cm_reason_t r = s_reason;
@@ -369,6 +375,18 @@ static void fsm_task(void *arg)
                     portEXIT_CRITICAL(&s_lock);
                     push_mode(CM_READY, CR_NONE);
                 } else {
+                    if (r == CR_HOME_TIMEOUT) {
+                        /* 超时诊断线索：DIAG 原始电平与活跃电平连续
+                         * 拍数——堵转门限未开/接线断/极性反的区分依据
+                         *（TMC2209 DIAG 堵转为高；持续撞墙期间电平
+                         * 恒低=信号未产生，恒高而计数 0=极性配置反） */
+                        ESP_LOGW(TAG, "回零超时：DIAG 电平=%d，活跃电平"
+                                 "连续 %u 拍（极性=%s）",
+                                 gpio_get_level(CONFIG_BSP_DIAG_GPIO),
+                                 s_diag_high_run,
+                                 CONFIG_CARTFSM_DIAG_ACTIVE_HIGH
+                                     ? "高有效" : "低有效");
+                    }
                     enter_fault(r);
                 }
             }
