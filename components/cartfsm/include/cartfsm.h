@@ -43,6 +43,9 @@ void cartfsm_test_exec(const cart_req_t *req);
 
 /** 编码器失联注入：0 无、1 AS5600、2 MT6835。 */
 void cartfsm_test_inject_encoder_fail(int which);
+
+/** 丢步判定注入：给 |E−C| 判据的 E 侧加偏置（µm）。 */
+void cartfsm_test_inject_loss_bias(long bias_um);
 #endif
 
 /* ---- 上板自测 ---- */

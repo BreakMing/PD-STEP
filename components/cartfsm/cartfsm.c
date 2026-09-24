@@ -57,6 +57,7 @@ static int s_diag_high_run = 0;
 /* 流程自测注入（CONFIG_CARTFSM_FLOW_TEST）：0 无、1 AS5600、2 MT6835 */
 #ifdef CONFIG_CARTFSM_FLOW_TEST
 static volatile int s_test_enc_fail = 0;
+static volatile long s_test_loss_bias_um = 0;   /* 丢步判定的 E 偏置注入 */
 #endif
 
 /* ---- 模式/原因字符串 ---- */
@@ -346,8 +347,11 @@ static void fsm_task(void *arg)
             } else if (!m6835_ok) {
                 enter_fault(CR_MT6835);
             } else {
-                /* 丢步判定：µm 域 |E−C| */
+                /* 丢步判定：µm 域 |E−C|（流程自测可注入 E 偏置） */
                 long e_um = (long)as5600_position_um();
+#ifdef CONFIG_CARTFSM_FLOW_TEST
+                e_um += s_test_loss_bias_um;
+#endif
                 long c_um = cmd_steps_to_um(step_engine_position_steps());
                 if (cm_step_loss(e_um, c_um, p->step_loss_um)) {
                     enter_fault(CR_STEP_LOSS);
@@ -403,6 +407,11 @@ void cartfsm_test_exec(const cart_req_t *req)
 void cartfsm_test_inject_encoder_fail(int which)
 {
     s_test_enc_fail = which;   /* 0 无、1 AS5600、2 MT6835 */
+}
+
+void cartfsm_test_inject_loss_bias(long bias_um)
+{
+    s_test_loss_bias_um = bias_um;
 }
 
 #endif

@@ -118,9 +118,32 @@ static bool test_homing_encoder_fail_priority(void)
     cartfsm_test_exec(&home);
     CHECK(wait_mode(CM_HOMING, 200), "应进入 HOMING");
 
+    TickType_t t0 = xTaskGetTickCount();
     cartfsm_test_inject_encoder_fail(1);  /* AS5600 失联 */
-    CHECK(wait_mode(CM_FAULT, 500), "失联后应立即 FAULT（先于超时）");
+    CHECK(wait_mode(CM_FAULT, 100), "失联后应立即 FAULT（先于超时）");
     cartfsm_test_inject_encoder_fail(0);
+    CHECK(wait_fault_settled(2000), "EN 关");
+    ESP_LOGI(TAG, "  失联→FAULT+EN 关 耗时 %u ms（实测，含调度）",
+             (unsigned)(xTaskGetTickCount() - t0));
+
+    to_disabled();
+    return true;
+}
+
+/* 3b. READY 中注入 |E−C| 偏差 → FAULT/STEP_LOSS（任务 9 用例③） */
+static bool test_ready_step_loss(void)
+{
+    to_disabled();
+
+    cart_req_t home = { .cmd = CART_CMD_HOME };
+    cartfsm_test_exec(&home);
+    CHECK(wait_mode(CM_HOMING, 200), "进入 HOMING");
+    cartfsm_report_stall(true);
+    CHECK(wait_mode(CM_READY, 500), "回零完成进 READY");
+
+    cartfsm_test_inject_loss_bias(10000);   /* 10 mm > STEP_LOSS_UM 3000 */
+    CHECK(wait_mode(CM_FAULT, 500), "偏差超阈值应 FAULT");
+    cartfsm_test_inject_loss_bias(0);
     CHECK(wait_fault_settled(2000), "EN 关");
 
     to_disabled();
@@ -162,6 +185,7 @@ void cartfsm_flow_test_run(void)
     RUN_TEST(test_home_stall_to_ready);
     RUN_TEST(test_home_timeout);
     RUN_TEST(test_homing_encoder_fail_priority);
+    RUN_TEST(test_ready_step_loss);
     RUN_TEST(test_reset_then_rehome);
 
     to_disabled();
