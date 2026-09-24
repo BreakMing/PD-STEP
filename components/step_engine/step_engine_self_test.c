@@ -93,7 +93,9 @@ static bool test_accel_converge(void)
 
     int n = cnt;
     CHECK(n >= 100 && n <= STEP_SELFTEST_MAX_SAMPLES, "样本数合理");
-    CHECK(buf[0] >= 20000, "首拍应为 dt0 量级（≈31622）");
+    /* 首个采样是第 1→2 拍间隔（v1≈63 steps/s → ≈15812 µs）；
+     * kick-start 到第 1 拍的 dt0 不产生采样（首拍只置基准） */
+    CHECK(buf[0] >= 12000 && buf[0] <= 20000, "首采样应为 1/v1 量级（≈15.8 ms）");
 
     for (int i = 1; i < n; i++) {
         CHECK(buf[i] <= buf[i - 1] + 3, "加速期间间隔应单调不增（容 3 µs 抖动）");
@@ -127,9 +129,12 @@ static bool test_watchdog_stop_and_recover(void)
     vTaskDelay(pdMS_TO_TICKS(200));
     CHECK(step_engine_position_steps() == p1, "归零后位置应冻结");
 
-    /* 命令恢复：继续跟踪 */
-    step_engine_vel_target(STEPS(200));
-    vTaskDelay(pdMS_TO_TICKS(300));
+    /* 命令恢复：以 50 Hz 持续喂狗（看门狗按命令流设计，单条命令
+     * 只保 WDT_MS 窗口），恢复后应继续跟踪 */
+    for (int i = 0; i < 15; i++) {
+        step_engine_vel_target(STEPS(200));
+        vTaskDelay(pdMS_TO_TICKS(20));
+    }
     CHECK(step_engine_position_steps() > p1 + 30,
           "恢复命令后应继续运动（≈200 steps/s）");
 
@@ -169,13 +174,15 @@ static bool test_reversal(void)
     CHECK(step_engine_vel_now_q16() < 0, "换向后速度应为负");
 
     int n = cnt;
-    int long_beats = 0;
+    /* 过零邻域标志：换向必经近零速，出现 dt0 量级长拍（减速尾端
+     * 也会产生长拍，不能按「恰一次」计数） */
+    uint32_t max_dt = 0;
     for (int i = 0; i < n; i++) {
-        if (buf[i] >= 15000 && buf[i] <= 60000) {
-            long_beats++;
+        if (buf[i] > max_dt) {
+            max_dt = buf[i];
         }
     }
-    CHECK(long_beats == 1, "过零处应恰有一次 dt0 量级长拍（含 DIR setup）");
+    CHECK(max_dt >= 30000, "过零处应出现 dt0 量级长拍（含 DIR setup）");
 
     for (int i = n - 20; i < n; i++) {
         CHECK(buf[i] > 4850 && buf[i] < 5150, "反向末段应稳定在 5000±150 µs");
@@ -269,11 +276,15 @@ static bool test_dir_invert(void)
 /* ---- 运行器 ---- */
 
 #define RUN_TEST(name) do { \
+    step_selftest_reset_isr_cycles(); \
     if (name()) { \
         s_pass++; \
-        ESP_LOGI(TAG, "  PASS  %s", #name); \
+        ESP_LOGI(TAG, "  PASS  %s（ISR max %u cycles）", #name, \
+                 step_selftest_max_isr_cycles()); \
     } else { \
         s_fail++; \
+        ESP_LOGE(TAG, "  FAIL %s（ISR max %u cycles）", #name, \
+                 step_selftest_max_isr_cycles()); \
     } \
 } while (0)
 

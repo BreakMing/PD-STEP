@@ -213,9 +213,10 @@ static bool line_handle_char(char c)
         return true;
     }
 
-    /* 超长行：丢弃整行到行尾（protocol.md：非法行静默丢弃） */
+    /* 超长行：丢弃整行到行尾（protocol.md：非法行静默丢弃；
+     * 悬空 RX 的连续噪声会刷屏，降为 debug） */
     if (s_line_len >= LINE_MAX_CHARS) {
-        ESP_LOGW(TAG, "行超长（>%d 字符），丢弃至行尾", LINE_MAX_CHARS);
+        ESP_LOGD(TAG, "行超长（>%d 字符），丢弃至行尾", LINE_MAX_CHARS);
         s_discarding = true;
         line_reset();
         return false;
@@ -235,7 +236,7 @@ static void line_check_timeout(void)
 
     TickType_t elapsed = xTaskGetTickCount() - s_line_start_tick;
     if (elapsed >= LINE_TIMEOUT_TICKS) {
-        ESP_LOGW(TAG, "不完整行超时（%d ms），静默丢弃 %d 字符",
+        ESP_LOGD(TAG, "不完整行超时（%d ms），静默丢弃 %d 字符",
                  CONFIG_CARTPROTO_LINE_TIMEOUT_MS, s_line_len);
         line_reset();
     }

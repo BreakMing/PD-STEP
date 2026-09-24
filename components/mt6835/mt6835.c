@@ -63,6 +63,21 @@ static spi_device_handle_t s_dev = NULL;
 static volatile bool s_ok = true;
 static bool s_initialized = false;
 
+/* 失败分诊：SPI 错误 / 全零帧 / CRC 不符；进入失败态时 dump 一次 */
+typedef enum { FAIL_SPI_ERR, FAIL_ALL_ZERO, FAIL_CRC } fail_kind_t;
+static fail_kind_t s_last_fail = FAIL_SPI_ERR;
+static uint8_t s_last_frame[MT6835_FRAME_BYTES];
+
+static const char *fail_str(fail_kind_t k)
+{
+    switch (k) {
+    case FAIL_SPI_ERR:   return "SPI 事务错误";
+    case FAIL_ALL_ZERO:  return "全零帧（MISO 悬空/器件未应答）";
+    case FAIL_CRC:       return "CRC 不符";
+    default:             return "?";
+    }
+}
+
 /* ================================================================
  * SPI 读取
  * ================================================================ */
@@ -87,7 +102,8 @@ static bool mt6835_read_raw(uint32_t *raw_out, uint8_t *status_out)
 
     esp_err_t err = spi_device_polling_transmit(s_dev, &t);
     if (err != ESP_OK) {
-        return false;
+        s_last_fail = FAIL_SPI_ERR;
+        goto fail;
     }
 
     uint32_t raw = ((uint32_t)rx[2] << 13) | ((uint32_t)rx[3] << 5)
@@ -97,15 +113,24 @@ static bool mt6835_read_raw(uint32_t *raw_out, uint8_t *status_out)
     /* 帧校验：拔线时 MISO 悬空常读全零——CRC 与全零帧一并拒绝，
      * 失败计入 fail_streak（10 ms 内 is_ok 变 false → FAULT/MT6835） */
     if (raw == 0 && status == 0 && rx[5] == 0) {
-        return false;
+        s_last_fail = FAIL_ALL_ZERO;
+        goto fail;
     }
     if (mt6835_crc8(raw, status) != rx[5]) {
-        return false;
+        s_last_fail = FAIL_CRC;
+        goto fail;
     }
 
     *raw_out = raw;
     *status_out = status;
     return true;
+
+fail:
+    /* 帧原文留存，进入失败态时一次性 dump（接线/算法分诊用） */
+    for (int i = 0; i < MT6835_FRAME_BYTES; i++) {
+        s_last_frame[i] = rx[i];
+    }
+    return false;
 }
 
 /* ================================================================
@@ -179,8 +204,13 @@ static void mt6835_task(void *arg)
             fail_streak++;
             if (fail_streak == MT6835_FAIL_LIMIT) {
                 s_ok = false;
-                ESP_LOGE(TAG, "SPI 读连续失败 %d 次——编码器标记 NOT OK",
-                         fail_streak);
+                ESP_LOGE(TAG, "SPI 读连续失败 %d 次——编码器标记 NOT OK（%s）",
+                         fail_streak, fail_str(s_last_fail));
+                ESP_LOGE(TAG, "末帧 rx = %02x %02x %02x %02x %02x %02x"
+                         "（tx = a0 03 00 00 00 00；rx[2..4]=角度/status，"
+                         "rx[5]=器件 CRC）",
+                         s_last_frame[0], s_last_frame[1], s_last_frame[2],
+                         s_last_frame[3], s_last_frame[4], s_last_frame[5]);
             }
         }
 
@@ -227,7 +257,11 @@ esp_err_t mt6835_init(void)
         ESP_LOGI(TAG, "MT6835 在线——首读 raw21=%u（种子，theta=%d µrad）",
                  raw, mt6835_theta_urad());
     } else {
-        ESP_LOGW(TAG, "首读失败——采样任务将继续重试");
+        ESP_LOGW(TAG, "首读失败（%s）——采样任务将继续重试",
+                 fail_str(s_last_fail));
+        ESP_LOGW(TAG, "末帧 rx = %02x %02x %02x %02x %02x %02x",
+                 s_last_frame[0], s_last_frame[1], s_last_frame[2],
+                 s_last_frame[3], s_last_frame[4], s_last_frame[5]);
     }
 
     BaseType_t ok = xTaskCreatePinnedToCore(mt6835_task, "mt6835",

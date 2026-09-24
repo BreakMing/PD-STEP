@@ -121,10 +121,12 @@ static esp_err_t bsp_uart1_init(void)
  * ================================================================ */
 static esp_err_t bsp_gpio_init(void)
 {
-    /* STEP and DIR as outputs, initial LOW */
+    /* STEP/DIR/EN as input-output: 输出功能不受影响，输入缓冲打开后
+     * gpio_get_level 可回读真实电平（自测与流程测试依赖回读） */
     gpio_config_t out_cfg = {
-        .pin_bit_mask = (1ULL << BSP_PIN_STEP) | (1ULL << BSP_PIN_DIR),
-        .mode = GPIO_MODE_OUTPUT,
+        .pin_bit_mask = (1ULL << BSP_PIN_STEP) | (1ULL << BSP_PIN_DIR)
+                      | (1ULL << BSP_PIN_EN),
+        .mode = GPIO_MODE_INPUT_OUTPUT,
         .pull_up_en = GPIO_PULLUP_DISABLE,
         .pull_down_en = GPIO_PULLDOWN_DISABLE,
         .intr_type = GPIO_INTR_DISABLE,
