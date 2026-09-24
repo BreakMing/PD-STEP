@@ -113,6 +113,11 @@ void step_selftest_stop_sampling(void);
 /** ISR 最大执行周期数（自上次复位）。 */
 uint32_t step_selftest_max_isr_cycles(void);
 
+/** ISR 分段最大周期数：脉冲段 / 递推段 / 排拍段（归因诊断用）。 */
+uint32_t step_selftest_max_cycles_pulse(void);
+uint32_t step_selftest_max_cycles_ramp(void);
+uint32_t step_selftest_max_cycles_alarm(void);
+
 /** 复位 ISR 周期计数。 */
 void step_selftest_reset_isr_cycles(void);
 

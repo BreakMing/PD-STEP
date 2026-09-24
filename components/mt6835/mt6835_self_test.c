@@ -27,9 +27,33 @@ static int s_fail = 0;
     } \
 } while (0)
 
-/* 1. 静止稳定性：1 s 内 raw21 抖动 ≤ 2 count */
+/* 1. 静止稳定性：先等机械稳定（|vth| 持续低于阈值），再测 1 s 内
+ *    raw21 抖动 ≤ 2 count。摆杆晃动/刚手动转过轴都会表现为大范围 */
 static bool test_stationary_stability(void)
 {
+    /* 等稳定：|vth| < 50 mrad/s 持续 300 ms，最多等 10 s */
+    bool calm = false;
+    for (int t = 0; t < 10000 && !calm; t += 10) {
+        int32_t v = mt6835_vth_mrad_s();
+        if (v > -50 && v < 50) {
+            calm = true;
+            for (int k = 0; k < 30; k++) {
+                vTaskDelay(pdMS_TO_TICKS(10));
+                v = mt6835_vth_mrad_s();
+                if (v <= -50 || v >= 50) {
+                    calm = false;
+                    break;
+                }
+            }
+        } else {
+            vTaskDelay(pdMS_TO_TICKS(10));
+        }
+    }
+    if (!calm) {
+        ESP_LOGW(TAG, "  10 s 内未稳定（vth=%d mrad/s）——扶稳摆杆后重试",
+                 mt6835_vth_mrad_s());
+    }
+
     uint32_t min_r = 0xFFFFFFFFu, max_r = 0;
     for (int i = 0; i < 1000; i++) {
         uint32_t r = mt6835_last_raw();

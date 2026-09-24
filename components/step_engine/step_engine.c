@@ -109,6 +109,10 @@ static volatile int *s_sample_count = NULL;
 static uint32_t  s_last_alarm_ccount = 0;
 
 static volatile uint32_t s_max_isr_cycles = 0;
+/* 分段计时（诊断 ISR 主体耗时归因）：脉冲 / 递推 / 排下一拍 */
+static volatile uint32_t s_max_cyc_pulse = 0;
+static volatile uint32_t s_max_cyc_ramp = 0;
+static volatile uint32_t s_max_cyc_alarm = 0;
 #endif /* CONFIG_STEP_ENGINE_SELF_TEST */
 
 /* ================================================================
@@ -217,6 +221,7 @@ static bool gptimer_alarm_cb(gptimer_handle_t timer,
         }
         s_last_alarm_ccount = now;
     }
+    uint32_t cyc_pulse_end = esp_cpu_get_cycle_count();
 #endif
 
     /* ---- 递推下一拍（持锁读共享目标，防 64 位撕裂读） ---- */
@@ -244,14 +249,31 @@ static bool gptimer_alarm_cb(gptimer_handle_t timer,
     }
     portEXIT_CRITICAL_ISR(&s_spinlock);
 
+#ifdef CONFIG_STEP_ENGINE_SELF_TEST
+    uint32_t cyc_ramp_end = esp_cpu_get_cycle_count();
+#endif
+
     if (!moving) {
         /* 到零速且无换向目标：停表（模式语义由 cartfsm 负责） */
         gptimer_stop(s_timer);
         s_timer_running = false;
 #ifdef CONFIG_STEP_ENGINE_SELF_TEST
         uint32_t cend2 = esp_cpu_get_cycle_count();
-        if (cend2 - isr_start_ccount > s_max_isr_cycles) {
-            s_max_isr_cycles = cend2 - isr_start_ccount;
+        uint32_t total2 = cend2 - isr_start_ccount;
+        if (total2 > s_max_isr_cycles) {
+            s_max_isr_cycles = total2;
+        }
+        uint32_t pulse_span = cyc_pulse_end - isr_start_ccount;
+        if (pulse_span > s_max_cyc_pulse) {
+            s_max_cyc_pulse = pulse_span;
+        }
+        uint32_t ramp_span = cyc_ramp_end - cyc_pulse_end;
+        if (ramp_span > s_max_cyc_ramp) {
+            s_max_cyc_ramp = ramp_span;
+        }
+        uint32_t alarm_span = cend2 - cyc_ramp_end;
+        if (alarm_span > s_max_cyc_alarm) {
+            s_max_cyc_alarm = alarm_span;
         }
 #endif
         return false;
@@ -261,8 +283,21 @@ static bool gptimer_alarm_cb(gptimer_handle_t timer,
 
 #ifdef CONFIG_STEP_ENGINE_SELF_TEST
     uint32_t cend3 = esp_cpu_get_cycle_count();
-    if (cend3 - isr_start_ccount > s_max_isr_cycles) {
-        s_max_isr_cycles = cend3 - isr_start_ccount;
+    uint32_t total3 = cend3 - isr_start_ccount;
+    if (total3 > s_max_isr_cycles) {
+        s_max_isr_cycles = total3;
+    }
+    uint32_t pulse_span3 = cyc_pulse_end - isr_start_ccount;
+    if (pulse_span3 > s_max_cyc_pulse) {
+        s_max_cyc_pulse = pulse_span3;
+    }
+    uint32_t ramp_span3 = cyc_ramp_end - cyc_pulse_end;
+    if (ramp_span3 > s_max_cyc_ramp) {
+        s_max_cyc_ramp = ramp_span3;
+    }
+    uint32_t alarm_span3 = cend3 - cyc_ramp_end;
+    if (alarm_span3 > s_max_cyc_alarm) {
+        s_max_cyc_alarm = alarm_span3;
     }
 #endif
 
@@ -491,9 +526,27 @@ uint32_t step_selftest_max_isr_cycles(void)
     return s_max_isr_cycles;
 }
 
+uint32_t step_selftest_max_cycles_pulse(void)
+{
+    return s_max_cyc_pulse;
+}
+
+uint32_t step_selftest_max_cycles_ramp(void)
+{
+    return s_max_cyc_ramp;
+}
+
+uint32_t step_selftest_max_cycles_alarm(void)
+{
+    return s_max_cyc_alarm;
+}
+
 void step_selftest_reset_isr_cycles(void)
 {
     s_max_isr_cycles = 0;
+    s_max_cyc_pulse = 0;
+    s_max_cyc_ramp = 0;
+    s_max_cyc_alarm = 0;
 }
 
 #endif /* CONFIG_STEP_ENGINE_SELF_TEST */

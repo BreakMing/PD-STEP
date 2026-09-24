@@ -95,6 +95,9 @@ static bool test_accel_converge(void)
     CHECK(n >= 100 && n <= STEP_SELFTEST_MAX_SAMPLES, "样本数合理");
     /* 首个采样是第 1→2 拍间隔（v1≈63 steps/s → ≈15812 µs）；
      * kick-start 到第 1 拍的 dt0 不产生采样（首拍只置基准） */
+    ESP_LOGI(TAG, "  采样前 6 项：%u %u %u %u %u %u（n=%d）",
+             n > 0 ? buf[0] : 0, n > 1 ? buf[1] : 0, n > 2 ? buf[2] : 0,
+             n > 3 ? buf[3] : 0, n > 4 ? buf[4] : 0, n > 5 ? buf[5] : 0, n);
     CHECK(buf[0] >= 12000 && buf[0] <= 20000, "首采样应为 1/v1 量级（≈15.8 ms）");
 
     for (int i = 1; i < n; i++) {
@@ -279,12 +282,18 @@ static bool test_dir_invert(void)
     step_selftest_reset_isr_cycles(); \
     if (name()) { \
         s_pass++; \
-        ESP_LOGI(TAG, "  PASS  %s（ISR max %u cycles）", #name, \
-                 step_selftest_max_isr_cycles()); \
+        ESP_LOGI(TAG, "  PASS  %s（ISR 总 %u：脉冲 %u / 递推 %u / 排拍 %u cycles）", \
+                 #name, step_selftest_max_isr_cycles(), \
+                 step_selftest_max_cycles_pulse(), \
+                 step_selftest_max_cycles_ramp(), \
+                 step_selftest_max_cycles_alarm()); \
     } else { \
         s_fail++; \
-        ESP_LOGE(TAG, "  FAIL %s（ISR max %u cycles）", #name, \
-                 step_selftest_max_isr_cycles()); \
+        ESP_LOGE(TAG, "  FAIL %s（ISR 总 %u：脉冲 %u / 递推 %u / 排拍 %u cycles）", \
+                 #name, step_selftest_max_isr_cycles(), \
+                 step_selftest_max_cycles_pulse(), \
+                 step_selftest_max_cycles_ramp(), \
+                 step_selftest_max_cycles_alarm()); \
     } \
 } while (0)
 
