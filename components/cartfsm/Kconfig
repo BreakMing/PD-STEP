@@ -9,11 +9,12 @@ config CARTFSM_SELF_TEST
 
 config CARTFSM_DIAG_ACTIVE_HIGH
     bool "DIAG1 堵转有效电平为高"
-    default y
+    default n
     help
         true：DIAG1 高电平视为堵转；false：低有效。
-        TMC2209 DIAG 推挽输出，极性上板以低速手堵验证
-        （上板清单 T8-②），不符时改此开关。
+        TMC2209 DIAG 为开漏输出、堵转拉低（须上拉，bsp 已开内部
+        上拉）——默认低有效；上板以低速手堵验证（清单 C1），
+        不符时改此开关。
 
 config CARTFSM_FLOW_TEST
     bool "上板流程自测（驱动 EN，含 12V 时小车会真实运动）"

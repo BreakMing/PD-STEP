@@ -94,11 +94,12 @@ static esp_err_t bsp_gpio_init(void)
      * 缓冲供回读——用 set_direction 避免重复 gpio_config 的冲突告警 */
     gpio_set_direction((gpio_num_t)BSP_PIN_EN, GPIO_MODE_INPUT_OUTPUT);
 
-    /* DIAG as input */
+    /* DIAG as input（TMC2209 DIAG 开漏输出：堵转时拉低，须上拉
+     * 才能读到空闲高电平；内部 ~45kΩ 上拉即可，量产可换外部 10k） */
     gpio_config_t in_cfg = {
         .pin_bit_mask = (1ULL << BSP_PIN_DIAG),
         .mode = GPIO_MODE_INPUT,
-        .pull_up_en = GPIO_PULLUP_DISABLE,
+        .pull_up_en = GPIO_PULLUP_ENABLE,
         .pull_down_en = GPIO_PULLDOWN_DISABLE,
         .intr_type = GPIO_INTR_DISABLE,
     };
