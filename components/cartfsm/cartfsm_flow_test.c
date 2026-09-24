@@ -19,6 +19,7 @@
 #include "driver/gpio.h"
 
 #include "as5600.h"
+#include "step_engine.h"
 
 static const char *TAG = "cartfsm_flowtest";
 
@@ -114,6 +115,15 @@ static bool test_home_timeout(void)
     cart_req_t home = { .cmd = CART_CMD_HOME };
     cartfsm_test_exec(&home);
     CHECK(wait_mode(CM_HOMING, 200), "应进入 HOMING");
+
+    /* 回零运动必须持续整个超时窗（监督任务续喂引擎看门狗——曾因
+     * 断喂在 100 ms 后减速停车，超时断言无法暴露，此处锚定；
+     * 步数为逻辑量，不依赖 12V） */
+    vTaskDelay(pdMS_TO_TICKS(300));
+    int32_t p1 = step_engine_position_steps();
+    vTaskDelay(pdMS_TO_TICKS(300));
+    int32_t p2 = step_engine_position_steps();
+    CHECK(p2 < p1 - 100, "HOMING 应持续运动（监督任务喂狗）");
 
     /* 无堵转、无编码器失联 → 只能超时 */
     CHECK(wait_mode(CM_FAULT, 3000), "1 s 超时后应 FAULT");

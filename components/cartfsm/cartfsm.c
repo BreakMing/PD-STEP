@@ -330,6 +330,12 @@ static void fsm_task(void *arg)
 #endif
 
         if (mode == CM_HOMING) {
+            /* 回零速度按拍续喂：引擎看门狗按命令流设计（WDT_MS 窗口
+             * 断流即减速），HOME 是单条命令，不续喂则 100 ms 后运动
+             * 停止、HOMING 干等超时。回零是固件自主运动，由监督任务
+             * 承担命令流角色；总时长上限仍由 HOME_TIMEOUT 把关 */
+            step_engine_vel_target(mmps_to_q16(-(long)p->home_vel));
+
             cm_mode_t m = mode;
             cm_reason_t r = s_reason;
             cm_event_t ev = CE_STALL;
