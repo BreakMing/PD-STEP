@@ -28,6 +28,13 @@ import serial
 class Rig:
     def __init__(self, port, baud=460800, timeout=0.2):
         self.ser = serial.Serial(port, baud, timeout=timeout)
+        # 打开瞬间丢弃流内残余（到首个 \n）：mid-stream 半行与开串口
+        # 毛刺不是链路质量问题，不得计入 UNKNOWN 统计
+        t0 = time.time()
+        while time.time() - t0 < 0.5:
+            chunk = self.ser.read(256)
+            if chunk and b"\n" in chunk:
+                break
         self.last_mode = None      # (mode, reason)
         self.last_reply = None     # (kind, name, value)
         self.state_count = 0
