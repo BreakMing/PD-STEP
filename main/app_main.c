@@ -54,6 +54,9 @@ void app_main(void)
 #ifdef CONFIG_CARTFSM_SELF_TEST
         cartfsm_self_test_run();
 #endif
+#ifdef CONFIG_CARTFSM_FLOW_TEST
+        cartfsm_flow_test_run();
+#endif
         ESP_ERROR_CHECK(telemetry_start());
 #ifdef CONFIG_STEP_ENGINE_SELF_TEST
         step_engine_self_test_run();

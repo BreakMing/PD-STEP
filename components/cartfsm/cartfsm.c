@@ -28,6 +28,7 @@
 #include "as5600.h"
 #include "mt6835.h"
 #include "cartproto.h"
+#include "driver/gpio.h"
 
 static const char *TAG = "cartfsm";
 
@@ -48,6 +49,15 @@ static volatile long s_last_cmd_v = 0;     /* 最近有效目标（软限位持�
 static volatile bool s_stall_report = false;
 static volatile bool s_fault_settling = false;  /* FAULT 斜坡停机进行中 */
 static bool s_started = false;
+
+/* DIAG1 堵转轮询去抖（连续高样本数；1 kHz 下 2 ms） */
+#define DIAG_DEBOUNCE 2
+static int s_diag_high_run = 0;
+
+/* 流程自测注入（CONFIG_CARTFSM_FLOW_TEST）：0 无、1 AS5600、2 MT6835 */
+#ifdef CONFIG_CARTFSM_FLOW_TEST
+static volatile int s_test_enc_fail = 0;
+#endif
 
 /* ---- 模式/原因字符串 ---- */
 static const char *mode_str(cm_mode_t m)
@@ -268,18 +278,42 @@ static void fsm_task(void *arg)
         const fw_params_t *p = fw_params();
         cm_mode_t mode = s_mode;
 
-        if (mode == CM_HOMING) {
-            bool stalled = s_stall_report;
-            s_stall_report = false;
+        /* DIAG1 堵转轮询：仅在使能的运动模式（HOMING/READY）下采样；
+         * 电平极性按 Kconfig（上板用低速手堵验证，见上板清单）。
+         * 2 ms 去抖。注入报告（任务 8 自测）与本轮询并联。 */
+        bool diag_stall = false;
+        if (mode == CM_HOMING || mode == CM_READY) {
+            int lvl = gpio_get_level(CONFIG_BSP_DIAG_GPIO);
+            bool high = CONFIG_CARTFSM_DIAG_ACTIVE_HIGH ? (lvl == 1)
+                                                         : (lvl == 0);
+            s_diag_high_run = high ? s_diag_high_run + 1 : 0;
+            if (s_diag_high_run >= DIAG_DEBOUNCE) {
+                diag_stall = true;
+            }
+        } else {
+            s_diag_high_run = 0;
+        }
 
+        bool stalled = s_stall_report || diag_stall;
+        s_stall_report = false;
+
+#ifdef CONFIG_CARTFSM_FLOW_TEST
+        bool a5600_ok = (s_test_enc_fail == 1) ? false : as5600_is_ok();
+        bool m6835_ok = (s_test_enc_fail == 2) ? false : mt6835_is_ok();
+#else
+        bool a5600_ok = as5600_is_ok();
+        bool m6835_ok = mt6835_is_ok();
+#endif
+
+        if (mode == CM_HOMING) {
             cm_mode_t m = mode;
             cm_reason_t r = s_reason;
             cm_event_t ev = CE_STALL;
 
             if (!stalled) {
-                if (!as5600_is_ok()) {
+                if (!a5600_ok) {
                     ev = CE_AS5600_FAIL;
-                } else if (!mt6835_is_ok()) {
+                } else if (!m6835_ok) {
                     ev = CE_MT6835_FAIL;
                 } else if ((xTaskGetTickCount() - s_home_start)
                            >= pdMS_TO_TICKS(p->home_timeout_ms)) {
@@ -305,14 +339,11 @@ static void fsm_task(void *arg)
                 }
             }
         } else if (mode == CM_READY) {
-            bool stalled = s_stall_report;
-            s_stall_report = false;
-
             if (stalled) {
                 enter_fault(CR_STALL);
-            } else if (!as5600_is_ok()) {
+            } else if (!a5600_ok) {
                 enter_fault(CR_AS5600);
-            } else if (!mt6835_is_ok()) {
+            } else if (!m6835_ok) {
                 enter_fault(CR_MT6835);
             } else {
                 /* 丢步判定：µm 域 |E−C| */
@@ -360,6 +391,21 @@ void cartfsm_report_stall(bool stalled)
 {
     s_stall_report = stalled;
 }
+
+/* ---- 流程自测钩子（CONFIG_CARTFSM_FLOW_TEST，上板注入用） ---- */
+#ifdef CONFIG_CARTFSM_FLOW_TEST
+
+void cartfsm_test_exec(const cart_req_t *req)
+{
+    exec_cmd(req);
+}
+
+void cartfsm_test_inject_encoder_fail(int which)
+{
+    s_test_enc_fail = which;   /* 0 无、1 AS5600、2 MT6835 */
+}
+
+#endif
 
 esp_err_t cartfsm_start(void)
 {

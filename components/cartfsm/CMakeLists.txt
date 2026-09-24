@@ -7,3 +7,7 @@ idf_component_register(
 if(CONFIG_CARTFSM_SELF_TEST)
     target_sources(${COMPONENT_LIB} PRIVATE "cartfsm_self_test.c")
 endif()
+
+if(CONFIG_CARTFSM_FLOW_TEST)
+    target_sources(${COMPONENT_LIB} PRIVATE "cartfsm_flow_test.c")
+endif()

@@ -34,9 +34,23 @@ cm_mode_t cartfsm_mode(void);
  */
 void cartfsm_report_stall(bool stalled);
 
-/* ---- 上板自测（CONFIG_CARTFSM_SELF_TEST=y） ---- */
+/* ---- 流程自测钩子（CONFIG_CARTFSM_FLOW_TEST，上板注入用） ---- */
+#ifdef CONFIG_CARTFSM_FLOW_TEST
+#include "cartproto.h"
+
+/** 直接注入一条已解析命令（绕过串口）。 */
+void cartfsm_test_exec(const cart_req_t *req);
+
+/** 编码器失联注入：0 无、1 AS5600、2 MT6835。 */
+void cartfsm_test_inject_encoder_fail(int which);
+#endif
+
+/* ---- 上板自测 ---- */
 #ifdef CONFIG_CARTFSM_SELF_TEST
 void cartfsm_self_test_run(void);
+#endif
+#ifdef CONFIG_CARTFSM_FLOW_TEST
+void cartfsm_flow_test_run(void);
 #endif
 
 #ifdef __cplusplus
