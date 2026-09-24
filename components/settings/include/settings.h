@@ -1,16 +1,17 @@
 /*
- * Settings — NVS-backed parameter store (PLAN §5)
+ * Settings — NVS 机械/驱动层参数存储
  *
- * 14 parameters ($0–$13) with validation, NVS persistence,
- * change notification, and derived value accessors.
+ * 5 项参数（$0–$4）带校验、NVS 持久化、变更通知与派生访问器。
+ * 方向反转不在此表——由线协议 CONFIG 扩项 X_INV 承担，
+ * 避免 NVS 与 CONFIG 两处权威。
  *
- * Thread-safe: internal FreeRTOS mutex protects all reads/writes.
- * No dependency on protocol / gcode_parser / bsp (pure data layer).
+ * 线程安全：内部 FreeRTOS 互斥保护全部读写。
+ * 不依赖 cartproto / bsp（纯数据层）。
  *
- * NVS layout: namespace "settings", keys "p0"–"p13", stored as u32
- * (float values are bit-copied via memcpy to/from uint32_t).
- * Missing keys → default value used silently (not written back until set).
- * Corrupt/out-of-range values → default + ESP_LOGW, key preserved.
+ * NVS 布局：namespace "cart"，键 "p0"–"p4"，u32 存储
+ * （float 值经 memcpy 位拷贝为 uint32_t）。
+ * 缺键 → 静默使用默认值（直到 set 才写回）。
+ * 损坏/超范围值 → 默认值 + ESP_LOGW，键保留。
  */
 
 #pragma once
@@ -23,100 +24,88 @@
 extern "C" {
 #endif
 
-#define SETTINGS_COUNT  14   /* $0..$13 */
+/* 参数索引（NVS 键 "p<idx>"） */
+enum {
+    SET_MICROSTEP   = 0,  /* 细分，2^n，1–256，整数，默认 8 */
+    SET_FULL_STEP   = 1,  /* 每转整步数，∈{200,400}，默认 200 */
+    SET_MM_PER_REV  = 2,  /* 每转行程 mm，(0,500]，默认 40.0 */
+    SET_RUN_MA      = 3,  /* 运行电流 mA，(0,2000]，整数，默认 800 */
+    SET_HOLD_MA     = 4,  /* 保持电流 mA，[0,$3]，整数，默认 400 */
+    SETTINGS_COUNT  = 5,
+};
 
-/* ---- Status codes ---- */
+/* ---- 状态码 ---- */
 typedef enum {
     SETTINGS_OK       = 0,
-    SETTINGS_INVALID  = 1,   /* value illegal / unknown idx  → error:4 */
-    SETTINGS_STORAGE  = 2,   /* NVS write/erase failure       → error:5 */
+    SETTINGS_INVALID  = 1,   /* 值非法 / 索引未知 */
+    SETTINGS_STORAGE  = 2,   /* NVS 写/擦失败 */
 } settings_status_t;
 
-/* ---- Change notification callback ----
- * Called after a successful set (and during reset_defaults for each
- * parameter that differs from default). */
+/* ---- 变更通知回调 ----
+ * set 成功后（以及 reset_defaults 时每个偏离默认值的参数）调用。 */
 typedef void (*settings_change_cb_t)(int idx, float new_value);
 
 /* ================================================================
- * Lifecycle
+ * 生命周期
  * ================================================================ */
 
 /**
- * @brief Initialize settings: nvs_flash_init + load all 14 values.
+ * @brief 初始化：nvs_flash_init + 载入全部参数。
  *
- * Must be called before any other settings_* function.
- * Safe to call multiple times (subsequent calls are no-op).
- *
- * @return ESP_OK on success, error code from nvs_flash_init otherwise.
+ * 必须在其他 settings_* 之前调用；重复调用为空操作。
  */
 esp_err_t settings_init(void);
 
 /**
- * @brief Reload all values from NVS (without re-running nvs_flash_init).
+ * @brief 从 NVS 重新载入全部参数（不重跑 nvs_flash_init）。
  *
- * @return SETTINGS_OK or SETTINGS_STORAGE.
+ * @return SETTINGS_OK 或 SETTINGS_STORAGE。
  */
 settings_status_t settings_reload(void);
 
 /**
- * @brief Reset all parameters to factory defaults.
+ * @brief 恢复出厂默认值。
  *
- * Erases all NVS keys in the "settings" namespace, loads defaults,
- * and fires change notifications for every parameter.
- *
- * @return SETTINGS_OK or SETTINGS_STORAGE.
+ * 擦除 "cart" namespace 全部键，载入默认值，
+ * 并对每个参数触发变更通知。
  */
 settings_status_t settings_reset_defaults(void);
 
 /* ================================================================
- * Core API
+ * 核心 API
  * ================================================================ */
 
 /**
- * @brief Set a parameter value (validates + writes to NVS + notifies).
+ * @brief 设置参数（校验 + 写 NVS + 通知）。
  *
- * @param idx    Parameter index (0..13).
- * @param value  New value.
- *
- * @return SETTINGS_OK / SETTINGS_INVALID / SETTINGS_STORAGE.
+ * @param idx    参数索引（0..4）。
+ * @param value  新值。
+ * @return SETTINGS_OK / SETTINGS_INVALID / SETTINGS_STORAGE。
  */
 settings_status_t settings_set(int idx, float value);
 
 /**
- * @brief Get current value of a parameter.
- *
- * @param idx  Parameter index (0..13).  Out-of-range returns 0.0f.
- * @return Current value.
+ * @brief 读取参数当前值。索引超范围返回 0.0f。
  */
 float settings_get(int idx);
 
 /**
- * @brief Pure validation — no side effects.
- *
- * @param idx    Parameter index.
- * @param value  Value to check.
- *
- * @return true if value is legal for this parameter (including cross-checks
- *         against current values of other parameters).
+ * @brief 纯校验，无副作用（含对其他参数当前值的交叉检查）。
  */
 bool settings_is_valid(int idx, float value);
 
 /**
- * @brief Number of parameters (= 14).
+ * @brief 参数数量（= 5）。
  */
 int settings_count(void);
 
 /**
- * @brief Short parameter name (for logging / $$ display aid).
- *
- * @param idx  Parameter index.  Out-of-range returns "?".
+ * @brief 参数短名（日志用）。索引超范围返回 "?"。
  */
 const char *settings_name(int idx);
 
 /* ================================================================
- * Derived / typed accessors
- *
- * Convenience wrappers; values derived per PLAN §4.7 / §5.
+ * 派生访问器
  * ================================================================ */
 
 int   settings_microstep(void);
@@ -125,34 +114,20 @@ float settings_units_per_rev(void);
 float settings_steps_per_mm(void);     /* full_steps * microstep / units_per_rev */
 int   settings_run_current_ma(void);
 int   settings_hold_current_ma(void);
-float settings_default_feed(void);
-float settings_default_accel(void);
-float settings_max_feed(void);
-float settings_max_accel(void);
-int   settings_report_hz(void);
-bool  settings_invert_dir(void);
-int   settings_uart_baud(void);
-float settings_soft_min(void);
-float settings_soft_max(void);
 
 /* ================================================================
- * Change notification
+ * 变更通知
  * ================================================================ */
 
 /**
- * @brief Subscribe to parameter changes.
- *
- * Up to 4 subscriber slots.  Returns false if slots are full.
- *
- * @param cb  Callback function.
- * @return true if subscribed successfully.
+ * @brief 订阅参数变更。最多 4 个订阅槽，满则返回 false。
  */
 bool  settings_subscribe(settings_change_cb_t cb);
 
-/* ---- On-target self-test (≥24 cases) ----
- * Only available when CONFIG_SETTINGS_SELF_TEST=y.
- * Prints results via ESP_LOG, final line: "SELF-TEST DONE: <n>/<total> PASS".
- * Cleans up with settings_reset_defaults() at the end. */
+/* ---- 上板自测 ----
+ * 仅 CONFIG_SETTINGS_SELF_TEST=y 时编入。
+ * 结束行："SELF-TEST DONE: <n>/<total> PASS"。
+ * 收尾调用 settings_reset_defaults() 清理。 */
 #ifdef CONFIG_SETTINGS_SELF_TEST
 int settings_self_test_run(void);
 #endif
