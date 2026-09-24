@@ -27,7 +27,16 @@ import serial
 
 class Rig:
     def __init__(self, port, baud=460800, timeout=0.2):
-        self.ser = serial.Serial(port, baud, timeout=timeout)
+        self.ser = serial.Serial()
+        self.ser.port = port
+        self.ser.baudrate = baud
+        self.ser.timeout = timeout
+        # Windows 下显式扩大驱动内部缓冲（SetupComm）：pyserial 默认
+        # 不调用 SetupComm，wch 驱动默认 RX 队列偏小，read 稳态积压
+        # （200 Hz STATE 流 ≈ 250 B）贴队列上限，读取间隙抖动即溢出
+        # 丢字节（实测 460800 下 ~2% 行被撕碎，大块读工具同口正常）
+        self.ser.set_buffer_size(rx_size=16384, tx_size=8192)
+        self.ser.open()
         # 打开瞬间丢弃流内残余（到首个 \n）：mid-stream 半行与开串口
         # 毛刺不是链路质量问题，不得计入 UNKNOWN 统计
         t0 = time.time()
