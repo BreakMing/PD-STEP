@@ -103,6 +103,14 @@ static bool test_calib_and_enable(void)
     cartfsm_test_exec(&mr);
     CHECK(cartfsm_calib() == CAL_DONE, "MARK RIGHT 后 CAL_DONE");
 
+    /* 坐标锚（calib-spec §2）：重定基后右端必须读 +L/2——
+     * set_origin 语义是「当前物理位置此后读 v」，右端即当前位
+     * 置；读数错位意味着软限位窗口整体偏移（右端不设防） */
+    vTaskDelay(pdMS_TO_TICKS(50));
+    int64_t x_right = as5600_position_um();
+    CHECK(x_right > 249000 && x_right < 251000,
+          "重定基后右端应读 +250000 µm 附近");
+
     cart_req_t en = { .cmd = CART_CMD_ENABLE };
     cartfsm_test_exec(&en);
     CHECK(wait_mode(CM_READY, 200), "ENABLE 后 READY");

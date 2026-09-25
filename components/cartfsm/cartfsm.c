@@ -225,10 +225,12 @@ static void exec_cmd(const cart_req_t *req)
         }
         s_calib_l_um = l;
         s_calib = CAL_DONE;
-        /* E/C 同帧重定基：两标中点为 x=0（引擎停止时整定） */
-        long mid_um = s_e_left_um + l / 2;
-        as5600_set_origin(mid_um / 1000.0);
-        step_engine_set_position(um_to_cmd_steps(mid_um));
+        /* E/C 同帧重定基：两标中点为 x=0（引擎停止时整定）。
+         * set_origin 的契约是「当前物理位置此后读 v」——此刻小车
+         * 在右端，传 +L/2 即得「右端=+L/2、中点=0、左端=−L/2」；
+         * C 同步到 E 的新读数，保持 E−C=0 */
+        as5600_set_origin((float)l / 2.0f / 1000.0f);
+        step_engine_set_position(um_to_cmd_steps(l / 2));
         cartproto_send_ok("MARK_RIGHT", l);
         break;
     }

@@ -24,7 +24,9 @@
 | `state` | 行率 200 Hz、字段有效 | |
 | `vel 200 --hold 1` | 小车运动、无 UNKNOWN | |
 | `config VEL_MAX 800` | `OK VEL_MAX 800` | |
-| `home` | `MODE HOMING NONE` → `MODE READY NONE` | |
+| `mark-left`（小车在左端） | `OK MARK_LEFT <E>` | |
+| `mark-right`（小车在右端） | `OK MARK_RIGHT <L>`（L ≈ 530 mm） | |
+| `enable` | `MODE READY NONE` | |
 | `console` 交互 | 命令/应答正常 | |
 
 ## 用例 3：看门狗（Review Focus 1）
@@ -35,7 +37,7 @@
 |---|---|---|
 | ~100 ms 内 vx_mm_s | 减到 0 | |
 | `QUERY` 应答 | `MODE READY NONE`（不改模式） | |
-| 恢复发送 VEL | 继续跟踪（不重新 HOME） | |
+| 恢复发送 VEL | 继续跟踪（模式不变） | |
 
 ## 用例 4：200 Hz + 460800 长稳
 
@@ -49,15 +51,17 @@
 
 ## 用例 5：全流程（演示当日流程）
 
-`HOME` → 小速度回中（`VEL 50` 至 x≈0）→ 手扶摆杆直立 →
+推最左 `mark-left` → 推最右 `mark-right`（核对 L ≈ 530 mm）→
+`enable` → 小速度回中（`VEL 50` 至 x≈0）→ 手扶摆杆直立 →
 策略接管（有模型时）或 `vel ±100` 手动换向验证 → FAULT 路径
-（拔 AS5600 线）→ STATE 流不断 → `RESET` → `HOME` 恢复。
+（拔 AS5600 线）→ STATE 流不断 → `RESET` → `enable` 恢复
+（RAM 标定保留，无需重新标记）。
 
 | 项 | 实测 |
 |---|---|
 | 全流程走通 | |
 | FAULT 后 STATE 流 | 不断（θ 恒有效） |
-| RESET→HOME 恢复 | |
+| RESET→ENABLE 恢复 | |
 
 ## 结论
 
