@@ -7,7 +7,9 @@ cartpole_host — cartpole 固件串口联调工具（PC 直连 ESP32-S3 UART1/C
 
 用法（示例）：
   python cartpole_host.py --port COM7 query
-  python cartpole_host.py --port COM7 home
+  python cartpole_host.py --port COM7 mark-left    # 小车推到最左端后
+  python cartpole_host.py --port COM7 mark-right   # 小车推到最右端后
+  python cartpole_host.py --port COM7 enable
   python cartpole_host.py --port COM7 vel 200 --hold 2
   python cartpole_host.py --port COM7 config VEL_MAX 800
   python cartpole_host.py --port COM7 dump
@@ -142,8 +144,27 @@ def cmd_reset(rig, args):
     return 1
 
 
-def cmd_home(rig, args):
-    rig.send_line("HOME")
+def cmd_mark(rig, args, word):
+    rig.send_line(word)
+    rig.pump(1.0)
+    r = rig.last_reply
+    if r and r[0] == "OK":
+        print("%s → %d" % (r[1], r[2]))
+        return 0
+    print("%s 被拒（%s）" % (word, r[1] if r else "无回执"))
+    return 1
+
+
+def cmd_mark_left(rig, args):
+    return cmd_mark(rig, args, "MARK LEFT")
+
+
+def cmd_mark_right(rig, args):
+    return cmd_mark(rig, args, "MARK RIGHT")
+
+
+def cmd_enable(rig, args):
+    rig.send_line("ENABLE")
     m = rig.wait_mode("READY", args.timeout)
     if m is None:
         print("超时未到 READY（当前 %s）" % (rig.last_mode,))
@@ -154,7 +175,7 @@ def cmd_home(rig, args):
 def cmd_vel(rig, args):
     m = rig.query()
     if not m or m[0] != "READY":
-        print("当前模式 %s，非 READY——先 HOME" % (m,))
+        print("当前模式 %s，非 READY——先标定并 ENABLE" % (m,))
         return 1
     end = time.time() + args.hold
     n = 0
@@ -212,7 +233,7 @@ def cmd_state(rig, args):
 def cmd_wdt_test(rig, args):
     m = rig.query()
     if not m or m[0] != "READY":
-        print("需先 HOME 到 READY")
+        print("需先标定并 ENABLE 到 READY")
         return 1
     end = time.time() + 1.0
     while time.time() < end:
@@ -246,7 +267,9 @@ def main():
     sub = ap.add_subparsers(dest="cmd", required=True)
 
     sub.add_parser("query")
-    p = sub.add_parser("home"); p.add_argument("--timeout", type=float, default=35.0)
+    sub.add_parser("mark-left")
+    sub.add_parser("mark-right")
+    p = sub.add_parser("enable"); p.add_argument("--timeout", type=float, default=5.0)
     p = sub.add_parser("vel"); p.add_argument("v", type=int)
     p.add_argument("--hold", type=float, default=1.0)
     p = sub.add_parser("config"); p.add_argument("name"); p.add_argument("value", type=int)
@@ -260,7 +283,8 @@ def main():
     rig = Rig(args.port, args.baud)
     try:
         table = {
-            "query": cmd_query, "home": cmd_home, "vel": cmd_vel,
+            "query": cmd_query, "mark-left": cmd_mark_left,
+            "mark-right": cmd_mark_right, "enable": cmd_enable, "vel": cmd_vel,
             "config": cmd_config, "dump": cmd_dump, "state": cmd_state,
             "wdt-test": cmd_wdt_test, "console": cmd_console,
             "reset": cmd_reset,
