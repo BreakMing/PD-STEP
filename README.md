@@ -3,7 +3,8 @@
 cartpole 实验台的运动端固件：ESP32-S3 + TMC2209 步进驱动 +
 AS5600 小车位置编码器 + MT6835 摆角编码器。上端（Hi3516CV610 或
 PC 联调机）通过串口以 **protocol.md 线协议** 驱动：200 Hz 状态流、
-`VEL` 速度模式跟踪、位置偏差判据回零、四态模式机与参数注册表。
+`VEL` 速度模式跟踪、手动两点标定（`MARK LEFT`/`MARK RIGHT`/`ENABLE`）、
+三态模式机与参数注册表。
 
 **线协议唯一权威：本仓库之外的项目主仓库
 `deploy/v2/protocol.md`**（命令词法、模式转换表、参数注册表、
@@ -30,8 +31,9 @@ namespace `cart`）→ 1600 steps/圈 = 40 steps/mm = 25 µm/step。
 components/
   bsp/          引脚与外设初始化（UART1/GPIO/I2C/SPI）
   cartproto/    线协议载体：行组装、命令解析（纯函数）、MODE/OK/ERR 应答
-  cartfsm/      四态模式机：纯核心（转换表/软限位/丢步）+ 参数注册表
-                + 1 kHz 监督任务（回零/编码器失联/丢步/软限位/FAULT 次序）
+  cartfsm/      三态模式机：纯核心（转换表/标定合法性/软限位窗口/丢步）
+                + 参数注册表 + 1 kHz 监督任务（标定状态/编码器失联/
+                丢步/软限位/FAULT 次序）
   step_engine/  GPTimer ISR 速度模式：vel_ramp 每步递推（纯函数）+
                 带符号目标 + 命令看门狗 + 换向经零速
   as5600/       小车编码器 1 kHz 采样（多圈计数 + 16 ms 速度窗）
@@ -86,9 +88,9 @@ wsl gcc -std=c11 -Wall -Wextra -Werror \
 `tools/cartpole_host.py`（`pip install pyserial`）：
 
 ```
-python tools/cartpole_host.py --port COM7 query|home|vel|config|dump|state|wdt-test|console
+python tools/cartpole_host.py --port COM7 query|mark-left|mark-right|enable|vel|config|dump|state|wdt-test|console
 ```
 
-上板验收按主仓库 `deploy/v2/onboard-checklist.md`（C 阶段，含回零
-到位判定）与 `docs/reviews/T10-acceptance.md`（端到端五用例）
+上板验收按主仓库 `deploy/v2/onboard-checklist.md`（C 阶段，两点
+标定规程）与 `docs/reviews/T10-acceptance.md`（端到端五用例）
 执行并回填。
