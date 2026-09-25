@@ -27,7 +27,6 @@ static const char *TAG = "bsp";
 #define BSP_PIN_STEP          CONFIG_BSP_STEP_GPIO
 #define BSP_PIN_DIR           CONFIG_BSP_DIR_GPIO
 #define BSP_PIN_EN            CONFIG_BSP_EN_GPIO
-#define BSP_PIN_DIAG          CONFIG_BSP_DIAG_GPIO
 
 #define BSP_PIN_I2C_SDA       CONFIG_BSP_I2C_SDA_GPIO
 #define BSP_PIN_I2C_SCL       CONFIG_BSP_I2C_SCL_GPIO
@@ -72,7 +71,7 @@ void bsp_early_init(void)
 }
 
 /* ================================================================
- * GPIO init (STEP / DIR / DIAG)
+ * GPIO init (STEP / DIR / EN)
  * ================================================================ */
 static esp_err_t bsp_gpio_init(void)
 {
@@ -94,19 +93,8 @@ static esp_err_t bsp_gpio_init(void)
      * 缓冲供回读——用 set_direction 避免重复 gpio_config 的冲突告警 */
     gpio_set_direction((gpio_num_t)BSP_PIN_EN, GPIO_MODE_INPUT_OUTPUT);
 
-    /* DIAG as input（TMC2209 DIAG 开漏输出：堵转时拉低，须上拉
-     * 才能读到空闲高电平；内部 ~45kΩ 上拉即可，量产可换外部 10k） */
-    gpio_config_t in_cfg = {
-        .pin_bit_mask = (1ULL << BSP_PIN_DIAG),
-        .mode = GPIO_MODE_INPUT,
-        .pull_up_en = GPIO_PULLUP_ENABLE,
-        .pull_down_en = GPIO_PULLDOWN_DISABLE,
-        .intr_type = GPIO_INTR_DISABLE,
-    };
-    ESP_RETURN_ON_ERROR(gpio_config(&in_cfg), TAG, "gpio_config (in) failed");
-
-    ESP_LOGI(TAG, "GPIO: STEP=%d (OUT LOW), DIR=%d (OUT LOW), DIAG=%d (IN), EN=%d (OUT HIGH=disabled)",
-             BSP_PIN_STEP, BSP_PIN_DIR, BSP_PIN_DIAG, BSP_PIN_EN);
+    ESP_LOGI(TAG, "GPIO: STEP=%d (OUT LOW), DIR=%d (OUT LOW), EN=%d (OUT HIGH=disabled)",
+             BSP_PIN_STEP, BSP_PIN_DIR, BSP_PIN_EN);
 
     return ESP_OK;
 }
@@ -253,7 +241,7 @@ esp_err_t bsp_init(void)
 {
     esp_err_t err;
 
-    /* GPIO (STEP / DIR / DIAG) */
+    /* GPIO (STEP / DIR / EN) */
     err = bsp_gpio_init();
     if (err != ESP_OK) {
         return err;

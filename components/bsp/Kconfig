@@ -40,7 +40,7 @@ menu "BSP - Board Support Package"
             Initialization is done in T5, not here.
 
     # ------------------------------------------------------------------
-    # Stepper signals (STEP / DIR / EN / DIAG)
+    # Stepper signals (STEP / DIR / EN)
     # ------------------------------------------------------------------
     config BSP_STEP_GPIO
         int "TMC2209 STEP GPIO"
@@ -62,13 +62,6 @@ menu "BSP - Board Support Package"
             Default matches docs/hardware.md §3 (GPIO21).
             Pulled HIGH (disabled) in bsp_early_init() as the very first
             peripheral action to avoid accidental enable during reset.
-
-    config BSP_DIAG_GPIO
-        int "TMC2209 DIAG1 GPIO"
-        default 16
-        help
-            TMC2209 DIAG1 (stall / over-temperature indicator, input).
-            Default matches docs/hardware.md §3 (GPIO16).
 
     # ------------------------------------------------------------------
     # I2C bus (AS5600 encoder)

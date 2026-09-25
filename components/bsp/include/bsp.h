@@ -37,7 +37,7 @@ void bsp_early_init(void);
  * Initializes:
  *   - UART1 (protocol channel) at Kconfig-configured pins / baud rate,
  *     with RX buffer >= 1024 bytes.
- *   - GPIO: STEP output LOW, DIR output LOW, DIAG input.
+ *   - GPIO: STEP output LOW, DIR output LOW.
  *   - I2C master bus (using new i2c_master API from ESP-IDF v6).
  *     Scans the bus for devices in the 0x08–0x77 range.
  *     If nothing responds, the bus is recreated with internal pullups

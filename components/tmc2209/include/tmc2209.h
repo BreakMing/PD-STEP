@@ -105,29 +105,6 @@ esp_err_t tmc2209_set_microstep(int ms);
  */
 esp_err_t tmc2209_enable(bool en);
 
-/**
- * @brief 写 StallGuard 堵转检测阈值 SGTHRS（REG 0x40）。
- *
- * 回零完成信号与 READY 堵转故障共用该阈值（CONFIG 注册表 SGTHRS）。
- * 值越大检测越灵敏（SG_RESULT < 2×SGTHRS 触发）。
- *
- * @param sgthrs  阈值 0–255。
- * @return ESP_OK 成功；ESP_FAIL UART 写失败。
- */
-esp_err_t tmc2209_set_stall_threshold(uint8_t sgthrs);
-
-/**
- * @brief 读 StallGuard 负载读数（DRV_STATUS 低 10 位；0=堵转/满载，
- *        ~510=空载）。通信失败返回 -1。诊断用。
- */
-int tmc2209_sg_result(void);
-
-/**
- * @brief 读当前步进周期 TSTEP（芯片 tick/步）。通信失败返回 -1。
- *        诊断用（核对 TCOOLTHRS 速度窗覆盖）。
- */
-int tmc2209_tstep(void);
-
 /* ================================================================
  * Status layer
  * ================================================================ */

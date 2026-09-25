@@ -43,13 +43,8 @@ static const char *TAG = "tmc2209";
 #define REG_IOIN            0x06
 #define REG_IHOLD_IRUN      0x10
 #define REG_TPOWERDOWN      0x11
-#define REG_TSTEP           0x12
 #define REG_TPWMTHRS        0x13
-#define REG_TCOOLTHRS       0x14
 #define REG_VACTUAL         0x22
-/* SGTHRS=0x74（写入其他地址芯片同样回 ACK，值不会生效）；SG_RESULT
- * 不是独立寄存器——为 DRV_STATUS(0x6F) 的低 10 位 */
-#define REG_SGTHRS          0x74
 #define REG_MSCNT           0x6A
 #define REG_CHOPCONF        0x6C
 #define REG_DRV_STATUS      0x6F
@@ -443,38 +438,6 @@ esp_err_t tmc2209_enable(bool en)
     return ESP_OK;
 }
 
-esp_err_t tmc2209_set_stall_threshold(uint8_t sgthrs)
-{
-    if (!s_initialized) return ESP_ERR_INVALID_STATE;
-
-    if (!tmc2209_write_reg(REG_SGTHRS, (uint32_t)sgthrs)) {
-        ESP_LOGE(TAG, "SGTHRS write failed (0x%02x)", sgthrs);
-        return ESP_FAIL;
-    }
-    ESP_LOGI(TAG, "SGTHRS = %u", sgthrs);
-    return ESP_OK;
-}
-
-int tmc2209_sg_result(void)
-{
-    /* StallGuard 负载读数 = DRV_STATUS 低 10 位（0=满负载/堵转，
-     * ~510=空载）。诊断用：区分「芯片没看到负载」与「DIAG 线断」 */
-    if (!s_initialized) return -1;
-    uint32_t val;
-    if (!tmc2209_read_reg(REG_DRV_STATUS, &val)) return -1;
-    return (int)(val & 0x3FF);
-}
-
-int tmc2209_tstep(void)
-{
-    /* 当前步进周期读数（芯片时钟 tick/步）。诊断用：核对 TCOOLTHRS
-     * 堵转输出速度窗是否覆盖当前速度 */
-    if (!s_initialized) return -1;
-    uint32_t val;
-    if (!tmc2209_read_reg(REG_TSTEP, &val)) return -1;
-    return (int)(val & 0xFFFFF);
-}
-
 /* ================================================================
  * Status layer
  * ================================================================ */
@@ -582,9 +545,8 @@ esp_err_t tmc2209_init(const tmc2209_config_t *cfg)
     /* ---- Apply default register configuration ---- */
 
     /* GCONF: pdn_disable=1 (UART mode), mstep_reg_select=1,
-     * en_spreadcycle=1（StallGuard2 仅在 SpreadCycle 下有效，
-     * 强制后 TPWMTHRS 不再参与模式切换；静音让位于堵转检测）,
-     * shaft=0 */
+     * en_spreadcycle=1（固定 SpreadCycle：全速域统一 chopper，
+     * TPWMTHRS 不参与模式切换）, shaft=0 */
     uint32_t gconf = GCONF_PDN_DISABLE | GCONF_MSTEP_REG_SELECT
                    | GCONF_EN_SPREADCYCLE;
     if (!tmc2209_write_reg(REG_GCONF, gconf)) {
@@ -626,15 +588,9 @@ esp_err_t tmc2209_init(const tmc2209_config_t *cfg)
     /* TPOWERDOWN: default delay */
     tmc2209_write_reg(REG_TPOWERDOWN, 20);
 
-    /* TPWMTHRS: en_spreadCycle 已强制 SpreadCycle，此值不参与
-     * 模式切换（保留写 0 = 寄存器确定状态） */
+    /* TPWMTHRS: 固定 SpreadCycle，此值不参与模式切换
+     *（保留写 0 = 寄存器确定状态） */
     tmc2209_write_reg(REG_TPWMTHRS, 0);
-
-    /* TCOOLTHRS: 堵转输出仅在 TSTEP ≤ TCOOLTHRS（速度足够快）时
-     * 启用，0 = 永不启用。f_clk≈12 MHz，50 mm/s = 2000 steps/s →
-     * TSTEP≈6000；60000 对应 ≥~200 steps/s（约 5 mm/s），覆盖回零
-     * 与全部运行速度，低速爬行时自动关闭防误报 */
-    tmc2209_write_reg(REG_TCOOLTHRS, 60000);
 
     /* PWMCONF: StealthChop2 default parameters
      * pwm_autoscale=1, pwm_autograd=1, freewheel=0, pwm_freq=1 */
