@@ -186,7 +186,9 @@ def cmd_vel(rig, args):
     rig.pump(0.3)
     print("已发送 %d 条 VEL（%.1f Hz）" % (n, n / args.hold))
     if rig.last_state:
-        print("最新 STATE: x=%s θ=%s vx=%s vth=%s" % tuple(rig.last_state))
+        x, th, vx, vth = rig.last_state
+        print("最新 STATE: x=%s（%.2f mm） θ=%s（%.2f°） vx=%s mm/s vth=%s mrad/s"
+              % (x, int(x) / 1000.0, th, int(th) / 17453.3, vx, vth))
     return 0
 
 
@@ -223,9 +225,12 @@ def cmd_state(rig, args):
           (dt, rig.state_count, rate))
     print("UNKNOWN 行：%d（要求 0）" % rig.unknown_count)
     if xs:
-        print("x_um ∈ [%d, %d]（漂移 %d µm）" %
-              (min(xs), max(xs), max(xs) - min(xs)))
-        print("theta_urad ∈ [%d, %d]" % (min(ths), max(ths)))
+        print("x_um ∈ [%d, %d]（漂移 %d µm；x ≈ %.2f mm）" %
+              (min(xs), max(xs), max(xs) - min(xs),
+               (min(xs) + max(xs)) / 2000.0))
+        print("theta_urad ∈ [%d, %d]（θ ≈ %.2f°）" %
+              (min(ths), max(ths),
+               (min(ths) + max(ths)) / 2 / 17453.3))
     ok = 199.0 <= rate <= 201.0 and rig.unknown_count == 0
     return 0 if ok else 1
 
