@@ -362,6 +362,10 @@ static void fsm_task(void *arg)
             long e_um = e_raw;
 #ifdef CONFIG_CARTFSM_FLOW_TEST
             e_um += s_test_loss_bias_um;
+            s_test_loss_bias_um = 0;   /* 一次性注入：判定拍消费即清
+                                        *（持续偏置无物理对应物——真实
+                                        *  偏差经完成重定基归零，否则
+                                        *  READY 首拍即丢步误杀） */
 #endif
             cm_homing_in_t hin = {
                 .a5600_ok = a5600_ok,
@@ -422,6 +426,7 @@ static void fsm_task(void *arg)
                 long e_um = (long)as5600_position_um();
 #ifdef CONFIG_CARTFSM_FLOW_TEST
                 e_um += s_test_loss_bias_um;
+                s_test_loss_bias_um = 0;   /* 一次性注入：判定拍消费即清 */
 #endif
                 long c_um = cmd_steps_to_um(step_engine_position_steps());
                 if (cm_step_loss(e_um, c_um, p->step_loss_um)) {

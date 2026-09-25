@@ -10,8 +10,10 @@
  *   4.  RESET → DISABLED，之后可重新 HOME；
  *   5.  HOMING 未达速偏差 FAULT 后重新 HOME 可恢复（入口重锚）。
  * 会开 EN；有 12V 时小车在超时用例中以 −HOME_VEL 真实运动 ≤1 s。
- * 判定注入经 follow_cmd（E 以指令位置替代）与 speed_latch 覆写实现，
- * 全部用例在有无 12V 时均确定。机械台位在位的真实回零散布验收见
+ * 判定注入经 follow_cmd（E 以指令位置替代）与 speed_latch 覆写实现；
+ * loss_bias 为一次性注入（判定拍消费即清——持续偏置会被 READY 首拍
+ * 丢步判定按契约消灭，完成用例即假失败）。全部用例在有无 12V 时
+ * 均确定。机械台位在位的真实回零散布验收见
  * deploy/v2/onboard-checklist.md（C1/C3，人工执行）。
  */
 
@@ -100,6 +102,7 @@ static bool test_home_done_to_ready(void)
     to_disabled();
     cartfsm_test_follow_cmd(false);
     cartfsm_test_speed_latch(-1);
+    cartfsm_test_inject_loss_bias(0);
 
     cart_req_t home = { .cmd = CART_CMD_HOME };
     cartfsm_test_exec(&home);
@@ -127,6 +130,7 @@ static bool test_home_loss_before_speed(void)
     to_disabled();
     cartfsm_test_follow_cmd(false);
     cartfsm_test_speed_latch(-1);
+    cartfsm_test_inject_loss_bias(0);
 
     cart_req_t home = { .cmd = CART_CMD_HOME };
     cartfsm_test_exec(&home);
@@ -149,6 +153,7 @@ static bool test_home_timeout(void)
     to_disabled();
     cartfsm_test_follow_cmd(false);
     cartfsm_test_speed_latch(-1);
+    cartfsm_test_inject_loss_bias(0);
     CHECK(fw_params_set("HOME_TIMEOUT", 1000), "临时收紧超时 1 s");
 
     cart_req_t home = { .cmd = CART_CMD_HOME };
@@ -182,6 +187,7 @@ static bool test_homing_encoder_fail_priority(void)
     to_disabled();
     cartfsm_test_follow_cmd(false);
     cartfsm_test_speed_latch(-1);
+    cartfsm_test_inject_loss_bias(0);
 
     cart_req_t home = { .cmd = CART_CMD_HOME };
     cartfsm_test_exec(&home);
@@ -208,6 +214,7 @@ static bool test_ready_step_loss(void)
     to_disabled();
     cartfsm_test_follow_cmd(false);
     cartfsm_test_speed_latch(-1);
+    cartfsm_test_inject_loss_bias(0);
 
     cart_req_t home = { .cmd = CART_CMD_HOME };
     cartfsm_test_exec(&home);
@@ -233,6 +240,7 @@ static bool test_reset_then_rehome(void)
     to_disabled();
     cartfsm_test_follow_cmd(false);
     cartfsm_test_speed_latch(-1);
+    cartfsm_test_inject_loss_bias(0);
 
     cart_req_t home = { .cmd = CART_CMD_HOME };
     cartfsm_test_exec(&home);
@@ -253,6 +261,7 @@ static bool test_rehome_after_step_loss(void)
     to_disabled();
     cartfsm_test_follow_cmd(false);
     cartfsm_test_speed_latch(-1);
+    cartfsm_test_inject_loss_bias(0);
 
     cart_req_t home = { .cmd = CART_CMD_HOME };
     cartfsm_test_exec(&home);
@@ -268,6 +277,7 @@ static bool test_rehome_after_step_loss(void)
      * 故障时的超前量）——入口重锚使 D 归零，注入到位应可完成 */
     to_disabled();
     cartfsm_test_speed_latch(-1);
+    cartfsm_test_inject_loss_bias(0);
     cartfsm_test_exec(&home);
     CHECK(wait_mode(CM_HOMING, 200), "重新 HOME 生效");
     cartfsm_test_speed_latch(1);
