@@ -117,6 +117,12 @@ bool cartproto_parse_line(const char *line, cart_req_t *out)
                 return true;
             }
         }
+        if (cmd_len == 6 && line[0] == 'E' && line[1] == 'N'
+            && line[2] == 'A' && line[3] == 'B' && line[4] == 'L'
+            && line[5] == 'E') {
+            out->cmd = CART_CMD_ENABLE;
+            return true;
+        }
         if (cmd_len == 7 && line[0] == 'C' && line[1] == 'O'
             && line[2] == 'N' && line[3] == 'F' && line[4] == 'I'
             && line[5] == 'G' && line[6] == '?') {
@@ -130,6 +136,24 @@ bool cartproto_parse_line(const char *line, cart_req_t *out)
     size_t rest = cmd_len + 1;
     if (rest >= len) {
         return false;   /* 命令词后直接结束（如 "VEL "）——行尾空白已剥 */
+    }
+
+    /* MARK <LEFT|RIGHT>：命令词 + 字面方向词（规格 §2） */
+    if (cmd_len == 4 && line[0] == 'M' && line[1] == 'A'
+        && line[2] == 'R' && line[3] == 'K') {
+        size_t rl = len - rest;
+        if (rl == 4 && line[rest] == 'L' && line[rest + 1] == 'E'
+            && line[rest + 2] == 'F' && line[rest + 3] == 'T') {
+            out->cmd = CART_CMD_MARK_LEFT;
+            return true;
+        }
+        if (rl == 5 && line[rest] == 'R' && line[rest + 1] == 'I'
+            && line[rest + 2] == 'G' && line[rest + 3] == 'H'
+            && line[rest + 4] == 'T') {
+            out->cmd = CART_CMD_MARK_RIGHT;
+            return true;
+        }
+        return false;
     }
 
     if (cmd_len == 3 && line[0] == 'V' && line[1] == 'E' && line[2] == 'L') {

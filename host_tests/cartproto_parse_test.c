@@ -40,6 +40,9 @@ static void test_legal(void)
     CHECK(p("VEL -32767") && req.v_mm_s == -32767, "VEL 下边界 -32767");
     CHECK(p("HOME") && req.cmd == CART_CMD_HOME, "HOME");
     CHECK(p("RESET") && req.cmd == CART_CMD_RESET, "RESET");
+    CHECK(p("ENABLE") && req.cmd == CART_CMD_ENABLE, "ENABLE");
+    CHECK(p("MARK LEFT") && req.cmd == CART_CMD_MARK_LEFT, "MARK LEFT");
+    CHECK(p("MARK RIGHT") && req.cmd == CART_CMD_MARK_RIGHT, "MARK RIGHT");
     CHECK(p("QUERY") && req.cmd == CART_CMD_QUERY, "QUERY");
     CHECK(p("CONFIG?") && req.cmd == CART_CMD_CONFIG_DUMP, "CONFIG?");
     CHECK(p("CONFIG X_LIMIT 250000") && req.cmd == CART_CMD_CONFIG_SET
@@ -88,6 +91,12 @@ static void test_illegal(void)
     CHECK(!p("CONFIG\n"), "行中控制字符");
     CHECK(!p("UNKNOWN 1"), "未知命令");
     CHECK(!p("CONFIG ABCDEFGHIJKLMNOP 1"), "NAME 超 15 字符");
+    CHECK(!p("MARK"), "MARK 缺方向词");
+    CHECK(!p("MARK UP"), "MARK 未知方向词");
+    CHECK(!p("MARK LEFT extra"), "MARK 多余参数");
+    CHECK(!p("MARK  LEFT"), "MARK 双空格分隔");
+    CHECK(!p("MARKLEFT"), "MARK 粘连");
+    CHECK(!p("ENABLE 1"), "ENABLE 带参数");
 }
 
 /* NAME 合法字符集 [A-Z0-9_]{1,15} */
