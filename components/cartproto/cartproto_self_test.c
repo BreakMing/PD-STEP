@@ -28,14 +28,19 @@ static bool test_parse_legal(void)
     CHECK(cartproto_parse_line("VEL 200", &r) && r.cmd == CART_CMD_VEL
           && r.v_mm_s == 200, "VEL 200");
     CHECK(cartproto_parse_line("VEL -200", &r) && r.v_mm_s == -200, "VEL -200");
-    CHECK(cartproto_parse_line("HOME", &r) && r.cmd == CART_CMD_HOME, "HOME");
+    CHECK(cartproto_parse_line("ENABLE", &r) && r.cmd == CART_CMD_ENABLE,
+          "ENABLE");
+    CHECK(cartproto_parse_line("MARK LEFT", &r)
+          && r.cmd == CART_CMD_MARK_LEFT, "MARK LEFT");
+    CHECK(cartproto_parse_line("MARK RIGHT", &r)
+          && r.cmd == CART_CMD_MARK_RIGHT, "MARK RIGHT");
     CHECK(cartproto_parse_line("RESET", &r) && r.cmd == CART_CMD_RESET, "RESET");
     CHECK(cartproto_parse_line("QUERY", &r) && r.cmd == CART_CMD_QUERY, "QUERY");
     CHECK(cartproto_parse_line("CONFIG?", &r)
           && r.cmd == CART_CMD_CONFIG_DUMP, "CONFIG?");
-    CHECK(cartproto_parse_line("CONFIG X_LIMIT 250000", &r)
-          && r.cmd == CART_CMD_CONFIG_SET && r.value == 250000,
-          "CONFIG X_LIMIT");
+    CHECK(cartproto_parse_line("CONFIG X_MARGIN_UM 10000", &r)
+          && r.cmd == CART_CMD_CONFIG_SET && r.value == 10000,
+          "CONFIG X_MARGIN_UM");
     return true;
 }
 
@@ -48,7 +53,7 @@ static bool test_parse_illegal(void)
     CHECK(!cartproto_parse_line("VEL 32768", &r), "超界");
     CHECK(!cartproto_parse_line("CONFIG VEL_MAX", &r), "缺值");
     CHECK(!cartproto_parse_line("CONFIG? extra", &r), "CONFIG? 带参");
-    CHECK(!cartproto_parse_line("HOME NOW", &r), "HOME 带参");
+    CHECK(!cartproto_parse_line("MARK UP", &r), "MARK 未知方向词");
     return true;
 }
 

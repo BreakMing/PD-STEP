@@ -38,23 +38,21 @@ static void test_legal(void)
           "VEL 0");
     CHECK(p("VEL 32767") && req.v_mm_s == 32767, "VEL 上边界 32767");
     CHECK(p("VEL -32767") && req.v_mm_s == -32767, "VEL 下边界 -32767");
-    CHECK(p("HOME") && req.cmd == CART_CMD_HOME, "HOME");
     CHECK(p("RESET") && req.cmd == CART_CMD_RESET, "RESET");
     CHECK(p("ENABLE") && req.cmd == CART_CMD_ENABLE, "ENABLE");
     CHECK(p("MARK LEFT") && req.cmd == CART_CMD_MARK_LEFT, "MARK LEFT");
     CHECK(p("MARK RIGHT") && req.cmd == CART_CMD_MARK_RIGHT, "MARK RIGHT");
     CHECK(p("QUERY") && req.cmd == CART_CMD_QUERY, "QUERY");
     CHECK(p("CONFIG?") && req.cmd == CART_CMD_CONFIG_DUMP, "CONFIG?");
-    CHECK(p("CONFIG X_LIMIT 250000") && req.cmd == CART_CMD_CONFIG_SET
-          && strcmp(req.name, "X_LIMIT") == 0 && req.value == 250000,
-          "CONFIG X_LIMIT 250000");
+    CHECK(p("CONFIG X_MARGIN_UM 10000") && req.cmd == CART_CMD_CONFIG_SET
+          && strcmp(req.name, "X_MARGIN_UM") == 0 && req.value == 10000,
+          "CONFIG X_MARGIN_UM 10000");
     CHECK(p("CONFIG VEL_MAX 800") && req.value == 800, "CONFIG VEL_MAX 800");
-    CHECK(p("CONFIG HOME_VEL 50") && req.value == 50, "CONFIG HOME_VEL 50");
+    CHECK(p("CONFIG WDT_MS 100") && req.value == 100, "CONFIG WDT_MS 100");
     CHECK(p("CONFIG POLE_ZERO_URAD -3141592") && req.value == -3141592,
           "负值 CONFIG");
 
     /* 行尾仅容空白 */
-    CHECK(p("HOME "), "行尾空格容忍");
     CHECK(p("VEL 200  ") && req.v_mm_s == 200, "行尾多空格容忍");
     CHECK(p("CONFIG VEL_MAX 800 \t"), "行尾制表符容忍");
 }
@@ -77,6 +75,7 @@ static void test_illegal(void)
     CHECK(!p("VEL 200x"), "VEL 尾随垃圾");
     CHECK(!p("VEL 0x10"), "VEL 十六进制");
     CHECK(!p("HOME NOW"), "HOME 带参数");
+    CHECK(!p("HOME"), "HOME 已退役");
     CHECK(!p("QUERY 1"), "QUERY 带参数");
     CHECK(!p("RESET ALL"), "RESET 带参数");
     CHECK(!p("CONFIG x 1"), "NAME 小写");

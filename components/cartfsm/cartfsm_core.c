@@ -14,43 +14,12 @@ bool cm_step(cm_mode_t *mode, cm_reason_t *reason, cm_event_t ev)
 
     switch (*mode) {
     case CM_DISABLED:
-        if (ev == CE_CMD_HOME) {
-            *mode = CM_HOMING;
+        if (ev == CE_CMD_ENABLE) {
+            *mode = CM_READY;
             *reason = CR_NONE;
             return true;
         }
         return false;
-
-    case CM_HOMING:
-        switch (ev) {
-        case CE_HOME_DONE:          /* 到位 = 回零完成信号（位置偏差判据） */
-            *mode = CM_READY;
-            *reason = CR_NONE;
-            return true;
-        case CE_STEP_LOSS:          /* 未达速偏差：起点压挡块/卡死/域未对齐 */
-            *mode = CM_FAULT;
-            *reason = CR_STEP_LOSS;
-            return true;
-        case CE_HOME_TIMEOUT:
-            *mode = CM_FAULT;
-            *reason = CR_HOME_TIMEOUT;
-            return true;
-        case CE_AS5600_FAIL:
-            *mode = CM_FAULT;
-            *reason = CR_AS5600;
-            return true;
-        case CE_MT6835_FAIL:
-            *mode = CM_FAULT;
-            *reason = CR_MT6835;
-            return true;
-        case CE_CMD_RESET:          /* 回零中止：用户逃生口（撞墙不停/
-                                     * 异响时立即停下），EN 由外壳关闭 */
-            *mode = CM_DISABLED;
-            *reason = CR_NONE;
-            return true;
-        default:
-            return false;           /* HOME 忽略 */
-        }
 
     case CM_READY:
         switch (ev) {
@@ -67,7 +36,7 @@ bool cm_step(cm_mode_t *mode, cm_reason_t *reason, cm_event_t ev)
             *reason = CR_MT6835;
             return true;
         default:
-            return false;           /* HOME/RESET/TIMEOUT 忽略 */
+            return false;           /* ENABLE/RESET 忽略 */
         }
 
     case CM_FAULT:
@@ -88,12 +57,13 @@ bool cm_config_set_allowed(cm_mode_t mode)
     return mode == CM_DISABLED || mode == CM_READY;
 }
 
-long cm_soft_limit_clamp(long x_um, long x_limit_um, long v_mm_s)
+long cm_soft_limit_clamp(long x_um, long x_min_um, long x_max_um,
+                         long v_mm_s)
 {
-    if (x_um > x_limit_um && v_mm_s > 0) {
+    if (x_um > x_max_um && v_mm_s > 0) {
         return 0;                   /* 越上界，向外（+）分量置 0 */
     }
-    if (x_um < -x_limit_um && v_mm_s < 0) {
+    if (x_um < x_min_um && v_mm_s < 0) {
         return 0;                   /* 越下界，向外（−）分量置 0 */
     }
     return v_mm_s;                  /* 界内或向内：不受限 */
@@ -108,30 +78,7 @@ bool cm_step_loss(long e_um, long c_um, long step_loss_um)
     return diff > step_loss_um;
 }
 
-bool cm_speed_reached(long v_meas_mm_s, long home_vel_mm_s)
+bool cm_calib_valid(long l_um)
 {
-    if (home_vel_mm_s <= 0) {
-        return false;
-    }
-    return v_meas_mm_s * 5 <= -home_vel_mm_s * 4;
-}
-
-cm_event_t cm_homing_event(const cm_homing_in_t *in)
-{
-    if (in == NULL) {
-        return (cm_event_t)0;
-    }
-    if (!in->a5600_ok) {
-        return CE_AS5600_FAIL;      /* E 无效时不得用于任何判定 */
-    }
-    if (!in->m6835_ok) {
-        return CE_MT6835_FAIL;
-    }
-    if (cm_step_loss(in->e_um, in->c_um, in->step_loss_um)) {
-        return in->speed_latch ? CE_HOME_DONE : CE_STEP_LOSS;
-    }
-    if (in->timed_out) {
-        return CE_HOME_TIMEOUT;
-    }
-    return (cm_event_t)0;
+    return l_um >= 100000L && l_um <= 1000000L;
 }

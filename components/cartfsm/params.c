@@ -15,9 +15,7 @@ static fw_params_t s_params = {
     .acc_max        = 5000,     /* 100 – 30000 mm/s²      */
     .wdt_ms         = 100,      /* 10 – 1000 ms           */
     .wdt_dec        = 5000,     /* 100 – 30000 mm/s²      */
-    .home_vel       = 50,       /* 5 – 200 mm/s           */
-    .home_timeout_ms = 30000,   /* 1000 – 120000 ms       */
-    .x_limit_um     = 260000,   /* 10000 – 265000 µm      */
+    .x_margin_um    = 10000,    /* 1000 – 50000 µm        */
     .pole_zero_urad = 0,        /* ±3141592 µrad          */
     .pole_inv       = 0,        /* 0 – 1                  */
     .x_inv          = 0,        /* 0 – 1                  */
@@ -36,9 +34,7 @@ static const param_entry_t s_entries[] = {
     { "ACC_MAX",        &s_params.acc_max,         100,     30000   },
     { "WDT_MS",         &s_params.wdt_ms,          10,      1000    },
     { "WDT_DEC",        &s_params.wdt_dec,         100,     30000   },
-    { "HOME_VEL",       &s_params.home_vel,        5,       200     },
-    { "HOME_TIMEOUT",   &s_params.home_timeout_ms, 1000,    120000  },
-    { "X_LIMIT",        &s_params.x_limit_um,      10000,   265000  },
+    { "X_MARGIN_UM",    &s_params.x_margin_um,     1000,    50000   },
     { "POLE_ZERO_URAD", &s_params.pole_zero_urad,  -3141592, 3141592 },
     { "POLE_INV",       &s_params.pole_inv,        0,       1       },
     { "X_INV",          &s_params.x_inv,           0,       1       },

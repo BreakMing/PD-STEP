@@ -60,7 +60,6 @@ void cartproto_send_raw(const char *data, int len);
 
 typedef enum {
     CART_CMD_VEL,            /* VEL <v_mm_s> */
-    CART_CMD_HOME,
     CART_CMD_MARK_LEFT,      /* MARK LEFT */
     CART_CMD_MARK_RIGHT,     /* MARK RIGHT */
     CART_CMD_ENABLE,

@@ -1,5 +1,5 @@
 /*
- * params — 参数注册表（protocol.md §参数注册表 十一项全量）
+ * params — 参数注册表（calib-spec §5：九项全量）
  *
  * 纯数据层（无 ESP 依赖，宿主可测）：默认值、合法范围、按名设置。
  * 固件按注册表默认值上电；参数权威在端侧，会话开始时推送覆盖。
@@ -16,8 +16,8 @@ extern "C" {
 #endif
 
 typedef struct {
-    long vel_max, acc_max, wdt_ms, wdt_dec, home_vel, home_timeout_ms,
-         x_limit_um;
+    long vel_max, acc_max, wdt_ms, wdt_dec;
+    long x_margin_um;                          /* 软限位两端余量 µm */
     long pole_zero_urad, pole_inv, x_inv, step_loss_um;  /* 台位标定项 */
 } fw_params_t;
 

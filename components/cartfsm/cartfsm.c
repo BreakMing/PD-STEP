@@ -35,30 +35,23 @@ static const char *TAG = "cartfsm";
 #define FSM_TASK_STACK    4096
 #define FSM_PERIOD_MS     1
 
-/* 回零完成点（protocol.md 模式转换表：触发点记为 x = −265000 µm） */
-#define HOME_ORIGIN_MM   (-265.0f)
-
 /* ---- 共享状态 ---- */
 static portMUX_TYPE s_lock = portMUX_INITIALIZER_UNLOCKED;
 static volatile cm_mode_t   s_mode = CM_DISABLED;
 static volatile cm_reason_t s_reason = CR_NONE;
-static TickType_t s_home_start = 0;
 static volatile long s_last_cmd_v = 0;     /* 最近有效目标（软限位持续钳制） */
 static volatile bool s_fault_settling = false;  /* FAULT 斜坡停机进行中 */
 static bool s_started = false;
 
-/* ---- HOMING 到位判定状态（homing-spec §2） ---- */
-static long s_last_e_um = 0;       /* v_meas 毫秒差分基准 */
-static long s_v_meas_mm_s = 0;     /* 最近实测速度（诊断用） */
-static bool s_speed_latch = false; /* 达速锁存 */
-static int  s_speed_run = 0;       /* 达速连续拍计数（2 拍去抖） */
+/* ---- 手动两点标定状态（calib-spec §1/§2，RAM，断电回 CAL_NONE） ---- */
+static calib_state_t s_calib = CAL_NONE;
+static long s_e_left_um = 0;   /* 左标 E（µm） */
+static long s_calib_l_um = 0;  /* 标定行程 L（CAL_DONE 后有效） */
 
 /* 流程自测注入（CONFIG_CARTFSM_FLOW_TEST）：0 无、1 AS5600、2 MT6835 */
 #ifdef CONFIG_CARTFSM_FLOW_TEST
 static volatile int s_test_enc_fail = 0;
 static volatile long s_test_loss_bias_um = 0;   /* 丢步判定的 E 偏置注入 */
-static volatile bool s_test_follow_cmd = false; /* 判定用 E 以指令位置替代 */
-static volatile int  s_test_speed_latch = -1;   /* -1 自然；0 强制清；1 强制置 */
 #endif
 
 /* ---- 模式/原因字符串 ---- */
@@ -66,7 +59,6 @@ static const char *mode_str(cm_mode_t m)
 {
     switch (m) {
     case CM_DISABLED: return "DISABLED";
-    case CM_HOMING:   return "HOMING";
     case CM_READY:    return "READY";
     case CM_FAULT:    return "FAULT";
     default:          return "DISABLED";
@@ -76,12 +68,11 @@ static const char *mode_str(cm_mode_t m)
 static const char *reason_str(cm_reason_t r)
 {
     switch (r) {
-    case CR_NONE:         return "NONE";
-    case CR_STEP_LOSS:    return "STEP_LOSS";
-    case CR_AS5600:       return "AS5600";
-    case CR_MT6835:       return "MT6835";
-    case CR_HOME_TIMEOUT: return "HOME_TIMEOUT";
-    default:              return "NONE";
+    case CR_NONE:      return "NONE";
+    case CR_STEP_LOSS: return "STEP_LOSS";
+    case CR_AS5600:    return "AS5600";
+    case CR_MT6835:    return "MT6835";
+    default:           return "NONE";
     }
 }
 
@@ -117,6 +108,13 @@ static int32_t um_to_cmd_steps(long um)
 
 /* ---- 参数作用点 ---- */
 
+/* 软限位窗口（calib-spec §4）：[-L/2+m, +L/2-m] */
+static void soft_window(const fw_params_t *p, long *min_um, long *max_um)
+{
+    *min_um = -s_calib_l_um / 2 + p->x_margin_um;
+    *max_um = s_calib_l_um / 2 - p->x_margin_um;
+}
+
 static void params_apply_engine(void)
 {
     const fw_params_t *p = fw_params();
@@ -145,13 +143,15 @@ static void params_apply_one(const char *name)
         if (cur > p->vel_max || cur < -p->vel_max) {
             long v = (cur > p->vel_max) ? p->vel_max
                     : (cur < -p->vel_max) ? -p->vel_max : cur;
+            long xmin, xmax;
+            soft_window(p, &xmin, &xmax);
             long eff = cm_soft_limit_clamp((long)as5600_position_um(),
-                                           p->x_limit_um, v);
+                                           xmin, xmax, v);
             s_last_cmd_v = eff;
             step_engine_vel_target(mmps_to_q16(eff));
         }
     }
-    /* 其余参数（HOME_* /X_LIMIT/标定量）为读取点即时生效 */
+    /* 其余参数（X_MARGIN_UM/标定量）为读取点即时生效 */
 }
 
 /* ---- 模式转换辅助 ---- */
@@ -192,38 +192,70 @@ static void exec_cmd(const cart_req_t *req)
         break;
     }
 
-    case CART_CMD_HOME: {
+    case CART_CMD_MARK_LEFT: {
+        if (s_mode != CM_DISABLED) {
+            cartproto_send_err("MARK_LEFT");   /* 规格 §2 回执原则 */
+            return;
+        }
+        long e = (long)as5600_position_um();
+#ifdef CONFIG_CARTFSM_FLOW_TEST
+        e += s_test_loss_bias_um;
+        s_test_loss_bias_um = 0;   /* 一次性注入：标记读数消费即清 */
+#endif
+        s_e_left_um = e;           /* 重复标记即覆盖重开（规格 §2） */
+        s_calib = CAL_LEFT;
+        cartproto_send_ok("MARK_LEFT", e);
+        break;
+    }
+
+    case CART_CMD_MARK_RIGHT: {
+        if (s_mode != CM_DISABLED) {
+            cartproto_send_err("MARK_RIGHT");
+            return;
+        }
+        long e = (long)as5600_position_um();
+#ifdef CONFIG_CARTFSM_FLOW_TEST
+        e += s_test_loss_bias_um;
+        s_test_loss_bias_um = 0;
+#endif
+        long l = e - s_e_left_um;
+        if (s_calib != CAL_LEFT || !cm_calib_valid(l)) {
+            cartproto_send_err("MARK_RIGHT");  /* 状态保持（规格 §2） */
+            return;
+        }
+        s_calib_l_um = l;
+        s_calib = CAL_DONE;
+        /* E/C 同帧重定基：两标中点为 x=0（引擎停止时整定） */
+        long mid_um = s_e_left_um + l / 2;
+        as5600_set_origin(mid_um / 1000.0);
+        step_engine_set_position(um_to_cmd_steps(mid_um));
+        cartproto_send_ok("MARK_RIGHT", l);
+        break;
+    }
+
+    case CART_CMD_ENABLE: {
+        if (s_mode != CM_DISABLED) {
+            return;   /* READY/FAULT 忽略（规格 §5 矩阵） */
+        }
+        if (s_calib != CAL_DONE) {
+            cartproto_send_err("ENABLE");
+            return;
+        }
         cm_mode_t m = s_mode;
         cm_reason_t r = CR_NONE;
-        if (!cm_step(&m, &r, CE_CMD_HOME)) {
-            return;   /* 仅 DISABLED 生效，其余忽略 */
+        if (!cm_step(&m, &r, CE_CMD_ENABLE)) {
+            return;
         }
-        const fw_params_t *p = fw_params();
-
-        /* 到位判定状态复位与 C 重锚，必须先于模式发布完成——监督
-         * 任务（CPU1）见 CM_HOMING 即开始按拍判定，携上一会话的
-         * 旧锁存/差分基准/绝对 E−C 执行首拍会误判。C 重锚到当前
-         * E 使 D 自入口从 0 起算（homing-spec §2）：故障后挪车重新
-         * 回零才可恢复；DISABLED 进入保证引擎已停止，满足整定约定 */
-        s_last_e_um = (long)as5600_position_um();
-        s_v_meas_mm_s = 0;
-        s_speed_latch = false;
-        s_speed_run = 0;
-        step_engine_set_position(um_to_cmd_steps(s_last_e_um));
-
-        portENTER_CRITICAL(&s_lock);
-        s_mode = CM_HOMING;
-        s_reason = CR_NONE;
-        s_home_start = xTaskGetTickCount();
-        portEXIT_CRITICAL(&s_lock);
-
-        /* 动作：EN 开 + 以 −HOME_VEL 起步 */
+        /* C 重锚到 E：先于模式发布——监督任务见 READY 即按拍判定，
+         * 携旧 C 会在首拍 STEP_LOSS 误报（标定后手挪过的窗口） */
+        step_engine_set_position(um_to_cmd_steps((long)as5600_position_um()));
         bsp_tmc_en_set(true);
-        step_engine_vel_set_accel(accel_to_steps(p->acc_max));
-        long hv = -(long)p->home_vel;
-        s_last_cmd_v = hv;
-        step_engine_vel_target(mmps_to_q16(hv));
-        push_mode(CM_HOMING, CR_NONE);
+        portENTER_CRITICAL(&s_lock);
+        s_mode = CM_READY;
+        s_reason = CR_NONE;
+        s_last_cmd_v = 0;
+        portEXIT_CRITICAL(&s_lock);
+        push_mode(CM_READY, CR_NONE);
         break;
     }
 
@@ -261,8 +293,10 @@ static void exec_cmd(const cart_req_t *req)
         } else if (v < -p->vel_max) {
             v = -p->vel_max;
         }
+        long xmin, xmax;
+        soft_window(p, &xmin, &xmax);
         long eff = cm_soft_limit_clamp((long)as5600_position_um(),
-                                       p->x_limit_um, v);
+                                       xmin, xmax, v);
         s_last_cmd_v = eff;
         step_engine_vel_target(mmps_to_q16(eff));
         break;
@@ -319,102 +353,7 @@ static void fsm_task(void *arg)
         bool m6835_ok = mt6835_is_ok();
 #endif
 
-        if (mode == CM_HOMING) {
-            /* 回零速度按拍续喂：引擎看门狗按命令流设计（WDT_MS 窗口
-             * 断流即减速），HOME 是单条命令，不续喂则 100 ms 后运动
-             * 停止、HOMING 干等超时。回零是固件自主运动，由监督任务
-             * 承担命令流角色；总时长上限仍由 HOME_TIMEOUT 把关。
-             * 持锁复查：与 exec 的 HOMING 中止（RESET→DISABLED）
-             * 交错时不得再喂，否则中止后引擎被重新起步 */
-            portENTER_CRITICAL(&s_lock);
-            if (s_mode == CM_HOMING) {
-                step_engine_vel_target(mmps_to_q16(-(long)p->home_vel));
-            }
-            portEXIT_CRITICAL(&s_lock);
-
-            /* 实测速度差分与达速锁存。v_meas 用原始 E：flowtest 的
-             * 偏置注入只进偏差判定，不得污染速度判据（偏置阶跃会把
-             * 锁存误置位，负路径用例假绿）。 */
-            long e_raw;
-#ifdef CONFIG_CARTFSM_FLOW_TEST
-            if (s_test_follow_cmd) {
-                e_raw = cmd_steps_to_um(step_engine_position_steps());
-            } else
-#endif
-            {
-                e_raw = (long)as5600_position_um();
-            }
-            s_v_meas_mm_s = e_raw - s_last_e_um;   /* µm/ms == mm/s */
-            s_last_e_um = e_raw;
-            if (cm_speed_reached(s_v_meas_mm_s, p->home_vel)) {
-                if (++s_speed_run >= 2) {
-                    s_speed_latch = true;
-                }
-            } else {
-                s_speed_run = 0;
-            }
-#ifdef CONFIG_CARTFSM_FLOW_TEST
-            if (s_test_speed_latch >= 0) {
-                s_speed_latch = (s_test_speed_latch > 0);
-            }
-#endif
-
-            long e_um = e_raw;
-#ifdef CONFIG_CARTFSM_FLOW_TEST
-            e_um += s_test_loss_bias_um;
-            s_test_loss_bias_um = 0;   /* 一次性注入：判定拍消费即清
-                                        *（持续偏置无物理对应物——真实
-                                        *  偏差经完成重定基归零，否则
-                                        *  READY 首拍即丢步误杀） */
-#endif
-            cm_homing_in_t hin = {
-                .a5600_ok = a5600_ok,
-                .m6835_ok = m6835_ok,
-                .speed_latch = s_speed_latch,
-                .e_um = e_um,
-                .c_um = cmd_steps_to_um(step_engine_position_steps()),
-                .step_loss_um = p->step_loss_um,
-                .timed_out = (xTaskGetTickCount() - s_home_start)
-                             >= pdMS_TO_TICKS(p->home_timeout_ms),
-            };
-            cm_event_t ev = cm_homing_event(&hin);
-
-            if (ev != 0) {
-                cm_mode_t m = mode;
-                cm_reason_t r = s_reason;
-                if (cm_step(&m, &r, ev)) {
-                    if (m == CM_READY) {
-                        /* 到位 = 完成：急停 + E/C 同帧重定基到 HOME 原点
-                         *（E、C 必须同时换到新坐标系，否则 READY 首拍
-                         *   |E−C| 丢步判定立即误报 FAULT/STEP_LOSS） */
-                        step_engine_stop();
-                        as5600_set_origin(HOME_ORIGIN_MM);
-                        step_engine_set_position(
-                            um_to_cmd_steps((long)(HOME_ORIGIN_MM * 1000.0)));
-                        portENTER_CRITICAL(&s_lock);
-                        s_mode = CM_READY;
-                        s_reason = CR_NONE;
-                        s_last_cmd_v = 0;
-                        portEXIT_CRITICAL(&s_lock);
-                        push_mode(CM_READY, CR_NONE);
-                    } else {
-                        if (r == CR_HOME_TIMEOUT) {
-                            /* 超时诊断：区分「从未达速」（电机未随动/
-                             * 速度过低/起点即堵）与「达速后未撞挡」
-                             *（传动脱离） */
-                            ESP_LOGW(TAG, "回零超时：E=%ld µm，C=%ld µm，"
-                                     "v_meas=%ld mm/s，达速锁存=%d",
-                                     e_raw, hin.c_um, s_v_meas_mm_s,
-                                     s_speed_latch ? 1 : 0);
-                        } else if (r == CR_STEP_LOSS) {
-                            ESP_LOGW(TAG, "回零未达速即偏差越限：起点压"
-                                     "挡块/皮带卡死/域未对齐——挪车后重试");
-                        }
-                        enter_fault(r);
-                    }
-                }
-            }
-        } else if (mode == CM_READY) {
+        if (mode == CM_READY) {
             if (!a5600_ok) {
                 enter_fault(CR_AS5600);
             } else if (!m6835_ok) {
@@ -433,8 +372,10 @@ static void fsm_task(void *arg)
                     enter_fault(CR_STEP_LOSS);
                 } else {
                     /* 软限位持续钳制（运行中收紧立即生效） */
+                    long xmin, xmax;
+                    soft_window(p, &xmin, &xmax);
                     long eff = cm_soft_limit_clamp(
-                        (long)as5600_position_um(), p->x_limit_um,
+                        (long)as5600_position_um(), xmin, xmax,
                         s_last_cmd_v);
                     if (eff != s_last_cmd_v) {
                         step_engine_vel_halt();
@@ -472,6 +413,11 @@ cm_reason_t cartfsm_reason(void)
     return s_reason;
 }
 
+calib_state_t cartfsm_calib(void)
+{
+    return s_calib;
+}
+
 /* ---- 流程自测钩子（CONFIG_CARTFSM_FLOW_TEST，上板注入用） ---- */
 #ifdef CONFIG_CARTFSM_FLOW_TEST
 
@@ -490,14 +436,11 @@ void cartfsm_test_inject_loss_bias(long bias_um)
     s_test_loss_bias_um = bias_um;
 }
 
-void cartfsm_test_follow_cmd(bool enable)
+void cartfsm_test_reset_calib(void)
 {
-    s_test_follow_cmd = enable;
-}
-
-void cartfsm_test_speed_latch(int state)
-{
-    s_test_speed_latch = state;
+    s_calib = CAL_NONE;   /* 模拟上电：RAM 标定丢失 */
+    s_e_left_um = 0;
+    s_calib_l_um = 0;
 }
 
 #endif

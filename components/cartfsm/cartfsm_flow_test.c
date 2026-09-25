@@ -1,20 +1,18 @@
 /*
  * cartfsm — 上板流程自测（CONFIG_CARTFSM_FLOW_TEST=y）
  *
- * 注入式验证回零流程与故障路径（homing-spec §6）：
- *   1.  HOME → 注入到位（达速锁存 + 偏差）→ READY，原点重置 −265000 µm；
- *   1b. HOME → 未达速偏差 → FAULT/STEP_LOSS（起点压挡块/卡死/域反向）；
- *   2.  HOME → 超时 → FAULT/HOME_TIMEOUT（理想编码器跟随，不依赖 12V）；
- *   3.  HOMING 中注入 AS5600 失联 → FAULT/AS5600 优先于偏差与超时；
- *   3b. READY 中注入 |E−C| 偏差 → FAULT/STEP_LOSS；
- *   4.  RESET → DISABLED，之后可重新 HOME；
- *   5.  HOMING 未达速偏差 FAULT 后重新 HOME 可恢复（入口重锚）。
- * 会开 EN；有 12V 时小车在超时用例中以 −HOME_VEL 真实运动 ≤1 s。
- * 判定注入经 follow_cmd（E 以指令位置替代）与 speed_latch 覆写实现；
- * loss_bias 为一次性注入（判定拍消费即清——持续偏置会被 READY 首拍
- * 丢步判定按契约消灭，完成用例即假失败）。全部用例在有无 12V 时
- * 均确定。机械台位在位的真实回零散布验收见
- * deploy/v2/onboard-checklist.md（C1/C3，人工执行）。
+ * 注入式验证手动两点标定流程与故障路径（calib-spec §7）：
+ *   1.  两 MARK + ENABLE → READY，重定基后无 STEP_LOSS 误报；
+ *   1b. 无左标 / L 非法：拒且状态保持；
+ *   1c. 上电未标定（reset_calib 模拟断电）即 ENABLE：拒；
+ *   2.  重新标定：CAL_DONE 后 MARK LEFT 覆盖重开；
+ *   3.  READY 注入 |E−C| 偏差 → FAULT/STEP_LOSS；
+ *   4.  READY 注入 AS5600 失联 → FAULT/AS5600（既有口径）；
+ *   5.  FAULT → RESET 回 DISABLED 后标定仍在，直接 ENABLE 恢复。
+ * MARK 的两标位置经一次性 loss_bias 注入提供（「手在别处」的替身，
+ * 标记读数消费即清）。会开 EN；有 12V 时小车不会运动（命令流为 0）。
+ * 机械台位在位的标定散布验收见 deploy/v2/onboard-checklist.md
+ * （C1/C2/C8，人工执行）。
  */
 
 #include "cartfsm.h"
@@ -67,18 +65,11 @@ static bool wait_fault_settled(int timeout_ms)
     return false;
 }
 
-/* 回到 DISABLED：HOMING 直接 RESET（中止逃生口）；READY 下 RESET
- * 被忽略，先经注入失联制造 FAULT（监督任务完成停机次序、EN 关）
- * 再 RESET。 */
+/* 回到 DISABLED：READY 下 RESET 被忽略，先经注入失联制造 FAULT
+ * （监督任务完成停机次序、EN 关）再 RESET。 */
 static void to_disabled(void)
 {
-    if (cartfsm_mode() == CM_HOMING) {
-        cart_req_t req = { .cmd = CART_CMD_RESET };
-        cartfsm_test_exec(&req);
-        for (int t = 0; t < 100 && cartfsm_mode() != CM_DISABLED; t += 5) {
-            vTaskDelay(pdMS_TO_TICKS(5));
-        }
-    } else if (cartfsm_mode() == CM_READY) {
+    if (cartfsm_mode() == CM_READY) {
         cartfsm_test_inject_encoder_fail(1);
         if (!wait_fault_settled(2000)) {
             ESP_LOGE(TAG, "to_disabled：FAULT 停机超时");
@@ -96,200 +87,163 @@ static void to_disabled(void)
     }
 }
 
-/* 1. HOME → 注入到位（达速锁存 + 偏差） → READY，原点重置 */
-static bool test_home_done_to_ready(void)
+/* 1. 标定正路径：两 MARK + ENABLE → READY，重定基后无误报 */
+static bool test_calib_and_enable(void)
 {
     to_disabled();
-    cartfsm_test_follow_cmd(false);
-    cartfsm_test_speed_latch(-1);
+    cartfsm_test_reset_calib();
     cartfsm_test_inject_loss_bias(0);
 
-    cart_req_t home = { .cmd = CART_CMD_HOME };
-    cartfsm_test_exec(&home);
-    CHECK(wait_mode(CM_HOMING, 200), "应进入 HOMING");
+    cart_req_t ml = { .cmd = CART_CMD_MARK_LEFT };
+    cartfsm_test_exec(&ml);                       /* E_left = E + 0 */
+    CHECK(cartfsm_calib() == CAL_LEFT, "MARK LEFT 后 CAL_LEFT");
 
-    cartfsm_test_speed_latch(1);             /* 达速锁存置位 */
-    cartfsm_test_inject_loss_bias(10000);    /* 偏差 10 mm > T 3 mm */
-    CHECK(wait_mode(CM_READY, 500), "到位后应 READY");
-    CHECK(cartfsm_reason() == CR_NONE, "READY 原因为 NONE");
-    cartfsm_test_inject_loss_bias(0);
+    cartfsm_test_inject_loss_bias(500000);        /* 右标在 +500 mm */
+    cart_req_t mr = { .cmd = CART_CMD_MARK_RIGHT };
+    cartfsm_test_exec(&mr);
+    CHECK(cartfsm_calib() == CAL_DONE, "MARK RIGHT 后 CAL_DONE");
 
-    vTaskDelay(pdMS_TO_TICKS(50));
-    int64_t x = as5600_position_um();
-    CHECK(x > -266000 && x < -264000, "原点应重置为 −265000 µm 附近");
-
-    to_disabled();
-    CHECK(cartfsm_mode() == CM_DISABLED, "RESET 回 DISABLED");
-    CHECK(en_is_off(), "DISABLED 时 EN 关");
-    return true;
-}
-
-/* 1b. HOME → 未达速偏差 → FAULT/STEP_LOSS（起点压挡块/卡死/域反向） */
-static bool test_home_loss_before_speed(void)
-{
-    to_disabled();
-    cartfsm_test_follow_cmd(false);
-    cartfsm_test_speed_latch(-1);
-    cartfsm_test_inject_loss_bias(0);
-
-    cart_req_t home = { .cmd = CART_CMD_HOME };
-    cartfsm_test_exec(&home);
-    CHECK(wait_mode(CM_HOMING, 200), "应进入 HOMING");
-
-    cartfsm_test_speed_latch(0);             /* 锁存强制清零 */
-    cartfsm_test_inject_loss_bias(10000);
-    CHECK(wait_mode(CM_FAULT, 500), "未达速偏差应 FAULT");
-    CHECK(cartfsm_reason() == CR_STEP_LOSS, "原因为 STEP_LOSS");
-    cartfsm_test_inject_loss_bias(0);
-    CHECK(wait_fault_settled(2000), "EN 关");
-
+    cart_req_t en = { .cmd = CART_CMD_ENABLE };
+    cartfsm_test_exec(&en);
+    CHECK(wait_mode(CM_READY, 200), "ENABLE 后 READY");
+    vTaskDelay(pdMS_TO_TICKS(200));
+    CHECK(cartfsm_mode() == CM_READY, "重定基后 200 ms 无 STEP_LOSS 误报");
     to_disabled();
     return true;
 }
 
-/* 2. HOME → 超时 → FAULT/HOME_TIMEOUT（理想编码器跟随，不依赖 12V） */
-static bool test_home_timeout(void)
+/* 1b. 无左标 / L 非法：拒且状态保持 */
+static bool test_calib_invalid(void)
 {
     to_disabled();
-    cartfsm_test_follow_cmd(false);
-    cartfsm_test_speed_latch(-1);
-    cartfsm_test_inject_loss_bias(0);
-    CHECK(fw_params_set("HOME_TIMEOUT", 1000), "临时收紧超时 1 s");
+    cartfsm_test_reset_calib();
 
-    cart_req_t home = { .cmd = CART_CMD_HOME };
-    cartfsm_test_exec(&home);
-    CHECK(wait_mode(CM_HOMING, 200), "应进入 HOMING");
-    cartfsm_test_follow_cmd(true);    /* E 跟随指令：D 恒 0，只可能超时 */
+    cart_req_t mr = { .cmd = CART_CMD_MARK_RIGHT };
+    cartfsm_test_exec(&mr);
+    CHECK(cartfsm_calib() == CAL_NONE, "无左标 MARK RIGHT 拒");
 
-    /* 回零运动必须持续整个超时窗（监督任务续喂引擎看门狗——曾因
-     * 断喂在 100 ms 后减速停车，超时断言无法暴露，此处锚定；
-     * 步数为逻辑量，不依赖 12V） */
-    vTaskDelay(pdMS_TO_TICKS(300));
-    int32_t p1 = step_engine_position_steps();
-    vTaskDelay(pdMS_TO_TICKS(300));
-    int32_t p2 = step_engine_position_steps();
-    CHECK(p2 < p1 - 100, "HOMING 应持续运动（监督任务喂狗）");
+    cart_req_t ml = { .cmd = CART_CMD_MARK_LEFT };
+    cartfsm_test_exec(&ml);
+    cartfsm_test_inject_loss_bias(0);             /* 两点重合 → L=0 */
+    cartfsm_test_exec(&mr);
+    CHECK(cartfsm_calib() == CAL_LEFT, "L 非法保持 CAL_LEFT");
 
-    /* 无偏差、无编码器失联 → 只能超时 */
-    CHECK(wait_mode(CM_FAULT, 3000), "1 s 超时后应 FAULT");
-    CHECK(cartfsm_reason() == CR_HOME_TIMEOUT, "原因为 HOME_TIMEOUT");
-    CHECK(wait_fault_settled(2000), "FAULT 停机次序完成（EN 关）");
-
-    cartfsm_test_follow_cmd(false);
-    fw_params_set("HOME_TIMEOUT", 30000);
+    cart_req_t en = { .cmd = CART_CMD_ENABLE };
+    cartfsm_test_exec(&en);
+    CHECK(cartfsm_mode() == CM_DISABLED, "未完成标定 ENABLE 拒");
     to_disabled();
     return true;
 }
 
-/* 3. HOMING 中注入 AS5600 失联 → FAULT/AS5600 优先于偏差与超时 */
-static bool test_homing_encoder_fail_priority(void)
+/* 1c. 断电语义：标定丢失后 ENABLE 拒 */
+static bool test_enable_after_reset_calib(void)
 {
     to_disabled();
-    cartfsm_test_follow_cmd(false);
-    cartfsm_test_speed_latch(-1);
-    cartfsm_test_inject_loss_bias(0);
+    cartfsm_test_reset_calib();
+    cart_req_t en = { .cmd = CART_CMD_ENABLE };
+    cartfsm_test_exec(&en);
+    CHECK(cartfsm_mode() == CM_DISABLED && cartfsm_calib() == CAL_NONE,
+          "上电未标定 ENABLE 拒");
+    return true;
+}
 
-    cart_req_t home = { .cmd = CART_CMD_HOME };
-    cartfsm_test_exec(&home);
-    CHECK(wait_mode(CM_HOMING, 200), "应进入 HOMING");
-    cartfsm_test_follow_cmd(true);
+/* 2. 重新标定：CAL_DONE 后 MARK LEFT 覆盖重开 */
+static bool test_recalib(void)
+{
+    to_disabled();
+    cartfsm_test_reset_calib();
 
-    TickType_t t0 = xTaskGetTickCount();
-    cartfsm_test_inject_encoder_fail(1);  /* AS5600 失联 */
-    CHECK(wait_mode(CM_FAULT, 100), "失联后应立即 FAULT（先于超时）");
-    CHECK(cartfsm_reason() == CR_AS5600, "原因为 AS5600");
-    cartfsm_test_inject_encoder_fail(0);
-    cartfsm_test_follow_cmd(false);
-    CHECK(wait_fault_settled(2000), "EN 关");
-    ESP_LOGI(TAG, "  失联→FAULT+EN 关 耗时 %u ms（实测，含调度）",
-             (unsigned)(xTaskGetTickCount() - t0));
+    cart_req_t ml = { .cmd = CART_CMD_MARK_LEFT };
+    cartfsm_test_exec(&ml);
+    cartfsm_test_inject_loss_bias(400000);
+    cart_req_t mr = { .cmd = CART_CMD_MARK_RIGHT };
+    cartfsm_test_exec(&mr);
+    CHECK(cartfsm_calib() == CAL_DONE, "第一段标定完成");
 
+    cartfsm_test_exec(&ml);                       /* 覆盖重开 */
+    CHECK(cartfsm_calib() == CAL_LEFT, "重复 MARK LEFT 重开");
+    cartfsm_test_inject_loss_bias(500000);
+    cartfsm_test_exec(&mr);
+    CHECK(cartfsm_calib() == CAL_DONE, "第二段标定完成");
+
+    cart_req_t en = { .cmd = CART_CMD_ENABLE };
+    cartfsm_test_exec(&en);
+    CHECK(wait_mode(CM_READY, 200), "新标定后 ENABLE");
     to_disabled();
     return true;
 }
 
-/* 3b. READY 中注入 |E−C| 偏差 → FAULT/STEP_LOSS */
+/* 3. READY 注入 |E−C| 偏差 → FAULT/STEP_LOSS（既有保护） */
 static bool test_ready_step_loss(void)
 {
     to_disabled();
-    cartfsm_test_follow_cmd(false);
-    cartfsm_test_speed_latch(-1);
-    cartfsm_test_inject_loss_bias(0);
+    cartfsm_test_reset_calib();
+    cart_req_t ml = { .cmd = CART_CMD_MARK_LEFT };
+    cartfsm_test_exec(&ml);
+    cartfsm_test_inject_loss_bias(500000);
+    cart_req_t mr = { .cmd = CART_CMD_MARK_RIGHT };
+    cartfsm_test_exec(&mr);
+    cart_req_t en = { .cmd = CART_CMD_ENABLE };
+    cartfsm_test_exec(&en);
+    CHECK(wait_mode(CM_READY, 200), "进入 READY");
 
-    cart_req_t home = { .cmd = CART_CMD_HOME };
-    cartfsm_test_exec(&home);
-    CHECK(wait_mode(CM_HOMING, 200), "进入 HOMING");
-    cartfsm_test_speed_latch(1);
-    cartfsm_test_inject_loss_bias(10000);
-    CHECK(wait_mode(CM_READY, 500), "回零完成进 READY");
-    cartfsm_test_inject_loss_bias(0);
-
-    cartfsm_test_inject_loss_bias(10000);   /* 10 mm > STEP_LOSS_UM 3000 */
+    cartfsm_test_inject_loss_bias(10000);   /* 一次性：> STEP_LOSS_UM */
     CHECK(wait_mode(CM_FAULT, 500), "偏差超阈值应 FAULT");
     CHECK(cartfsm_reason() == CR_STEP_LOSS, "原因为 STEP_LOSS");
-    cartfsm_test_inject_loss_bias(0);
     CHECK(wait_fault_settled(2000), "EN 关");
-
     to_disabled();
     return true;
 }
 
-/* 4. FAULT 后 RESET → 可重新 HOME 全流程 */
-static bool test_reset_then_rehome(void)
+/* 4. READY 注入 AS5600 失联 → FAULT/AS5600（复用既有口径） */
+static bool test_ready_encoder_fail(void)
 {
     to_disabled();
-    cartfsm_test_follow_cmd(false);
-    cartfsm_test_speed_latch(-1);
-    cartfsm_test_inject_loss_bias(0);
+    cartfsm_test_reset_calib();
+    cart_req_t ml = { .cmd = CART_CMD_MARK_LEFT };
+    cartfsm_test_exec(&ml);
+    cartfsm_test_inject_loss_bias(500000);
+    cart_req_t mr = { .cmd = CART_CMD_MARK_RIGHT };
+    cartfsm_test_exec(&mr);
+    cart_req_t en = { .cmd = CART_CMD_ENABLE };
+    cartfsm_test_exec(&en);
+    CHECK(wait_mode(CM_READY, 200), "进入 READY");
 
-    cart_req_t home = { .cmd = CART_CMD_HOME };
-    cartfsm_test_exec(&home);
-    CHECK(wait_mode(CM_HOMING, 200), "重新 HOME 生效");
-    cartfsm_test_speed_latch(1);
-    cartfsm_test_inject_loss_bias(10000);
-    CHECK(wait_mode(CM_READY, 500), "再次回零完成");
-    cartfsm_test_inject_loss_bias(0);
+    TickType_t t0 = xTaskGetTickCount();
+    cartfsm_test_inject_encoder_fail(1);
+    CHECK(wait_mode(CM_FAULT, 100), "失联应 FAULT");
+    CHECK(cartfsm_reason() == CR_AS5600, "原因为 AS5600");
+    cartfsm_test_inject_encoder_fail(0);
+    CHECK(wait_fault_settled(2000), "EN 关");
+    ESP_LOGI(TAG, "  失联→FAULT+EN 关 耗时 %u ms（实测，含调度）",
+             (unsigned)(xTaskGetTickCount() - t0));
     to_disabled();
     return true;
 }
 
-/* 5. HOMING 未达速偏差 FAULT 后，挪车重新 HOME 可恢复（入口重锚）：
- *    无重锚时 C 停在 E−(T+δ)，D 恒超阈，重 HOME 首拍即再 FAULT——
- *    「挪车后重试」死锁（评审 Critical 1 的回归锚） */
-static bool test_rehome_after_step_loss(void)
+/* 5. FAULT → RESET 回 DISABLED 后标定仍在，直接 ENABLE 恢复 */
+static bool test_fault_reset_recovery(void)
 {
     to_disabled();
-    cartfsm_test_follow_cmd(false);
-    cartfsm_test_speed_latch(-1);
-    cartfsm_test_inject_loss_bias(0);
-
-    cart_req_t home = { .cmd = CART_CMD_HOME };
-    cartfsm_test_exec(&home);
-    CHECK(wait_mode(CM_HOMING, 200), "应进入 HOMING");
-    cartfsm_test_speed_latch(0);
+    cartfsm_test_reset_calib();
+    cart_req_t ml = { .cmd = CART_CMD_MARK_LEFT };
+    cartfsm_test_exec(&ml);
+    cartfsm_test_inject_loss_bias(500000);
+    cart_req_t mr = { .cmd = CART_CMD_MARK_RIGHT };
+    cartfsm_test_exec(&mr);
+    cart_req_t en = { .cmd = CART_CMD_ENABLE };
+    cartfsm_test_exec(&en);
+    CHECK(wait_mode(CM_READY, 200), "进入 READY");
     cartfsm_test_inject_loss_bias(10000);
-    CHECK(wait_mode(CM_FAULT, 500), "未达速偏差应 FAULT");
-    CHECK(cartfsm_reason() == CR_STEP_LOSS, "原因为 STEP_LOSS");
-    cartfsm_test_inject_loss_bias(0);
-    CHECK(wait_fault_settled(2000), "EN 关");
-
-    /* RESET 后重 HOME：模拟挪车（清偏置即等效 E 未变、C 不再滞留
-     * 故障时的超前量）——入口重锚使 D 归零，注入到位应可完成 */
-    to_disabled();
-    cartfsm_test_speed_latch(-1);
-    cartfsm_test_inject_loss_bias(0);
-    cartfsm_test_exec(&home);
-    CHECK(wait_mode(CM_HOMING, 200), "重新 HOME 生效");
-    cartfsm_test_speed_latch(1);
-    cartfsm_test_inject_loss_bias(10000);
-    CHECK(wait_mode(CM_READY, 500), "挪车后重新回零应完成（重锚）");
-    CHECK(cartfsm_reason() == CR_NONE, "READY 原因为 NONE");
+    CHECK(wait_mode(CM_FAULT, 500), "制造 FAULT");
     cartfsm_test_inject_loss_bias(0);
 
-    vTaskDelay(pdMS_TO_TICKS(50));
-    int64_t x = as5600_position_um();
-    CHECK(x > -266000 && x < -264000, "原点应重置为 −265000 µm 附近");
-
+    cart_req_t rs = { .cmd = CART_CMD_RESET };
+    cartfsm_test_exec(&rs);
+    CHECK(cartfsm_mode() == CM_DISABLED, "RESET 回 DISABLED");
+    CHECK(cartfsm_calib() == CAL_DONE, "标定保留");
+    cartfsm_test_exec(&en);
+    CHECK(wait_mode(CM_READY, 200), "直接 ENABLE 恢复");
     to_disabled();
     return true;
 }
@@ -312,13 +266,13 @@ void cartfsm_flow_test_run(void)
     ESP_LOGI(TAG, " cartfsm 流程自测（注入式，会开 EN）");
     ESP_LOGI(TAG, "========================================");
 
-    RUN_TEST(test_home_done_to_ready);
-    RUN_TEST(test_home_loss_before_speed);
-    RUN_TEST(test_home_timeout);
-    RUN_TEST(test_homing_encoder_fail_priority);
+    RUN_TEST(test_calib_and_enable);
+    RUN_TEST(test_calib_invalid);
+    RUN_TEST(test_enable_after_reset_calib);
+    RUN_TEST(test_recalib);
     RUN_TEST(test_ready_step_loss);
-    RUN_TEST(test_reset_then_rehome);
-    RUN_TEST(test_rehome_after_step_loss);
+    RUN_TEST(test_ready_encoder_fail);
+    RUN_TEST(test_fault_reset_recovery);
 
     to_disabled();
 

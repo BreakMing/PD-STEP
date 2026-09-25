@@ -98,13 +98,6 @@ bool cartproto_parse_line(const char *line, cart_req_t *out)
 
     /* 无参数命令 */
     if (cmd_len == len) {
-        if (cmd_len == 4) {
-            if (line[0] == 'H' && line[1] == 'O' && line[2] == 'M'
-                && line[3] == 'E') {
-                out->cmd = CART_CMD_HOME;
-                return true;
-            }
-        }
         if (cmd_len == 5) {
             if (line[0] == 'R' && line[1] == 'E' && line[2] == 'S'
                 && line[3] == 'E' && line[4] == 'T') {
