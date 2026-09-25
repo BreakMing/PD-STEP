@@ -27,6 +27,10 @@ bool cm_step(cm_mode_t *mode, cm_reason_t *reason, cm_event_t ev)
             *mode = CM_READY;
             *reason = CR_NONE;
             return true;
+        case CE_HOME_DONE:          /* 到位 = 回零完成信号（位置偏差判据） */
+            *mode = CM_READY;
+            *reason = CR_NONE;
+            return true;
         case CE_HOME_TIMEOUT:
             *mode = CM_FAULT;
             *reason = CR_HOME_TIMEOUT;
@@ -106,4 +110,32 @@ bool cm_step_loss(long e_um, long c_um, long step_loss_um)
         diff = -diff;
     }
     return diff > step_loss_um;
+}
+
+bool cm_speed_reached(long v_meas_mm_s, long home_vel_mm_s)
+{
+    if (home_vel_mm_s <= 0) {
+        return false;
+    }
+    return v_meas_mm_s * 5 <= -home_vel_mm_s * 4;
+}
+
+cm_event_t cm_homing_event(const cm_homing_in_t *in)
+{
+    if (in == NULL) {
+        return (cm_event_t)0;
+    }
+    if (!in->a5600_ok) {
+        return CE_AS5600_FAIL;      /* E 无效时不得用于任何判定 */
+    }
+    if (!in->m6835_ok) {
+        return CE_MT6835_FAIL;
+    }
+    if (cm_step_loss(in->e_um, in->c_um, in->step_loss_um)) {
+        return in->speed_latch ? CE_HOME_DONE : CE_STEP_LOSS;
+    }
+    if (in->timed_out) {
+        return CE_HOME_TIMEOUT;
+    }
+    return (cm_event_t)0;
 }

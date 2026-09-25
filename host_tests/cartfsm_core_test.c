@@ -40,6 +40,7 @@ static void test_transitions(void)
     m = CM_DISABLED;
     CHECK(!step(CE_CMD_RESET), "DISABLED+RESET 忽略");
     CHECK(!step(CE_STALL), "DISABLED+STALL 忽略");
+    CHECK(!step(CE_HOME_DONE), "DISABLED+HOME_DONE 忽略");
     CHECK(!step(CE_STEP_LOSS), "DISABLED+STEP_LOSS 忽略");
     CHECK(!step(CE_HOME_TIMEOUT), "DISABLED+TIMEOUT 忽略");
     CHECK(!step(CE_AS5600_FAIL), "DISABLED+AS5600 忽略");
@@ -47,6 +48,11 @@ static void test_transitions(void)
     /* HOMING + 堵转 → READY/NONE（完成信号） */
     m = CM_HOMING; r = CR_NONE;
     CHECK(step(CE_STALL) && m == CM_READY && r == CR_NONE, "HOMING+STALL→READY");
+
+    /* HOMING + 到位（位置偏差判据事件）→ READY/NONE */
+    m = CM_HOMING; r = CR_NONE;
+    CHECK(step(CE_HOME_DONE) && m == CM_READY && r == CR_NONE,
+          "HOMING+HOME_DONE→READY");
 
     /* HOMING + 超时 → FAULT/HOME_TIMEOUT */
     m = CM_HOMING;
@@ -89,6 +95,7 @@ static void test_transitions(void)
     CHECK(!step(CE_CMD_HOME), "READY+HOME 忽略");
     CHECK(!step(CE_CMD_RESET), "READY+RESET 忽略");
     CHECK(!step(CE_HOME_TIMEOUT), "READY+TIMEOUT 忽略");
+    CHECK(!step(CE_HOME_DONE), "READY+HOME_DONE 忽略");
 
     /* FAULT + RESET → DISABLED/NONE */
     m = CM_FAULT; r = CR_STALL;
@@ -98,6 +105,7 @@ static void test_transitions(void)
     m = CM_FAULT; r = CR_NONE;
     CHECK(!step(CE_CMD_HOME), "FAULT+HOME 忽略");
     CHECK(!step(CE_STALL), "FAULT+STALL 忽略");
+    CHECK(!step(CE_HOME_DONE), "FAULT+HOME_DONE 忽略");
     CHECK(!step(CE_AS5600_FAIL), "FAULT+AS5600 忽略");
     CHECK(!step(CE_HOME_TIMEOUT), "FAULT+TIMEOUT 忽略");
     CHECK(!step(CE_STEP_LOSS), "FAULT+STEP_LOSS 忽略");
@@ -250,12 +258,62 @@ static void test_registry_enum(void)
     }
 }
 
+/* ---- HOMING 到位决策表（homing-spec §2 优先序） ---- */
+static void test_homing_event(void)
+{
+    cm_homing_in_t in = {
+        .a5600_ok = true, .m6835_ok = true, .speed_latch = true,
+        .e_um = 0, .c_um = 0, .step_loss_um = 3000, .timed_out = false,
+    };
+    /* 序 1：AS5600 失败最优先——E 无效不得参与任何判定 */
+    in.a5600_ok = false; in.e_um = 999999;
+    CHECK(cm_homing_event(&in) == CE_AS5600_FAIL, "AS5600 失败最优先");
+    in.a5600_ok = true;
+    /* 序 2：MT6835 失败次之 */
+    in.m6835_ok = false;
+    CHECK(cm_homing_event(&in) == CE_MT6835_FAIL, "MT6835 失败次之");
+    in.m6835_ok = true;
+    /* 序 3：未达速偏差 → STEP_LOSS（起点压挡块/卡死/域反向） */
+    in.speed_latch = false; in.e_um = 4000;
+    CHECK(cm_homing_event(&in) == CE_STEP_LOSS, "未达速偏差→STEP_LOSS");
+    /* 序 4：达速偏差 → 到位 */
+    in.speed_latch = true;
+    CHECK(cm_homing_event(&in) == CE_HOME_DONE, "达速偏差→到位");
+    /* 序 4 优先于序 5：同拍超时也判到位 */
+    in.timed_out = true;
+    CHECK(cm_homing_event(&in) == CE_HOME_DONE, "到位优先于超时");
+    /* 序 5：无偏差时超时（不论锁存） */
+    in.e_um = 0; in.speed_latch = false;
+    CHECK(cm_homing_event(&in) == CE_HOME_TIMEOUT, "未达速无偏差→超时");
+    in.speed_latch = true;
+    CHECK(cm_homing_event(&in) == CE_HOME_TIMEOUT, "达速无偏差→超时");
+    /* 无事件与 NULL 安全 */
+    in.timed_out = false;
+    CHECK(cm_homing_event(&in) == 0, "常态无事件");
+    CHECK(cm_homing_event(NULL) == 0, "NULL 无事件");
+}
+
+/* ---- 达速判据：含符号、0.8×HOME_VEL 门限 ---- */
+static void test_speed_reached(void)
+{
+    CHECK(cm_speed_reached(-40, 50), "−40 达 −0.8×50 门限");
+    CHECK(!cm_speed_reached(-39, 50), "−39 未达门限");
+    CHECK(cm_speed_reached(-50, 50), "额定速度达标");
+    CHECK(!cm_speed_reached(40, 50), "正方向不算（域反向保护）");
+    CHECK(!cm_speed_reached(0, 50), "静止不算");
+    CHECK(!cm_speed_reached(-40, 0), "HOME_VEL=0 非法输入不算");
+    CHECK(!cm_speed_reached(-40, -50), "HOME_VEL 负值不算");
+    CHECK(cm_speed_reached(-4, 5), "最小 HOME_VEL=5 的门限 −4");
+}
+
 int main(void)
 {
     test_transitions();
     test_config_matrix();
     test_soft_limit();
     test_step_loss();
+    test_homing_event();
+    test_speed_reached();
     test_params_ranges();
     test_registry_enum();
 

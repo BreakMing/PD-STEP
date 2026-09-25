@@ -26,6 +26,7 @@ typedef enum {
     CE_CMD_HOME = 1,      /* DISABLED 才生效 */
     CE_CMD_RESET,         /* FAULT 清除；HOMING 中止（逃生口） */
     CE_STALL,             /* HOMING=完成；READY=故障 */
+    CE_HOME_DONE,         /* HOMING 到位判定（达速后 |E−C| 越限） */
     CE_HOME_TIMEOUT,
     CE_AS5600_FAIL,
     CE_MT6835_FAIL,
@@ -51,6 +52,31 @@ long cm_soft_limit_clamp(long x_um, long x_limit_um, long v_mm_s);
 
 /** 丢步判定（µm 域）：|E−C| 超过阈值即丢步。 */
 bool cm_step_loss(long e_um, long c_um, long step_loss_um);
+
+/* ---- HOMING 到位判定（位置偏差判据，homing-spec §2） ---- */
+
+/** HOMING 每拍判定输入（监督任务 1 kHz 组装）。 */
+typedef struct {
+    bool a5600_ok;      /* AS5600 读取成功（E 有效性；false 最先判） */
+    bool m6835_ok;      /* MT6835 读取成功 */
+    bool speed_latch;   /* 达速锁存已置位（实测曾达 −0.8×HOME_VEL） */
+    long e_um;          /* 实测位置 µm（含测试偏置） */
+    long c_um;          /* 指令位置 µm */
+    long step_loss_um;  /* 偏差阈值 T */
+    bool timed_out;     /* 已超过 HOME_TIMEOUT */
+} cm_homing_in_t;
+
+/**
+ * @brief HOMING 每拍事件判定（优先序决策表）：
+ *        AS5600 失败 > MT6835 失败 > 偏差越限（按达速锁存分类：
+ *        达速=到位 CE_HOME_DONE，未达速=CE_STEP_LOSS）> 超时。
+ *        E 无效时不得用于任何判定。
+ * @return 触发的事件；0 = 本拍无事件。
+ */
+cm_event_t cm_homing_event(const cm_homing_in_t *in);
+
+/** 达速判据：实测速度达到回零方向 80%（v_meas ≤ −0.8×home_vel，含符号）。 */
+bool cm_speed_reached(long v_meas_mm_s, long home_vel_mm_s);
 
 #ifdef __cplusplus
 }
