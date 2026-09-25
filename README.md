@@ -3,7 +3,7 @@
 cartpole 实验台的运动端固件：ESP32-S3 + TMC2209 步进驱动 +
 AS5600 小车位置编码器 + MT6835 摆角编码器。上端（Hi3516CV610 或
 PC 联调机）通过串口以 **protocol.md 线协议** 驱动：200 Hz 状态流、
-`VEL` 速度模式跟踪、StallGuard 堵转回零、四态模式机与参数注册表。
+`VEL` 速度模式跟踪、位置偏差判据回零、四态模式机与参数注册表。
 
 **线协议唯一权威：本仓库之外的项目主仓库
 `deploy/v2/protocol.md`**（命令词法、模式转换表、参数注册表、
@@ -14,7 +14,7 @@ PC 联调机）通过串口以 **protocol.md 线协议** 驱动：200 Hz 状态�
 | 模块 | 器件 | 引脚 | 职责 |
 |---|---|---|---|
 | 主控 | ESP32-S3-WROOM-1-N16R8 | — | 16MB Flash + 8MB PSRAM，240 MHz |
-| 步进驱动 | TMC2209 | EN=21（低有效）、STEP=5、DIR=6、DIAG1=16、UART TX=17/RX=18 | 42 步进电机驱动，单线 UART 配置 + StallGuard |
+| 步进驱动 | TMC2209 | EN=21（低有效）、STEP=5、DIR=6、UART TX=17/RX=18 | 42 步进电机驱动，单线 UART 配置 |
 | 小车编码器 | AS5600（电机尾部直装） | I2C SDA=8 / SCL=9 @400 kHz | 12 bit 多圈 → x_um 遥测与丢步判定 |
 | 摆角编码器 | MT6835（21 bit） | SPI MISO=46、MOSI=40、SCK=39、CS=7 | ±π µrad 摆角与角速度遥测 |
 | 主机通道 | UART1 | TX=41 / RX=42 @460800 8N1 | protocol.md 线协议（经 CH343P USB） |
@@ -39,7 +39,7 @@ components/
                 docs/reviews/T4-brief.md）+ ±π 环绕换算（纯函数）
   telemetry/    200 Hz STATE 组帧（纯函数 + 常开任务）
   settings/     NVS 机械参数（$0–$4：细分/整步/每转行程/电流）
-  tmc2209/      驱动配置（电流/细分/StallGuard 阈值）
+  tmc2209/      驱动配置（电流/细分）
 main/app_main.c 启动接线（含 Kconfig 门控自测入口）
 host_tests/     宿主可跑的纯逻辑测试（gcc，无 ESP 依赖）
 tools/          cartpole_host.py 联调工具、自测构建片段
@@ -89,6 +89,6 @@ wsl gcc -std=c11 -Wall -Wextra -Werror \
 python tools/cartpole_host.py --port COM7 query|home|vel|config|dump|state|wdt-test|console
 ```
 
-上板验收按 `docs/reviews/T8-acceptance.md`（回零散布/StallGuard
-标定/DIAG 极性）与 `docs/reviews/T10-acceptance.md`（端到端五用例）
+上板验收按主仓库 `deploy/v2/onboard-checklist.md`（C 阶段，含回零
+到位判定）与 `docs/reviews/T10-acceptance.md`（端到端五用例）
 执行并回填。
