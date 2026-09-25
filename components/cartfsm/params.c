@@ -2,7 +2,7 @@
  * params — 参数注册表实现（默认值与范围：protocol.md §参数注册表）
  *
  * 纯数据层：fw_params_set 只做范围校验与写值；写硬件的作用点
- * （引擎加速度/看门狗/方向反转/堵转阈值）由 cartfsm 外壳执行。
+ * （引擎加速度/看门狗/方向反转）由 cartfsm 外壳执行。
  */
 
 #include "params.h"
@@ -21,7 +21,6 @@ static fw_params_t s_params = {
     .pole_zero_urad = 0,        /* ±3141592 µrad          */
     .pole_inv       = 0,        /* 0 – 1                  */
     .x_inv          = 0,        /* 0 – 1                  */
-    .sgthrs         = 40,       /* 0 – 255                */
     .step_loss_um   = 3000,     /* 500 – 20000 µm         */
 };
 
@@ -43,7 +42,6 @@ static const param_entry_t s_entries[] = {
     { "POLE_ZERO_URAD", &s_params.pole_zero_urad,  -3141592, 3141592 },
     { "POLE_INV",       &s_params.pole_inv,        0,       1       },
     { "X_INV",          &s_params.x_inv,           0,       1       },
-    { "SGTHRS",         &s_params.sgthrs,          0,       255     },
     { "STEP_LOSS_UM",   &s_params.step_loss_um,    500,     20000   },
 };
 

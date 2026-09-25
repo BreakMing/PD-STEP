@@ -2,7 +2,8 @@
  * cartfsm_core — 模式机纯核心（无硬件依赖，宿主可测）
  *
  * 转换表完整分类（protocol.md §固件模式机 + §命令×模式矩阵）。
- * 堵转在 HOMING 是预期的完成信号，在 READY 跟踪中才是故障。
+ * 回零完成信号是位置偏差判据（达速锁存后 |E−C| 越限，homing-spec.md）；
+ * 未达速的偏差越限是故障。
  * 纯核心只做状态判定与数值钳位；EN 控制、MODE 行推送、回零动作
  * 由 cartfsm.c 的外壳按核心判定结果执行。
  */
@@ -19,18 +20,17 @@ extern "C" {
 typedef enum { CM_DISABLED, CM_HOMING, CM_READY, CM_FAULT } cm_mode_t;
 
 typedef enum {
-    CR_NONE, CR_STEP_LOSS, CR_STALL, CR_AS5600, CR_MT6835, CR_HOME_TIMEOUT,
+    CR_NONE, CR_STEP_LOSS, CR_AS5600, CR_MT6835, CR_HOME_TIMEOUT,
 } cm_reason_t;
 
 typedef enum {
     CE_CMD_HOME = 1,      /* DISABLED 才生效 */
     CE_CMD_RESET,         /* FAULT 清除；HOMING 中止（逃生口） */
-    CE_STALL,             /* HOMING=完成；READY=故障 */
-    CE_HOME_DONE,         /* HOMING 到位判定（达速后 |E−C| 越限） */
+    CE_HOME_DONE,         /* HOMING 到位判定（达速后 |E−C| 越限）→ 完成 */
     CE_HOME_TIMEOUT,
     CE_AS5600_FAIL,
     CE_MT6835_FAIL,
-    CE_STEP_LOSS,
+    CE_STEP_LOSS,         /* READY 丢步；HOMING 未达速偏差 */
 } cm_event_t;
 
 /**

@@ -23,13 +23,13 @@ bool cm_step(cm_mode_t *mode, cm_reason_t *reason, cm_event_t ev)
 
     case CM_HOMING:
         switch (ev) {
-        case CE_STALL:              /* 堵转 = 回零完成信号 */
-            *mode = CM_READY;
-            *reason = CR_NONE;
-            return true;
         case CE_HOME_DONE:          /* 到位 = 回零完成信号（位置偏差判据） */
             *mode = CM_READY;
             *reason = CR_NONE;
+            return true;
+        case CE_STEP_LOSS:          /* 未达速偏差：起点压挡块/卡死/域未对齐 */
+            *mode = CM_FAULT;
+            *reason = CR_STEP_LOSS;
             return true;
         case CE_HOME_TIMEOUT:
             *mode = CM_FAULT;
@@ -49,7 +49,7 @@ bool cm_step(cm_mode_t *mode, cm_reason_t *reason, cm_event_t ev)
             *reason = CR_NONE;
             return true;
         default:
-            return false;           /* HOME/STEP_LOSS 忽略 */
+            return false;           /* HOME 忽略 */
         }
 
     case CM_READY:
@@ -57,10 +57,6 @@ bool cm_step(cm_mode_t *mode, cm_reason_t *reason, cm_event_t ev)
         case CE_STEP_LOSS:
             *mode = CM_FAULT;
             *reason = CR_STEP_LOSS;
-            return true;
-        case CE_STALL:
-            *mode = CM_FAULT;
-            *reason = CR_STALL;
             return true;
         case CE_AS5600_FAIL:
             *mode = CM_FAULT;

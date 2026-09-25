@@ -39,15 +39,10 @@ static void test_transitions(void)
     /* DISABLED 忽略其余命令事件 */
     m = CM_DISABLED;
     CHECK(!step(CE_CMD_RESET), "DISABLED+RESET 忽略");
-    CHECK(!step(CE_STALL), "DISABLED+STALL 忽略");
     CHECK(!step(CE_HOME_DONE), "DISABLED+HOME_DONE 忽略");
     CHECK(!step(CE_STEP_LOSS), "DISABLED+STEP_LOSS 忽略");
     CHECK(!step(CE_HOME_TIMEOUT), "DISABLED+TIMEOUT 忽略");
     CHECK(!step(CE_AS5600_FAIL), "DISABLED+AS5600 忽略");
-
-    /* HOMING + 堵转 → READY/NONE（完成信号） */
-    m = CM_HOMING; r = CR_NONE;
-    CHECK(step(CE_STALL) && m == CM_READY && r == CR_NONE, "HOMING+STALL→READY");
 
     /* HOMING + 到位（位置偏差判据事件）→ READY/NONE */
     m = CM_HOMING; r = CR_NONE;
@@ -72,17 +67,17 @@ static void test_transitions(void)
     CHECK(step(CE_CMD_RESET) && m == CM_DISABLED && r == CR_NONE,
           "HOMING+RESET→DISABLED");
 
-    /* HOMING 忽略 HOME/STEP_LOSS */
+    /* HOMING 忽略 HOME；未达速偏差 → FAULT/STEP_LOSS（决策表序 3） */
     m = CM_HOMING;
     CHECK(!step(CE_CMD_HOME), "HOMING+HOME 忽略");
-    CHECK(!step(CE_STEP_LOSS), "HOMING+STEP_LOSS 忽略");
+    m = CM_HOMING; r = CR_NONE;
+    CHECK(step(CE_STEP_LOSS) && m == CM_FAULT && r == CR_STEP_LOSS,
+          "HOMING+STEP_LOSS→FAULT（未达速偏差）");
 
-    /* READY 故障四源 */
+    /* READY 故障三源 */
     m = CM_READY;
     CHECK(step(CE_STEP_LOSS) && m == CM_FAULT && r == CR_STEP_LOSS,
           "READY+STEP_LOSS→FAULT");
-    m = CM_READY;
-    CHECK(step(CE_STALL) && m == CM_FAULT && r == CR_STALL, "READY+STALL→FAULT");
     m = CM_READY;
     CHECK(step(CE_AS5600_FAIL) && m == CM_FAULT && r == CR_AS5600,
           "READY+AS5600→FAULT");
@@ -98,13 +93,12 @@ static void test_transitions(void)
     CHECK(!step(CE_HOME_DONE), "READY+HOME_DONE 忽略");
 
     /* FAULT + RESET → DISABLED/NONE */
-    m = CM_FAULT; r = CR_STALL;
+    m = CM_FAULT; r = CR_STEP_LOSS;
     CHECK(step(CE_CMD_RESET) && m == CM_DISABLED && r == CR_NONE, "FAULT+RESET→DISABLED");
 
     /* FAULT 忽略其余 */
     m = CM_FAULT; r = CR_NONE;
     CHECK(!step(CE_CMD_HOME), "FAULT+HOME 忽略");
-    CHECK(!step(CE_STALL), "FAULT+STALL 忽略");
     CHECK(!step(CE_HOME_DONE), "FAULT+HOME_DONE 忽略");
     CHECK(!step(CE_AS5600_FAIL), "FAULT+AS5600 忽略");
     CHECK(!step(CE_HOME_TIMEOUT), "FAULT+TIMEOUT 忽略");
@@ -162,7 +156,6 @@ static void test_params_ranges(void)
     CHECK(p->x_limit_um == 260000, "X_LIMIT 默认 260000");
     CHECK(p->pole_zero_urad == 0 && p->pole_inv == 0 && p->x_inv == 0,
           "标定项默认 0");
-    CHECK(p->sgthrs == 40, "SGTHRS 默认 40");
     CHECK(p->step_loss_um == 3000, "STEP_LOSS_UM 默认 3000");
 
     /* 逐项边界 ±1 */
@@ -213,10 +206,6 @@ static void test_params_ranges(void)
     CHECK(fw_params_set("X_INV", 1), "X_INV 界内");
     CHECK(!fw_params_set("X_INV", 5), "X_INV 界外拒绝");
 
-    CHECK(fw_params_set("SGTHRS", 0) && fw_params_set("SGTHRS", 255),
-          "SGTHRS 界内");
-    CHECK(!fw_params_set("SGTHRS", 256), "SGTHRS 256 拒绝");
-
     CHECK(fw_params_set("STEP_LOSS_UM", 500)
           && fw_params_set("STEP_LOSS_UM", 20000), "STEP_LOSS_UM 界内");
     CHECK(!fw_params_set("STEP_LOSS_UM", 499)
@@ -232,17 +221,17 @@ static void test_params_ranges(void)
 /* ---- 注册表枚举一致性 ---- */
 static void test_registry_enum(void)
 {
-    CHECK(fw_params_count() == 12, "十二项");
-    CHECK(fw_params_name(0) != NULL && fw_params_name(11) != NULL,
-          "0..11 有名");
-    CHECK(fw_params_name(12) == NULL, "越界 NULL");
+    CHECK(fw_params_count() == 11, "十一项");
+    CHECK(fw_params_name(0) != NULL && fw_params_name(10) != NULL,
+          "0..10 有名");
+    CHECK(fw_params_name(11) == NULL, "越界 NULL");
     /* dump 顺序的 NAME 拼写 */
     const char *expect[] = {
         "VEL_MAX", "ACC_MAX", "WDT_MS", "WDT_DEC", "HOME_VEL", "HOME_TIMEOUT",
-        "X_LIMIT", "POLE_ZERO_URAD", "POLE_INV", "X_INV", "SGTHRS",
+        "X_LIMIT", "POLE_ZERO_URAD", "POLE_INV", "X_INV",
         "STEP_LOSS_UM",
     };
-    for (int i = 0; i < 12; i++) {
+    for (int i = 0; i < 11; i++) {
         int ok = fw_params_name(i) != NULL;
         if (ok) {
             const char *a = fw_params_name(i);

@@ -1,9 +1,9 @@
 /*
  * cartfsm — cartpole 模式机外壳（纯核心 cartfsm_core + 硬件作用点）
  *
- * 1 kHz 监督任务（CPU1、优先级 4）：回零完成/超时、编码器失联、
- * 丢步（µm 域 |E−C|）、软限位持续钳制、FAULT 停机次序
- * （目标斜坡置 0 → vel_now==0 → EN 关 → 推 MODE）。
+ * 1 kHz 监督任务（CPU1、优先级 4）：回零到位判定（位置偏差+达速
+ * 锁存）/超时、编码器失联、丢步（µm 域 |E−C|）、软限位持续钳制、
+ * FAULT 停机次序（目标斜坡置 0 → vel_now==0 → EN 关 → 推 MODE）。
  * 命令执行回调（cartproto exec，CPU0）：命令×模式矩阵 + CONFIG
  * 注册表作用点。上电 DISABLED、EN 关。
  */
@@ -27,12 +27,8 @@ esp_err_t cartfsm_start(void);
 /** 当前模式（枚举原子读）。 */
 cm_mode_t cartfsm_mode(void);
 
-/**
- * @brief 堵转报告（任务 8 的 DIAG1 轮询接入点）。
- *
- * HOMING 中 = 回零完成信号；READY 中 = 堵转故障。监督任务消费。
- */
-void cartfsm_report_stall(bool stalled);
+/** 当前原因（枚举原子读；流程自测核对 reason 用）。 */
+cm_reason_t cartfsm_reason(void);
 
 /* ---- 流程自测钩子（CONFIG_CARTFSM_FLOW_TEST，上板注入用） ---- */
 #ifdef CONFIG_CARTFSM_FLOW_TEST
@@ -46,6 +42,12 @@ void cartfsm_test_inject_encoder_fail(int which);
 
 /** 丢步判定注入：给 |E−C| 判据的 E 侧加偏置（µm）。 */
 void cartfsm_test_inject_loss_bias(long bias_um);
+
+/** 判定用 E 以指令位置替代（理想编码器替身；用例不依赖 12V）。 */
+void cartfsm_test_follow_cmd(bool enable);
+
+/** 达速锁存测试覆写：-1 自然判据（默认）；0 强制清零；1 强制置位。 */
+void cartfsm_test_speed_latch(int state);
 #endif
 
 /* ---- 上板自测 ---- */

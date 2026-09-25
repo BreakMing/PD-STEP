@@ -2,7 +2,7 @@
  * cartfsm — 上板自测（核心向量与宿主测试同源，不驱动电机）
  *
  * CONFIG_CARTFSM_SELF_TEST=y 时编入，cartfsm_start 之后运行。
- * 流程级注入用例（假 stall/时钟）在任务 8 的上板验收中人工执行。
+ * 流程级注入用例（假到位/时钟）在任务 8 的上板验收中人工执行。
  */
 
 #include "cartfsm.h"
@@ -26,8 +26,8 @@ static bool test_transitions_spot(void)
     cm_mode_t m = CM_DISABLED;
     cm_reason_t r = CR_NONE;
     CHECK(cm_step(&m, &r, CE_CMD_HOME) && m == CM_HOMING, "HOME→HOMING");
-    CHECK(cm_step(&m, &r, CE_STALL) && m == CM_READY && r == CR_NONE,
-          "堵转完成→READY");
+    CHECK(cm_step(&m, &r, CE_HOME_DONE) && m == CM_READY && r == CR_NONE,
+          "到位完成→READY");
     CHECK(cm_step(&m, &r, CE_STEP_LOSS) && m == CM_FAULT && r == CR_STEP_LOSS,
           "丢步→FAULT");
     CHECK(cm_step(&m, &r, CE_CMD_RESET) && m == CM_DISABLED, "RESET→DISABLED");

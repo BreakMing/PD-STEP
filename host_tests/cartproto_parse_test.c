@@ -46,7 +46,7 @@ static void test_legal(void)
           && strcmp(req.name, "X_LIMIT") == 0 && req.value == 250000,
           "CONFIG X_LIMIT 250000");
     CHECK(p("CONFIG VEL_MAX 800") && req.value == 800, "CONFIG VEL_MAX 800");
-    CHECK(p("CONFIG SGTHRS 0") && req.value == 0, "CONFIG SGTHRS 0");
+    CHECK(p("CONFIG HOME_VEL 50") && req.value == 50, "CONFIG HOME_VEL 50");
     CHECK(p("CONFIG POLE_ZERO_URAD -3141592") && req.value == -3141592,
           "负值 CONFIG");
 
