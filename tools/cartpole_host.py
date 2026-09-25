@@ -228,9 +228,10 @@ def cmd_state(rig, args):
         print("x_um ∈ [%d, %d]（漂移 %d µm；x ≈ %.2f mm）" %
               (min(xs), max(xs), max(xs) - min(xs),
                (min(xs) + max(xs)) / 2000.0))
-        print("theta_urad ∈ [%d, %d]（θ ≈ %.2f°）" %
+        # θ 逐端换算：±π 环绕边界处 min/max 会分居两侧，取均值无意义
+        print("theta_urad ∈ [%d, %d]（θ ∈ [%.2f°, %.2f°]）" %
               (min(ths), max(ths),
-               (min(ths) + max(ths)) / 2 / 17453.3))
+               min(ths) / 17453.3, max(ths) / 17453.3))
     ok = 199.0 <= rate <= 201.0 and rig.unknown_count == 0
     return 0 if ok else 1
 
