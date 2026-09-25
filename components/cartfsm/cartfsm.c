@@ -199,17 +199,23 @@ static void exec_cmd(const cart_req_t *req)
             return;   /* 仅 DISABLED 生效，其余忽略 */
         }
         const fw_params_t *p = fw_params();
+
+        /* 到位判定状态复位与 C 重锚，必须先于模式发布完成——监督
+         * 任务（CPU1）见 CM_HOMING 即开始按拍判定，携上一会话的
+         * 旧锁存/差分基准/绝对 E−C 执行首拍会误判。C 重锚到当前
+         * E 使 D 自入口从 0 起算（homing-spec §2）：故障后挪车重新
+         * 回零才可恢复；DISABLED 进入保证引擎已停止，满足整定约定 */
+        s_last_e_um = (long)as5600_position_um();
+        s_v_meas_mm_s = 0;
+        s_speed_latch = false;
+        s_speed_run = 0;
+        step_engine_set_position(um_to_cmd_steps(s_last_e_um));
+
         portENTER_CRITICAL(&s_lock);
         s_mode = CM_HOMING;
         s_reason = CR_NONE;
         s_home_start = xTaskGetTickCount();
         portEXIT_CRITICAL(&s_lock);
-
-        /* 到位判定状态复位（homing-spec §2：进入 HOMING 时清零） */
-        s_last_e_um = (long)as5600_position_um();
-        s_v_meas_mm_s = 0;
-        s_speed_latch = false;
-        s_speed_run = 0;
 
         /* 动作：EN 开 + 以 −HOME_VEL 起步 */
         bsp_tmc_en_set(true);

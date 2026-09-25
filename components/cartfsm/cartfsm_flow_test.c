@@ -7,7 +7,8 @@
  *   2.  HOME → 超时 → FAULT/HOME_TIMEOUT（理想编码器跟随，不依赖 12V）；
  *   3.  HOMING 中注入 AS5600 失联 → FAULT/AS5600 优先于偏差与超时；
  *   3b. READY 中注入 |E−C| 偏差 → FAULT/STEP_LOSS；
- *   4.  RESET → DISABLED，之后可重新 HOME。
+ *   4.  RESET → DISABLED，之后可重新 HOME；
+ *   5.  HOMING 未达速偏差 FAULT 后重新 HOME 可恢复（入口重锚）。
  * 会开 EN；有 12V 时小车在超时用例中以 −HOME_VEL 真实运动 ≤1 s。
  * 判定注入经 follow_cmd（E 以指令位置替代）与 speed_latch 覆写实现，
  * 全部用例在有无 12V 时均确定。机械台位在位的真实回零散布验收见
@@ -244,6 +245,45 @@ static bool test_reset_then_rehome(void)
     return true;
 }
 
+/* 5. HOMING 未达速偏差 FAULT 后，挪车重新 HOME 可恢复（入口重锚）：
+ *    无重锚时 C 停在 E−(T+δ)，D 恒超阈，重 HOME 首拍即再 FAULT——
+ *    「挪车后重试」死锁（评审 Critical 1 的回归锚） */
+static bool test_rehome_after_step_loss(void)
+{
+    to_disabled();
+    cartfsm_test_follow_cmd(false);
+    cartfsm_test_speed_latch(-1);
+
+    cart_req_t home = { .cmd = CART_CMD_HOME };
+    cartfsm_test_exec(&home);
+    CHECK(wait_mode(CM_HOMING, 200), "应进入 HOMING");
+    cartfsm_test_speed_latch(0);
+    cartfsm_test_inject_loss_bias(10000);
+    CHECK(wait_mode(CM_FAULT, 500), "未达速偏差应 FAULT");
+    CHECK(cartfsm_reason() == CR_STEP_LOSS, "原因为 STEP_LOSS");
+    cartfsm_test_inject_loss_bias(0);
+    CHECK(wait_fault_settled(2000), "EN 关");
+
+    /* RESET 后重 HOME：模拟挪车（清偏置即等效 E 未变、C 不再滞留
+     * 故障时的超前量）——入口重锚使 D 归零，注入到位应可完成 */
+    to_disabled();
+    cartfsm_test_speed_latch(-1);
+    cartfsm_test_exec(&home);
+    CHECK(wait_mode(CM_HOMING, 200), "重新 HOME 生效");
+    cartfsm_test_speed_latch(1);
+    cartfsm_test_inject_loss_bias(10000);
+    CHECK(wait_mode(CM_READY, 500), "挪车后重新回零应完成（重锚）");
+    CHECK(cartfsm_reason() == CR_NONE, "READY 原因为 NONE");
+    cartfsm_test_inject_loss_bias(0);
+
+    vTaskDelay(pdMS_TO_TICKS(50));
+    int64_t x = as5600_position_um();
+    CHECK(x > -266000 && x < -264000, "原点应重置为 −265000 µm 附近");
+
+    to_disabled();
+    return true;
+}
+
 #define RUN_TEST(name) do { \
     if (name()) { \
         s_pass++; \
@@ -268,6 +308,7 @@ void cartfsm_flow_test_run(void)
     RUN_TEST(test_homing_encoder_fail_priority);
     RUN_TEST(test_ready_step_loss);
     RUN_TEST(test_reset_then_rehome);
+    RUN_TEST(test_rehome_after_step_loss);
 
     to_disabled();
 
