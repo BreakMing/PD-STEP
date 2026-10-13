@@ -36,8 +36,8 @@ cm_reason_t cartfsm_reason(void);
 /** 当前标定状态（READY 进入前提是 CAL_DONE）。 */
 calib_state_t cartfsm_calib(void);
 
-/* ---- 流程自测钩子（CONFIG_CARTFSM_FLOW_TEST，上板注入用） ---- */
-#ifdef CONFIG_CARTFSM_FLOW_TEST
+/* ---- 流程测试注入钩子（CONFIG_CARTFSM_TEST_HOOKS，测试工程启用） ---- */
+#ifdef CONFIG_CARTFSM_TEST_HOOKS
 #include "cartproto.h"
 
 /** 直接注入一条已解析命令（绕过串口）。 */
@@ -51,14 +51,6 @@ void cartfsm_test_inject_loss_bias(long bias_um);
 
 /** 标定状态回 CAL_NONE（模拟断电丢 RAM 标定；测试用例隔离）。 */
 void cartfsm_test_reset_calib(void);
-#endif
-
-/* ---- 上板自测 ---- */
-#ifdef CONFIG_CARTFSM_SELF_TEST
-void cartfsm_self_test_run(void);
-#endif
-#ifdef CONFIG_CARTFSM_FLOW_TEST
-void cartfsm_flow_test_run(void);
 #endif
 
 #ifdef __cplusplus

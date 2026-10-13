@@ -137,14 +137,6 @@ bool     as5600_is_ok(void);
  */
 void     as5600_set_origin(float new_pos_mm);
 
-/* ================================================================
- * Self-test (18 cases: 12 pure logic + 6 hardware, plus a guided
- * manual segment that is logged but not counted)
- * ================================================================ */
-#ifdef CONFIG_AS5600_SELF_TEST
-int  as5600_self_test_run(void);   /* final line: "SELF-TEST DONE: <n>/<total> PASS" */
-#endif
-
 #ifdef __cplusplus
 }
 #endif

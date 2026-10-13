@@ -1,19 +1,15 @@
 menu "cartfsm - 模式机"
 
-config CARTFSM_SELF_TEST
-    bool "上电运行 cartfsm 核心自测"
+config CARTFSM_TEST_HOOKS
+    bool "编入流程测试注入钩子"
     default n
     help
-        启用后在启动时运行转换表/软限位/注册表向量自测
-        （不驱动电机）。结束行 "SELF-TEST DONE: <n>/<total> PASS"。
+        编入 cartfsm_test_* 注入钩子（命令直注、编码器失联注入、
+        丢步偏差注入、标定状态复位）。仅供独立测试工程（test/，
+        经其 sdkconfig 默认开启）使用，流程测试用例
+        （test_cartfsm_flow.c）依赖这些钩子。
 
-config CARTFSM_FLOW_TEST
-    bool "上板流程自测（驱动 EN，含 12V 时小车会真实运动）"
-    default n
-    help
-        在核心自测之上追加注入式流程用例：HOME→注入到位→READY
-        且原点重置为 −265 mm；HOME 未达速偏差→FAULT/STEP_LOSS；
-        HOME 超时→FAULT；编码器失联注入→FAULT 优先于超时；
-        RESET 后可重新 HOME。需要 cartfsm_start 已运行；会开 EN。
+        与历史 FLOW_TEST 选项不同：本项不自动运行任何测试，仅暴露
+        注入接口。正式固件保持关闭。
 
 endmenu

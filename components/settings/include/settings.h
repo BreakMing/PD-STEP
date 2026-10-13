@@ -124,14 +124,6 @@ int   settings_hold_current_ma(void);
  */
 bool  settings_subscribe(settings_change_cb_t cb);
 
-/* ---- 上板自测 ----
- * 仅 CONFIG_SETTINGS_SELF_TEST=y 时编入。
- * 结束行："SELF-TEST DONE: <n>/<total> PASS"。
- * 收尾调用 settings_reset_defaults() 清理。 */
-#ifdef CONFIG_SETTINGS_SELF_TEST
-int settings_self_test_run(void);
-#endif
-
 #ifdef __cplusplus
 }
 #endif

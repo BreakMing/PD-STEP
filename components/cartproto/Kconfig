@@ -16,12 +16,4 @@ menu "cartproto - cartpole 线协议通讯栈"
             行首字节到行结尾 '\n' 之间允许的最大间隔。超时的不完整
             行被静默丢弃（protocol.md：非法行静默丢弃）。
 
-    config CARTPROTO_SELF_TEST
-        bool "上电运行 cartproto 解析自测"
-        default n
-        help
-            启用后在启动时运行解析向量自测，并向 UART1 冒烟发送
-            MODE/OK/ERR 各一行（供环回核对）。
-            结束行 "SELF-TEST DONE: <n>/<total> PASS"。
-
 endmenu

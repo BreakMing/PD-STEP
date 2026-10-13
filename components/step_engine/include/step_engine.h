@@ -106,9 +106,9 @@ void step_engine_set_position(int32_t steps);
  */
 void step_engine_set_dir_invert(bool invert);
 
-/* ---- 自测钩子（仅 SELF_TEST=y） ---- */
+/* ---- 测试钩子插桩（仅 CONFIG_STEP_ENGINE_TEST_HOOKS=y；测试工程启用） ---- */
 
-#ifdef CONFIG_STEP_ENGINE_SELF_TEST
+#ifdef CONFIG_STEP_ENGINE_TEST_HOOKS
 
 /** 间隔采样缓冲最大样本数 */
 #define STEP_SELFTEST_MAX_SAMPLES  256
@@ -136,11 +136,7 @@ uint32_t step_selftest_avg_cycles_alarm(void);
 /** 复位 ISR 周期计数。 */
 void step_selftest_reset_isr_cycles(void);
 
-/** 运行全部自测（纯函数向量 + ISR 级速度模式行为）。
- * 结束行："SELF-TEST DONE: <n>/<total> PASS" */
-void step_engine_self_test_run(void);
-
-#endif /* CONFIG_STEP_ENGINE_SELF_TEST */
+#endif /* CONFIG_STEP_ENGINE_TEST_HOOKS */
 
 #ifdef __cplusplus
 }

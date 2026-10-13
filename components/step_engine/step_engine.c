@@ -99,10 +99,10 @@ static portMUX_TYPE s_spinlock = portMUX_INITIALIZER_UNLOCKED;
 static bool s_initialized = false;
 
 /* ================================================================
- * 自测钩子（仅 CONFIG_STEP_ENGINE_SELF_TEST=y）
+ * 自测钩子（仅 CONFIG_STEP_ENGINE_TEST_HOOKS=y）
  * ================================================================ */
 
-#ifdef CONFIG_STEP_ENGINE_SELF_TEST
+#ifdef CONFIG_STEP_ENGINE_TEST_HOOKS
 static uint32_t *s_sample_buf = NULL;
 static int       s_sample_max = 0;
 static volatile int *s_sample_count = NULL;
@@ -119,7 +119,7 @@ static volatile uint64_t s_sum_cyc_pulse = 0;
 static volatile uint64_t s_sum_cyc_ramp = 0;
 static volatile uint64_t s_sum_cyc_alarm = 0;
 static volatile uint32_t s_isr_pulse_count = 0;
-#endif /* CONFIG_STEP_ENGINE_SELF_TEST */
+#endif /* CONFIG_STEP_ENGINE_TEST_HOOKS */
 
 /* ================================================================
  * 辅助：方向输出
@@ -180,7 +180,7 @@ static bool gptimer_alarm_cb(gptimer_handle_t timer,
     s_cb_alarm_base = edata->alarm_value;
     s_cb_guard_floor = edata->count_value + ALARM_GUARD_US;
 
-#ifdef CONFIG_STEP_ENGINE_SELF_TEST
+#ifdef CONFIG_STEP_ENGINE_TEST_HOOKS
     uint32_t isr_start_ccount = esp_cpu_get_cycle_count();
 #endif
 
@@ -197,7 +197,7 @@ static bool gptimer_alarm_cb(gptimer_handle_t timer,
                        ? MAX_ALARM_US : s_chain_remaining_us;
         s_chain_remaining_us -= chunk;
         arm_alarm(s_cb_alarm_base, s_cb_guard_floor, chunk);
-#ifdef CONFIG_STEP_ENGINE_SELF_TEST
+#ifdef CONFIG_STEP_ENGINE_TEST_HOOKS
         uint32_t cend = esp_cpu_get_cycle_count();
         if (cend - isr_start_ccount > s_max_isr_cycles) {
             s_max_isr_cycles = cend - isr_start_ccount;
@@ -218,7 +218,7 @@ static bool gptimer_alarm_cb(gptimer_handle_t timer,
         s_position--;
     }
 
-#ifdef CONFIG_STEP_ENGINE_SELF_TEST
+#ifdef CONFIG_STEP_ENGINE_TEST_HOOKS
     if (s_sample_buf && s_sample_count && *s_sample_count < s_sample_max) {
         uint32_t now = esp_cpu_get_cycle_count();
         if (s_last_alarm_ccount != 0) {
@@ -255,7 +255,7 @@ static bool gptimer_alarm_cb(gptimer_handle_t timer,
     }
     portEXIT_CRITICAL_ISR(&s_spinlock);
 
-#ifdef CONFIG_STEP_ENGINE_SELF_TEST
+#ifdef CONFIG_STEP_ENGINE_TEST_HOOKS
     uint32_t cyc_ramp_end = esp_cpu_get_cycle_count();
 #endif
 
@@ -263,7 +263,7 @@ static bool gptimer_alarm_cb(gptimer_handle_t timer,
         /* 到零速且无换向目标：停表（模式语义由 cartfsm 负责） */
         gptimer_stop(s_timer);
         s_timer_running = false;
-#ifdef CONFIG_STEP_ENGINE_SELF_TEST
+#ifdef CONFIG_STEP_ENGINE_TEST_HOOKS
         uint32_t cend2 = esp_cpu_get_cycle_count();
         uint32_t total2 = cend2 - isr_start_ccount;
         if (total2 > s_max_isr_cycles) {
@@ -291,7 +291,7 @@ static bool gptimer_alarm_cb(gptimer_handle_t timer,
 
     isr_set_alarm(dt);
 
-#ifdef CONFIG_STEP_ENGINE_SELF_TEST
+#ifdef CONFIG_STEP_ENGINE_TEST_HOOKS
     uint32_t cend3 = esp_cpu_get_cycle_count();
     uint32_t total3 = cend3 - isr_start_ccount;
     if (total3 > s_max_isr_cycles) {
@@ -521,7 +521,7 @@ void step_engine_set_dir_invert(bool invert)
  * 自测钩子
  * ================================================================ */
 
-#ifdef CONFIG_STEP_ENGINE_SELF_TEST
+#ifdef CONFIG_STEP_ENGINE_TEST_HOOKS
 
 void step_selftest_start_sampling(uint32_t *buf, int max, volatile int *count)
 {
@@ -589,4 +589,4 @@ void step_selftest_reset_isr_cycles(void)
     s_isr_pulse_count = 0;
 }
 
-#endif /* CONFIG_STEP_ENGINE_SELF_TEST */
+#endif /* CONFIG_STEP_ENGINE_TEST_HOOKS */

@@ -42,9 +42,11 @@ components/
   telemetry/    200 Hz STATE 组帧（纯函数 + 常开任务）
   settings/     NVS 机械参数（$0–$4：细分/整步/每转行程/电流）
   tmc2209/      驱动配置（电流/细分）
-main/app_main.c 启动接线（含 Kconfig 门控自测入口）
+  <每个组件>/test/  组件单元测试（Unity，仅测试工程编入）
+main/app_main.c 启动接线（纯业务，无测试代码）
+test/           独立测试工程（TEST_COMPONENTS + Unity 菜单）
 host_tests/     宿主可跑的纯逻辑测试（gcc，无 ESP 依赖）
-tools/          cartpole_host.py 联调工具、自测构建片段
+tools/          cartpole_host.py 联调工具
 docs/reviews/   抄录与上板验收记录
 ```
 
@@ -58,23 +60,33 @@ telemetry 组帧（prio 2）。全部订阅任务看门狗。
 
 ```powershell
 . C:\esp\v6.1\esp-idf\export.ps1
-idf.py -B build build                    # 正式固件
+idf.py -B build build                    # 正式固件（不含任何测试代码）
 idf.py -B build flash monitor            # 烧录 + 日志
 ```
 
-自测构建（Kconfig 门控，见各组件 Kconfig）：
+### 测试固件（独立测试工程，官方 unit_test 模式）
+
+各组件测试在 `components/<c>/test/`（Unity），由 `test/` 独立工程经
+`TEST_COMPONENTS` 编入，正式固件构建完全不包含：
 
 ```powershell
-idf.py -B build-selftest -DSDKCONFIG=build-selftest/sdkconfig `
-      -DSDKCONFIG_DEFAULTS="sdkconfig.defaults;tools/selftest.defaults" build
-idf.py -B build-flowtest -DSDKCONFIG=build-flowtest/sdkconfig `
-      -DSDKCONFIG_DEFAULTS="sdkconfig.defaults;tools/flowtest.defaults" build
+idf.py -C test build flash monitor       # 测试工程
+idf.py -C test -T cartfsm build          # 只编某组件的测试
 ```
 
-- **selftest**：各组件向量自测（不驱动电机），上电自运行，
-  每组件结束行 `SELF-TEST DONE: <n>/<total> PASS`。
-- **flowtest**：在 selftest 之上加 cartfsm 注入式流程自测
-  （会开 EN；有 12V 时小车会真实运动）。
+上电初始化后进入 Unity 菜单：Enter 列出用例，按名称/序号/`[标签]`/`*`
+选择执行。标签约定：
+
+| 标签 | 内容 | 注意 |
+|---|---|---|
+| `[组件名]` | 常规自测（向量 + 硬件读取） | B 组手勿碰轴 |
+| `[flowtest]` | cartfsm 注入式流程自测 | 会开 EN |
+| `[manual]` | 人工引导段（手转轴/摆杆） | 按提示操作 |
+| `[bringup]` | TMC2209 寄存器核对；`[spin]` 实转 | `[spin]` 确认可自由转动 |
+
+（历史 selftest/flowtest 构建风味与 `SELF-TEST DONE` 汇总行已被
+此机制取代；`step_engine`/`cartfsm` 的 `*_TEST_HOOKS` 插桩开关由
+测试工程 sdkconfig 默认开启，正式固件关闭。）
 
 宿主纯逻辑测试（无需硬件）：
 

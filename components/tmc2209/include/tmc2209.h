@@ -165,20 +165,6 @@ int tmc2209_ma_to_cs(int ma, float r_sense);
  */
 int tmc2209_microstep_to_mres(int ms);
 
-/* ================================================================
- * Self-test (gated by CONFIG_TMC2209_SELF_TEST)
- * ================================================================ */
-#ifdef CONFIG_TMC2209_SELF_TEST
-int tmc2209_self_test_run(void);
-#endif
-
-/* ================================================================
- * Bring-up test (gated by CONFIG_TMC2209_BRINGUP)
- * ================================================================ */
-#ifdef CONFIG_TMC2209_BRINGUP
-int tmc2209_bringup_run(void);
-#endif
-
 #ifdef __cplusplus
 }
 #endif

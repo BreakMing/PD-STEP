@@ -54,14 +54,6 @@ uint32_t mt6835_last_raw(void);
  */
 int32_t mt6835_position_counts(void);
 
-/* ---- 上板自测（CONFIG_MT6835_SELF_TEST=y） ---- */
-#ifdef CONFIG_MT6835_SELF_TEST
-/**
- * 运行自测，结束行 "SELF-TEST DONE: <n>/<total> PASS"。
- */
-int mt6835_self_test_run(void);
-#endif
-
 #ifdef __cplusplus
 }
 #endif

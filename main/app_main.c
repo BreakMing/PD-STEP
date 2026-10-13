@@ -1,10 +1,10 @@
 /*
- * cartpole 固件入口（任务 1 最小骨架）
+ * cartpole 固件入口
  *
  * 启动次序：bsp_early_init（EN 拉高 = 电机不使能，任何外设动作之前）
- * → settings_init → bsp_init → as5600_init → tmc2209_init →
- * cartproto_start → step_engine_init。
- * 模式机（cartfsm）与遥测（telemetry）在任务 7/5 接入。
+ * → settings_init → bsp_init → as5600_init → mt6835_init →
+ * tmc2209_init → cartproto_start → step_engine_init → cartfsm_start →
+ * telemetry_start。测试代码不编入正式固件（见 test/ 独立测试工程）。
  */
 
 #include "esp_log.h"
@@ -23,21 +23,12 @@ void app_main(void)
 {
     bsp_early_init();                    /* EN 高 = 电机不使能 */
     ESP_ERROR_CHECK(settings_init());
-#ifdef CONFIG_SETTINGS_SELF_TEST
-    settings_self_test_run();
-#endif
     /* bsp 任一外设初始化失败即 panic 重启：静默半启动表现为死链路，
      * 可见可恢复优于带病存活 */
     ESP_ERROR_CHECK(bsp_init());
     {
         ESP_ERROR_CHECK(as5600_init());
-#ifdef CONFIG_AS5600_SELF_TEST
-        as5600_self_test_run();
-#endif
         ESP_ERROR_CHECK(mt6835_init());
-#ifdef CONFIG_MT6835_SELF_TEST
-        mt6835_self_test_run();
-#endif
         tmc2209_config_t tmc = {
             .uart_num = UART_NUM_2,
             .tx_pin = CONFIG_BSP_TMC_UART_TX_GPIO,
@@ -48,24 +39,9 @@ void app_main(void)
         };
         ESP_ERROR_CHECK(tmc2209_init(&tmc));
         ESP_ERROR_CHECK(cartproto_start());
-#ifdef CONFIG_CARTPROTO_SELF_TEST
-        cartproto_self_test_run();
-#endif
         ESP_ERROR_CHECK(step_engine_init(CONFIG_BSP_STEP_GPIO, CONFIG_BSP_DIR_GPIO));
-#ifdef CONFIG_TELEMETRY_SELF_TEST
-        telemetry_self_test_run();
-#endif
         ESP_ERROR_CHECK(cartfsm_start());
-#ifdef CONFIG_CARTFSM_SELF_TEST
-        cartfsm_self_test_run();
-#endif
-#ifdef CONFIG_CARTFSM_FLOW_TEST
-        cartfsm_flow_test_run();
-#endif
         ESP_ERROR_CHECK(telemetry_start());
-#ifdef CONFIG_STEP_ENGINE_SELF_TEST
-        step_engine_self_test_run();
-#endif
     }
-    ESP_LOGI("app_main", "cartpole 固件已启动（协议骨架）");
+    ESP_LOGI("app_main", "cartpole 固件已启动");
 }

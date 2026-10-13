@@ -1,0 +1,8 @@
+# 测试工程附加默认值（在 ../sdkconfig.defaults 之后应用）
+
+# 分区表在仓库根（CUSTOM_FILENAME 相对本测试工程目录解析，需指回上级）
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="../partitions.csv"
+
+# 测试钩子插桩（step_engine / cartfsm 流程测试用例依赖；正式固件关闭）
+CONFIG_STEP_ENGINE_TEST_HOOKS=y
+CONFIG_CARTFSM_TEST_HOOKS=y

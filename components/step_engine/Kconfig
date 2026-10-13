@@ -1,20 +1,14 @@
 menu "Step Engine (GPTimer ISR pulse generator)"
 
-config STEP_ENGINE_SELF_TEST
-    bool "Run step-engine self-test on boot"
+config STEP_ENGINE_TEST_HOOKS
+    bool "编入 ISR 测试钩子插桩（间隔采样与周期计数）"
     default n
     help
-        When enabled, the firmware runs all step-engine unit tests
-        during startup (after BSP init, before protocol stack).
-        Results printed via ESP_LOG, final summary line:
-        "SELF-TEST DONE: <n>/<total> PASS" (tag: step_selftest).
+        编入 step_selftest_* 钩子：ISR 发步间隔采样与分段周期计数。
+        仅供独立测试工程（test/，经其 sdkconfig 默认开启）使用；
+        开启后测试用例（test_step_engine.c）方可运行。
 
-        Tests cover: step count accuracy, period accuracy,
-        immediate stop, queue behavior, direction change,
-        very low speed (chain-wait), direction inversion,
-        and ISR execution time measurement.
-
-        For on-target verification only.  Keep disabled in
-        production firmware.
+        与历史 SELF_TEST 选项不同：本项不自动运行任何测试，仅暴露
+        插桩接口。正式固件保持关闭，保 ISR 热路径干净。
 
 endmenu

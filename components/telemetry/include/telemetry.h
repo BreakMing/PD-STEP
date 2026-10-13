@@ -37,11 +37,6 @@ int telemetry_format_state(char *buf, size_t len, int32_t x_um,
                            int32_t theta_urad, int32_t vx_mm_s,
                            int32_t vth_mrad_s);
 
-/* ---- 上板自测（CONFIG_TELEMETRY_SELF_TEST=y） ---- */
-#ifdef CONFIG_TELEMETRY_SELF_TEST
-void telemetry_self_test_run(void);
-#endif
-
 #ifdef __cplusplus
 }
 #endif

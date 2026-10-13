@@ -96,11 +96,6 @@ void cartproto_send_err(const char *name);                       /* "ERR <name>\
 typedef void (*cartproto_exec_cb_t)(const cart_req_t *req);
 void cartproto_register_exec(cartproto_exec_cb_t cb);
 
-/* ---- 上板自测（CONFIG_CARTPROTO_SELF_TEST=y） ---- */
-#ifdef CONFIG_CARTPROTO_SELF_TEST
-void cartproto_self_test_run(void);
-#endif
-
 #ifdef __cplusplus
 }
 #endif

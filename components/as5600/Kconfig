@@ -19,15 +19,6 @@ config AS5600_INVERT_DIR
         physical direction, which flips the encoder sense as well.
 
         Implementation: applied in as5600_read_raw() (driver layer), so
-        the pure-logic tracker and its self-test cases are unaffected.
-
-config AS5600_SELF_TEST
-    bool "Run AS5600 encoder self-test on boot"
-    default n
-    help
-        Runs the AS5600 self-test during startup: pure-logic
-        multi-turn tracking cases plus live I2C read / noise checks.
-        Ends with a guided manual check (turn the shaft 3 turns).
-        Final line: "SELF-TEST DONE: <n>/<total> PASS".
+        the pure-logic tracker and its test cases are unaffected.
 
 endmenu

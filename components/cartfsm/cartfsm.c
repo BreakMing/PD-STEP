@@ -48,8 +48,8 @@ static calib_state_t s_calib = CAL_NONE;
 static long s_e_left_um = 0;   /* 左标 E（µm） */
 static long s_calib_l_um = 0;  /* 标定行程 L（CAL_DONE 后有效） */
 
-/* 流程自测注入（CONFIG_CARTFSM_FLOW_TEST）：0 无、1 AS5600、2 MT6835 */
-#ifdef CONFIG_CARTFSM_FLOW_TEST
+/* 流程测试注入钩子（CONFIG_CARTFSM_TEST_HOOKS）：0 无、1 AS5600、2 MT6835 */
+#ifdef CONFIG_CARTFSM_TEST_HOOKS
 static volatile int s_test_enc_fail = 0;
 static volatile long s_test_loss_bias_um = 0;   /* 丢步判定的 E 偏置注入 */
 #endif
@@ -198,7 +198,7 @@ static void exec_cmd(const cart_req_t *req)
             return;
         }
         long e = (long)as5600_position_um();
-#ifdef CONFIG_CARTFSM_FLOW_TEST
+#ifdef CONFIG_CARTFSM_TEST_HOOKS
         e += s_test_loss_bias_um;
         s_test_loss_bias_um = 0;   /* 一次性注入：标记读数消费即清 */
 #endif
@@ -214,7 +214,7 @@ static void exec_cmd(const cart_req_t *req)
             return;
         }
         long e = (long)as5600_position_um();
-#ifdef CONFIG_CARTFSM_FLOW_TEST
+#ifdef CONFIG_CARTFSM_TEST_HOOKS
         e += s_test_loss_bias_um;
         s_test_loss_bias_um = 0;
 #endif
@@ -347,7 +347,7 @@ static void fsm_task(void *arg)
         const fw_params_t *p = fw_params();
         cm_mode_t mode = s_mode;
 
-#ifdef CONFIG_CARTFSM_FLOW_TEST
+#ifdef CONFIG_CARTFSM_TEST_HOOKS
         bool a5600_ok = (s_test_enc_fail == 1) ? false : as5600_is_ok();
         bool m6835_ok = (s_test_enc_fail == 2) ? false : mt6835_is_ok();
 #else
@@ -365,7 +365,7 @@ static void fsm_task(void *arg)
                  * 运行中堵转由它捕获；回零后抵挡块静止属正常——
                  * C 不前进、D 不增长，无误报 */
                 long e_um = (long)as5600_position_um();
-#ifdef CONFIG_CARTFSM_FLOW_TEST
+#ifdef CONFIG_CARTFSM_TEST_HOOKS
                 e_um += s_test_loss_bias_um;
                 s_test_loss_bias_um = 0;   /* 一次性注入：判定拍消费即清 */
 #endif
@@ -420,8 +420,8 @@ calib_state_t cartfsm_calib(void)
     return s_calib;
 }
 
-/* ---- 流程自测钩子（CONFIG_CARTFSM_FLOW_TEST，上板注入用） ---- */
-#ifdef CONFIG_CARTFSM_FLOW_TEST
+/* ---- 流程测试注入钩子（CONFIG_CARTFSM_TEST_HOOKS） ---- */
+#ifdef CONFIG_CARTFSM_TEST_HOOKS
 
 void cartfsm_test_exec(const cart_req_t *req)
 {

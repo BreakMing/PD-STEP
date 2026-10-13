@@ -8,35 +8,4 @@ menu "TMC2209 - Stepper Motor Driver (UART)"
             Default 0.11 — to be verified against schematic/BOM.
             Used for mA ↔ CS register conversion.
 
-    config TMC2209_SELF_TEST
-        bool "Enable TMC2209 pure-logic self-test"
-        default n
-        help
-            Run pure logic self-tests on boot (CRC8, mA→CS, microstep→MRES,
-            bit layout verification, etc.).  No hardware dependency.
-            Prints PASS/FAIL per case, final line "SELF-TEST DONE: n/total PASS".
-
-    config TMC2209_BRINGUP
-        bool "Enable TMC2209 hardware bring-up test"
-        default n
-        help
-            Run hardware bring-up tests after self-test:
-            1. Read IOIN → VERSION check
-            2. GCONF write + read-back
-            3. IHOLD_IRUN set_current
-            4. CHOPCONF set_microstep + read-back
-            5. DRV_STATUS sanity check
-            6. (optional) Spin test
-            Final line "BRINGUP: PASS n/6".
-
-    config TMC2209_SPIN_TEST
-        bool "Enable spin test (requires BRINGUP)"
-        default n
-        depends on TMC2209_BRINGUP
-        help
-            Include the spin test in bring-up: enable driver, send 2000
-            STEP pulses at ~500 Hz (1µs pulse width), then disable.
-            Motor should rotate ~10 full steps (1/8 revolution at 8 microsteps).
-            WARNING: make sure motor can move freely before enabling.
-
 endmenu
