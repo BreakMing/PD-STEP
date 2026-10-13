@@ -170,6 +170,36 @@ static void isr_set_alarm(uint32_t dt_us)
  * GPTimer alarm ISR
  * ================================================================ */
 
+#ifdef CONFIG_STEP_ENGINE_TEST_HOOKS
+/* 分段计时更新（ISR 发步出口调用一次；max 段与 sum 段口径同旧：
+ * total=now-start，pulse=pulse_end-start，ramp=ramp_end-pulse_end，
+ * alarm=now-ramp_end）。 */
+static inline void record_isr_timings(uint32_t start, uint32_t pulse_end,
+                                      uint32_t ramp_end, uint32_t now)
+{
+    uint32_t total = now - start;
+    if (total > s_max_isr_cycles) {
+        s_max_isr_cycles = total;
+    }
+    uint32_t pulse = pulse_end - start;
+    if (pulse > s_max_cyc_pulse) {
+        s_max_cyc_pulse = pulse;
+    }
+    uint32_t ramp = ramp_end - pulse_end;
+    if (ramp > s_max_cyc_ramp) {
+        s_max_cyc_ramp = ramp;
+    }
+    uint32_t alarm = now - ramp_end;
+    if (alarm > s_max_cyc_alarm) {
+        s_max_cyc_alarm = alarm;
+    }
+    s_sum_cyc_pulse += pulse;
+    s_sum_cyc_ramp += ramp;
+    s_sum_cyc_alarm += alarm;
+    s_isr_pulse_count++;
+}
+#endif /* CONFIG_STEP_ENGINE_TEST_HOOKS */
+
 static bool gptimer_alarm_cb(gptimer_handle_t timer,
                              const gptimer_alarm_event_data_t *edata,
                              void *user_ctx)
@@ -191,7 +221,8 @@ static bool gptimer_alarm_cb(gptimer_handle_t timer,
         return false;
     }
 
-    /* 链式等待：本次 alarm 不发步，续排下一块 */
+    /* 链式等待：本次 alarm 不发步，续排下一块（不发步不进分段统计，
+     * 只更新整段最大值，口径同旧） */
     if (s_chain_remaining_us > 0) {
         uint32_t chunk = (s_chain_remaining_us > MAX_ALARM_US)
                        ? MAX_ALARM_US : s_chain_remaining_us;
@@ -264,27 +295,8 @@ static bool gptimer_alarm_cb(gptimer_handle_t timer,
         gptimer_stop(s_timer);
         s_timer_running = false;
 #ifdef CONFIG_STEP_ENGINE_TEST_HOOKS
-        uint32_t cend2 = esp_cpu_get_cycle_count();
-        uint32_t total2 = cend2 - isr_start_ccount;
-        if (total2 > s_max_isr_cycles) {
-            s_max_isr_cycles = total2;
-        }
-        uint32_t pulse_span = cyc_pulse_end - isr_start_ccount;
-        if (pulse_span > s_max_cyc_pulse) {
-            s_max_cyc_pulse = pulse_span;
-        }
-        uint32_t ramp_span = cyc_ramp_end - cyc_pulse_end;
-        if (ramp_span > s_max_cyc_ramp) {
-            s_max_cyc_ramp = ramp_span;
-        }
-        uint32_t alarm_span = cend2 - cyc_ramp_end;
-        if (alarm_span > s_max_cyc_alarm) {
-            s_max_cyc_alarm = alarm_span;
-        }
-        s_sum_cyc_pulse += pulse_span;
-        s_sum_cyc_ramp += ramp_span;
-        s_sum_cyc_alarm += alarm_span;
-        s_isr_pulse_count++;
+        record_isr_timings(isr_start_ccount, cyc_pulse_end,
+                           cyc_ramp_end, esp_cpu_get_cycle_count());
 #endif
         return false;
     }
@@ -292,27 +304,8 @@ static bool gptimer_alarm_cb(gptimer_handle_t timer,
     isr_set_alarm(dt);
 
 #ifdef CONFIG_STEP_ENGINE_TEST_HOOKS
-    uint32_t cend3 = esp_cpu_get_cycle_count();
-    uint32_t total3 = cend3 - isr_start_ccount;
-    if (total3 > s_max_isr_cycles) {
-        s_max_isr_cycles = total3;
-    }
-    uint32_t pulse_span3 = cyc_pulse_end - isr_start_ccount;
-    if (pulse_span3 > s_max_cyc_pulse) {
-        s_max_cyc_pulse = pulse_span3;
-    }
-    uint32_t ramp_span3 = cyc_ramp_end - cyc_pulse_end;
-    if (ramp_span3 > s_max_cyc_ramp) {
-        s_max_cyc_ramp = ramp_span3;
-    }
-    uint32_t alarm_span3 = cend3 - cyc_ramp_end;
-    if (alarm_span3 > s_max_cyc_alarm) {
-        s_max_cyc_alarm = alarm_span3;
-    }
-    s_sum_cyc_pulse += pulse_span3;
-    s_sum_cyc_ramp += ramp_span3;
-    s_sum_cyc_alarm += alarm_span3;
-    s_isr_pulse_count++;
+    record_isr_timings(isr_start_ccount, cyc_pulse_end,
+                       cyc_ramp_end, esp_cpu_get_cycle_count());
 #endif
 
     return false;
