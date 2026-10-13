@@ -34,7 +34,7 @@ typedef enum {
 } mt6835_hw_fail_t;
 
 typedef struct {
-    spi_host_device_t host;        /* 已初始化的 SPI 总线（业务壳从 bsp 获取） */
+    spi_host_device_t host;        /* SPI 主机编号（如 SPI3_HOST；业务壳从 bsp 获取，须已初始化） */
     int               clock_speed_hz;
     int               spics_io_num;
 } mt6835_hw_config_t;
@@ -42,7 +42,9 @@ typedef struct {
 /**
  * @brief 在 config 给出的总线上添加 MT6835 设备（MODE3）。
  *
- * @return ESP_OK；错误码与 spi_bus_add_device 一致。
+ * @return ESP_OK；cfg 为 NULL 或 host < 0 返回
+ *         ESP_ERR_INVALID_ARG；其余错误码与
+ *         spi_bus_add_device 一致。
  */
 esp_err_t mt6835_hw_init(const mt6835_hw_config_t *cfg);
 

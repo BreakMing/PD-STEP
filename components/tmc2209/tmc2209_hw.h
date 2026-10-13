@@ -33,6 +33,10 @@ typedef struct {
  *
  * 失败直接返回错误码（与旧 tmc2209_init 的 UART 建立段一致）；
  * 成功后 tmc2209_read_reg / tmc2209_write_reg 可用。
+ *
+ * @return ESP_OK；cfg 为 NULL 返回 ESP_ERR_INVALID_ARG；互斥量创建
+ *         失败返回 ESP_ERR_NO_MEM；UART 安装/配置/设引脚失败返回
+ *         对应驱动错误码。
  */
 esp_err_t tmc2209_hw_init(const tmc2209_hw_config_t *cfg);
 

@@ -35,7 +35,9 @@ typedef struct {
 /**
  * @brief 在 config 给出的总线上添加 AS5600 设备。
  *
- * @return ESP_OK；错误码与 i2c_master_bus_add_device 一致。
+ * @return ESP_OK；cfg 为 NULL 或 bus 为 NULL 返回
+ *         ESP_ERR_INVALID_ARG；其余错误码与
+ *         i2c_master_bus_add_device 一致。
  */
 esp_err_t as5600_hw_init(const as5600_hw_config_t *cfg);
 
