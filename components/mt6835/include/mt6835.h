@@ -3,7 +3,7 @@
  *
  * 纯传感器职责：读原始 21-bit 角、±π 环绕换算（标定前的原始角）、
  * 16 样本窗口角速度估计、连续失败 ≥10 次的 is_ok。零位/符号标定
- * （POLE_ZERO_URAD / POLE_INV）由 telemetry 组帧时应用（任务 7），
+ * （POLE_ZERO_URAD / POLE_INV）由 telemetry 组帧时应用，
  * 本组件不读参数。
  *
  * 采样任务：CPU1、优先级 3、1 kHz vTaskDelayUntil（结构照抄 as5600：

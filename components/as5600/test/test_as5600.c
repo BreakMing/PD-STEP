@@ -110,7 +110,7 @@ TEST_CASE("A6 0↔4095 抖动 ×8 → 累计漂移 ≤1 count", "[as5600]")
                              "边界抖动累计漂移超限");
 }
 
-/* 3 整圈 = +12288 counts = 120.0 mm——PLAN 验收判据的纯逻辑等价 */
+/* 3 整圈 = +12288 counts = 120.0 mm——上板验收判据的纯逻辑等价 */
 TEST_CASE("A7 正转 3 圈 → +12288 counts = 120 mm", "[as5600]")
 {
     as5600_tracker_t t;
@@ -214,7 +214,8 @@ TEST_CASE("B14 20 次实时读全部 12 bit 内且链路健康", "[as5600]")
              as5600_last_raw(), (long)as5600_position_counts());
 }
 
-/* 静止噪声：20 样本峰峰值 ≤2 counts（PLAN T8 验收判据），保持轴静止。
+/* 静止噪声：20 样本峰峰值 ≤2 counts（验收判据见
+ * docs/reviews/T8-acceptance.md），保持轴静止。
  *
  * 峰峰值按相对首样本的「展开差」度量（与 tracker 同一 ±2048 规则）：
  * 直接比 raw 会在轴恰好停在 0/4095 回绕点时报 4095 counts 的「噪声」
@@ -282,7 +283,7 @@ TEST_CASE("B17 E == counts × units_per_rev / 4096", "[as5600]")
     TEST_ASSERT_FLOAT_WITHIN(0.01f, expect, actual);
 }
 
-/* 原点重置：上报位置跟随 set_origin()（D10 用它保持 C 与 E 可比） */
+/* 原点重置：上报位置跟随 set_origin()（保持 C 与 E 可比） */
 TEST_CASE("B18 原点重置（设 100 / 回 0）", "[as5600]")
 {
     as5600_set_origin(100.0f);

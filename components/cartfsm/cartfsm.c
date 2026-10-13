@@ -43,7 +43,7 @@ static volatile long s_last_cmd_v = 0;     /* 最近有效目标（软限位持�
 static volatile bool s_fault_settling = false;  /* FAULT 斜坡停机进行中 */
 static bool s_started = false;
 
-/* ---- 手动两点标定状态（calib-spec §1/§2，RAM，断电回 CAL_NONE） ---- */
+/* ---- 手动两点标定状态（RAM，断电回 CAL_NONE） ---- */
 static calib_state_t s_calib = CAL_NONE;
 static long s_e_left_um = 0;   /* 左标 E（µm） */
 static long s_calib_l_um = 0;  /* 标定行程 L（CAL_DONE 后有效） */
@@ -92,7 +92,7 @@ static uint32_t accel_to_steps(long a_mm_s2)
     return (uint32_t)llround((double)a_mm_s2 * spm);
 }
 
-/* 指令位置 steps → µm（与 AS5600 的 E 同域，P3 裁决） */
+/* 指令位置 steps → µm（与 AS5600 的 E 同域） */
 static long cmd_steps_to_um(int32_t steps)
 {
     double spm = (double)settings_steps_per_mm();
@@ -108,7 +108,7 @@ static int32_t um_to_cmd_steps(long um)
 
 /* ---- 参数作用点 ---- */
 
-/* 软限位窗口（calib-spec §4）：[-L/2+m, +L/2-m] */
+/* 软限位窗口：[-L/2+m, +L/2-m] */
 static void soft_window(const fw_params_t *p, long *min_um, long *max_um)
 {
     *min_um = -s_calib_l_um / 2 + p->x_margin_um;

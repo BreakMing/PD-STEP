@@ -1,11 +1,11 @@
 /*
  * AS5600 magnetic encoder — 12-bit angle + multi-turn position
  *
- * Scope (PLAN T8): sensor layer only — I2C angle read → multi-turn
+ * Scope: sensor layer only — I2C angle read → multi-turn
  * counting → continuous position (counts / mm) + velocity estimate +
  * origin shift.  NO loss-of-step detection and NO closed-loop
- * compensation (D6 explicitly defers both to phase 2), no status-frame
- * packing (T9).
+ * compensation (both deliberately deferred to phase 2), no status-frame
+ * packing.
  *
  * !! READ-ONLY DEVICE — RED LINE !!
  *   The AS5600 ZPOS / MPOS / CONF / MANG registers are one-time
@@ -15,14 +15,14 @@
  *   i2c_master_transmit_receive() (register address out, data in,
  *   one transaction).  Do not add write helpers here.
  *
- * Hardware facts (T0/T2):
+ * Hardware facts:
  *   7-bit address 0x36 (CONFIG_BSP_AS5600_I2C_ADDR), I2C_NUM_0,
  *   SDA=GPIO8 / SCL=GPIO9 @ 400 kHz, external pullups present.
  *   RAW ANGLE = 0x0C/0x0D, 12 bit → 4096 counts/rev.
  *   Drive: 2GT 20T × 2 mm = 40 mm/rev (D7, settings $2) →
  *   1 count = 40 / 4096 = 9.7656 µm.
  *
- * Sampling: dedicated task at 1 kHz (PLAN §3.1/§3.2), pinned to CPU1 so
+ * Sampling: dedicated task at 1 kHz, pinned to CPU1 so
  * the blocking I2C transaction cannot delay the STEP-pulse ISR on CPU0.
  */
 
@@ -58,7 +58,7 @@ void as5600_tracker_reset(as5600_tracker_t *t);
  * @brief Feed one raw angle, return the updated continuous position.
  *
  * First sample only seeds the tracker (position 0, no displacement).
- * Wraparound correction (PLAN T8):
+ * Wraparound correction:
  *   diff = raw - last_raw
  *   diff >  +2048 → diff -= 4096   (backwards across the 0/4095 edge)
  *   diff <  -2047 → diff += 4096   (forwards across the 0/4095 edge)

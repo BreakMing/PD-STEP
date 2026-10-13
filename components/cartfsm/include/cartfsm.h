@@ -18,7 +18,7 @@
 extern "C" {
 #endif
 
-/** 标定状态（calib-spec §1：RAM，断电回 CAL_NONE，RESET 不清除）。 */
+/** 标定状态（RAM，断电回 CAL_NONE，RESET 不清除）。 */
 typedef enum { CAL_NONE, CAL_LEFT, CAL_DONE } calib_state_t;
 
 /**

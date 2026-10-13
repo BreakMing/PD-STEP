@@ -5,7 +5,7 @@
  * on-target without touching I2C (see as5600_self_test.c group A).
  *
  * The AS5600 reports an absolute single-turn angle (0..4095).  Because
- * the magnet is mounted on the motor shaft (D7: direct drive, 40 mm/rev),
+ * the magnet is mounted on the motor shaft (direct drive, 40 mm/rev),
  * a continuous position needs unwrapping across the 0/4095 edge:
  *
  *   diff = raw − last_raw
@@ -26,7 +26,8 @@
  * ---------------------------
  * dithering 4095 ↔ 0 after correction yields diff = +1 / −1 instead of
  * ±4095, so no extra dead-band is needed to meet the "≤2 counts at
- * standstill" criterion (PLAN T8 acceptance) — the edge dither degrades
+ * standstill" criterion (acceptance record: docs/reviews/T8-acceptance.md)
+ * — the edge dither degrades
  * naturally to ±1 count, same order as the sensor's own LSB noise.
  *
  * Speed ceiling
@@ -34,7 +35,7 @@
  * The largest reliably resolvable step per sample is ±2048 counts (half
  * a turn); anything faster is misread as a step the other way.  At the
  * 1 kHz sampling rate that is 2,048,000 counts/s = 500 rev/s =
- * 30,000 rpm.  The PLAN requirement (">4500 rpm still has margin") is
+ * 30,000 rpm.  The design requirement (">4500 rpm still has margin") is
  * 75 rev/s = 307 counts/ms, i.e. 15% of the ceiling — 6.7× margin.
  */
 

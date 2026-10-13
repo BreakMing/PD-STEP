@@ -1,6 +1,6 @@
 /*
  * cartfsm 流程测试——注入式验证手动两点标定流程与故障路径
- * （官方 test/ 子目录约定，仅测试工程编入；calib-spec §7）
+ * （官方 test/ 子目录约定，仅测试工程编入）
  *
  *   1.  两 MARK + ENABLE → READY，重定基后无 STEP_LOSS 误报；
  *   1b. 无左标 / L 非法：拒且状态保持；
@@ -96,7 +96,7 @@ TEST_CASE("流程：两 MARK + ENABLE → READY 无误报", "[cartfsm][flowtest]
     cartfsm_test_exec(&mr);
     TEST_ASSERT_EQUAL_INT(CAL_DONE, cartfsm_calib());
 
-    /* 坐标锚（calib-spec §2）：重定基后右端必须读 +L/2——
+    /* 坐标锚：重定基后右端必须读 +L/2——
      * set_origin 语义是「当前物理位置此后读 v」，右端即当前位
      * 置；读数错位意味着软限位窗口整体偏移（右端不设防） */
     vTaskDelay(pdMS_TO_TICKS(50));

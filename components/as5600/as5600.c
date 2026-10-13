@@ -5,15 +5,15 @@
  *   本组件对器件的唯一总线操作是只读的 as5600_hw_read_raw()；
  *   任何情况下不得向 ZPOS / MPOS / CONF / MANG（OTP）写入。
  *
- * Data path (PLAN §3.1):
+ * Data path:
  *   as5600_task (1 kHz, prio 3, CPU1)
  *     → read RAW ANGLE 0x0C/0x0D as one 2-byte burst  (as5600_hw)
  *     → as5600_tracker_update()       (pure logic, multi-turn counts)
- *     → as5600_publish()              (atomic snapshot for T9)
+ *     → as5600_publish()              (atomic snapshot)
  *
  * Why CPU1: the I2C transaction blocks ~100–200 µs at 400 kHz.  Pinning
  * the task to CPU1 keeps that off CPU0, where the STEP-pulse ISR lives
- * (T6 verified the ISR is timing sensitive).
+ * (the ISR is timing sensitive).
  *
  * Why a 2-byte burst: two independent single-byte reads can straddle an
  * internal angle update and splice together a value that never existed.
@@ -48,7 +48,7 @@
 static const char *TAG = "as5600";
 
 /* ---- Timing / limits ---- */
-#define AS5600_SAMPLE_PERIOD_MS 1      /* 1 kHz (PLAN §3.1/§3.2) */
+#define AS5600_SAMPLE_PERIOD_MS 1      /* 1 kHz */
 #define AS5600_FAIL_LIMIT       10     /* consecutive failures → not OK */
 #define AS5600_TASK_PRIO        3
 #define AS5600_TASK_CORE        1
@@ -57,7 +57,7 @@ static const char *TAG = "as5600";
 /* ---- Velocity: mean over the last 16 × 1 ms differences (16 ms) ----
  * Raw 1 ms differences carry ±1 count ≈ ±9.77 mm/s of quantisation
  * noise; averaging 16 of them brings that down to ≈ ±2.4 mm/s, which is
- * plenty for "report the order of magnitude" telemetry (T9).
+ * plenty for "report the order of magnitude" telemetry.
  * 17 samples are kept so the difference spans exactly 16 ms. */
 #define AS5600_SPEED_WINDOW     16
 #define AS5600_HIST_LEN         (AS5600_SPEED_WINDOW + 1)
@@ -154,7 +154,7 @@ static void as5600_task(void *arg)
     TickType_t last_wake = xTaskGetTickCount();
     int        fail_streak = 0;
 
-    /* Task watchdog (T10): the 1 kHz cadence is far shorter than the 30 s
+    /* Task watchdog: the 1 kHz cadence is far shorter than the 30 s
      * timeout, so subscribe and kick the WDT every cycle.  A failed
      * subscribe is not fatal — log it and keep sampling. */
     bool wdt_ok = (esp_task_wdt_add(NULL) == ESP_OK);
@@ -233,7 +233,7 @@ esp_err_t as5600_init(void)
                  ? "INVERTED (magnet mounted opposite; +X move counts up)"
                  : "normal (not inverted)");
 
-    /* First read: seeds the tracker (position 0 here, D10) and proves the
+    /* First read: seeds the tracker (position 0 here) and proves the
      * bus works before the task starts hammering it. */
     uint16_t raw = 0;
     if (as5600_hw_read_raw(&raw)) {

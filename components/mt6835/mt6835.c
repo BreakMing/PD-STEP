@@ -3,7 +3,7 @@
  *
  * 纯传感器职责：读原始 21-bit 角、±π 环绕换算（标定前的原始角）、
  * 16 样本窗口角速度估计、连续失败 ≥10 次的 is_ok。零位/符号标定
- * （POLE_ZERO_URAD / POLE_INV）由 telemetry 组帧时应用（任务 7），
+ * （POLE_ZERO_URAD / POLE_INV）由 telemetry 组帧时应用，
  * 本组件不读参数。
  *
  * SPI 帧格式与校验（OP_ANGLE/ANGLE1 突发、全零帧与 CRC 拒收、

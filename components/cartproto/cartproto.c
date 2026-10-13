@@ -79,7 +79,7 @@ void cartproto_send_raw(const char *data, int len)
 }
 
 /* ================================================================
- * 应答原语（任务 6）
+ * 应答原语
  * ================================================================ */
 
 void cartproto_send_mode(const char *mode, const char *reason)
@@ -119,7 +119,7 @@ void cartproto_send_err(const char *name)
 }
 
 /* ================================================================
- * 命令分发（任务 6；执行语义由 cartfsm 在任务 7 注册）
+ * 命令分发（执行语义由 cartfsm 经 exec 回调注册）
  * ================================================================ */
 
 static cartproto_exec_cb_t s_exec_cb = NULL;

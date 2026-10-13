@@ -5,7 +5,7 @@
  * 常开是契约。组帧经 cartproto_send_raw 上 UART1（TX 互斥共用）。
  *
  * 字段来源：x_um ← as5600_position_um()（含回零原点）；theta_urad ←
- * mt6835_theta_urad()（任务 7 起应用 POLE_ZERO_URAD/POLE_INV 标定）；
+ * mt6835_theta_urad()（应用 POLE_ZERO_URAD/POLE_INV 标定）；
  * vx_mm_s ← as5600 16 ms 窗口速度取整；vth_mrad_s ← mt6835。
  */
 

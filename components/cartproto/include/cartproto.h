@@ -1,13 +1,13 @@
 /*
  * cartproto — cartpole 线协议通讯栈（protocol.md 的 UART1 载体）
  *
- * 职责（任务 1 骨架范围）：
+ * 职责：
  *   - UART1 事件队列驱动的接收：行组装（'\n' 结尾，容忍 '\r'）、
  *     超长与超时不完整行静默丢弃（protocol.md：非法行静默丢弃）；
  *   - 每凑成一行回调一次注册的行处理器（行内不含 '\r'/'\n'）；
  *   - 发送原语 cartproto_send_raw：单一 TX 互斥保护，460800 8N1。
  *
- * 命令解析与应答原语（MODE/OK/ERR）在任务 6 填充；本骨架未注册
+ * 命令解析与应答原语（MODE/OK/ERR）由本组件提供；未注册
  * 行处理器时收到的行仅丢弃，不产生任何输出。
  */
 
@@ -55,7 +55,7 @@ void cartproto_register_line_handler(cartproto_line_cb_t cb);
 void cartproto_send_raw(const char *data, int len);
 
 /* ================================================================
- * 命令解析与应答（任务 6）
+ * 命令解析与应答
  * ================================================================ */
 
 typedef enum {
@@ -92,7 +92,7 @@ void cartproto_send_mode(const char *mode, const char *reason);  /* "MODE <mode>
 void cartproto_send_ok(const char *name, long value);            /* "OK <name> <value>\n" */
 void cartproto_send_err(const char *name);                       /* "ERR <name>\n" */
 
-/** 命令执行回调（cartfsm 在任务 7 注册；未注册时合法行仅丢弃） */
+/** 命令执行回调（cartfsm 注册；未注册时合法行仅丢弃） */
 typedef void (*cartproto_exec_cb_t)(const cart_req_t *req);
 void cartproto_register_exec(cartproto_exec_cb_t cb);
 
