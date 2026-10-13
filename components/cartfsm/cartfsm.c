@@ -176,155 +176,172 @@ static void enter_fault(cm_reason_t r)
     /* ②③（等 vel_now==0 → EN 关 → 推 MODE）由监督任务完成 */
 }
 
-/* ---- 命令执行（cartproto exec，CPU0） ---- */
+/* ---- 命令处理（cartproto exec 回调，CPU0） ----
+ * exec_cmd 只做分派；各命令的业务细节在 exec_* 函数。 */
+
+#ifdef CONFIG_CARTFSM_TEST_HOOKS
+/* 流程测试注入：读数偏置一次性消费（MARK 标记与丢步判定拍共用） */
+static long consume_test_bias(long e_um)
+{
+    e_um += s_test_loss_bias_um;
+    s_test_loss_bias_um = 0;
+    return e_um;
+}
+#endif
+
+static void exec_query(void)
+{
+    cm_mode_t m;
+    cm_reason_t r;
+    portENTER_CRITICAL(&s_lock);
+    m = s_mode;
+    r = s_reason;
+    portEXIT_CRITICAL(&s_lock);
+    push_mode(m, r);
+}
+
+static void exec_mark_left(void)
+{
+    if (s_mode != CM_DISABLED) {
+        cartproto_send_err("MARK_LEFT");   /* 规格 §2 回执原则 */
+        return;
+    }
+    long e = (long)as5600_position_um();
+#ifdef CONFIG_CARTFSM_TEST_HOOKS
+    e = consume_test_bias(e);
+#endif
+    s_e_left_um = e;           /* 重复标记即覆盖重开（规格 §2） */
+    s_calib = CAL_LEFT;
+    cartproto_send_ok("MARK_LEFT", e);
+}
+
+static void exec_mark_right(void)
+{
+    if (s_mode != CM_DISABLED) {
+        cartproto_send_err("MARK_RIGHT");
+        return;
+    }
+    long e = (long)as5600_position_um();
+#ifdef CONFIG_CARTFSM_TEST_HOOKS
+    e = consume_test_bias(e);
+#endif
+    long l = e - s_e_left_um;
+    if (s_calib != CAL_LEFT || !cm_calib_valid(l)) {
+        cartproto_send_err("MARK_RIGHT");  /* 状态保持（规格 §2） */
+        return;
+    }
+    s_calib_l_um = l;
+    s_calib = CAL_DONE;
+    /* E/C 同帧重定基：两标中点为 x=0（引擎停止时整定）。
+     * set_origin 的契约是「当前物理位置此后读 v」——此刻小车
+     * 在右端，传 +L/2 即得「右端=+L/2、中点=0、左端=−L/2」；
+     * C 同步到 E 的新读数，保持 E−C=0 */
+    as5600_set_origin((float)l / 2.0f / 1000.0f);
+    step_engine_set_position(um_to_cmd_steps(l / 2));
+    cartproto_send_ok("MARK_RIGHT", l);
+}
+
+static void exec_enable(void)
+{
+    if (s_mode != CM_DISABLED) {
+        return;   /* READY/FAULT 忽略（规格 §5 矩阵） */
+    }
+    if (s_calib != CAL_DONE) {
+        cartproto_send_err("ENABLE");
+        return;
+    }
+    cm_mode_t m = s_mode;
+    cm_reason_t r = CR_NONE;
+    if (!cm_step(&m, &r, CE_CMD_ENABLE)) {
+        return;
+    }
+    /* C 重锚到 E：先于模式发布——监督任务见 READY 即按拍判定，
+     * 携旧 C 会在首拍 STEP_LOSS 误报（标定后手挪过的窗口） */
+    step_engine_set_position(um_to_cmd_steps((long)as5600_position_um()));
+    bsp_tmc_en_set(true);
+    portENTER_CRITICAL(&s_lock);
+    s_mode = CM_READY;
+    s_reason = CR_NONE;
+    s_last_cmd_v = 0;
+    portEXIT_CRITICAL(&s_lock);
+    push_mode(CM_READY, CR_NONE);
+}
+
+static void exec_reset(void)
+{
+    cm_mode_t m = s_mode;
+    cm_reason_t r = s_reason;
+    if (!cm_step(&m, &r, CE_CMD_RESET)) {
+        return;   /* 仅 FAULT 生效 */
+    }
+    portENTER_CRITICAL(&s_lock);
+    s_mode = CM_DISABLED;
+    s_reason = CR_NONE;
+    s_fault_settling = false;
+    s_last_cmd_v = 0;
+    portEXIT_CRITICAL(&s_lock);
+
+    step_engine_stop();          /* 斜坡未完也立即急停 */
+    bsp_tmc_en_set(false);
+    params_apply_engine();       /* 恢复 ACC_MAX 档等 */
+    push_mode(CM_DISABLED, CR_NONE);
+}
+
+static void exec_vel(int32_t v_mm_s)
+{
+    portENTER_CRITICAL(&s_lock);
+    cm_mode_t cur = s_mode;
+    portEXIT_CRITICAL(&s_lock);
+    if (cur != CM_READY) {
+        return;   /* 仅 READY 执行；持锁复查防 FAULT 进入瞬间的在途命令 */
+    }
+    const fw_params_t *p = fw_params();
+    long v = v_mm_s;
+    if (v > p->vel_max) {
+        v = p->vel_max;
+    } else if (v < -p->vel_max) {
+        v = -p->vel_max;
+    }
+    long xmin, xmax;
+    soft_window(p, &xmin, &xmax);
+    long eff = cm_soft_limit_clamp((long)as5600_position_um(),
+                                   xmin, xmax, v);
+    s_last_cmd_v = eff;
+    step_engine_vel_target(mmps_to_q16(eff));
+}
+
+static void exec_config_set(const cart_req_t *req)
+{
+    if (!cm_config_set_allowed(s_mode)) {
+        cartproto_send_err(req->name);   /* FAULT 拒绝 */
+        return;
+    }
+    if (fw_params_set(req->name, req->value)) {
+        params_apply_one(req->name);
+        cartproto_send_ok(req->name, req->value);   /* 回显归一化值 */
+    } else {
+        cartproto_send_err(req->name);
+    }
+}
+
+static void exec_config_dump(void)
+{
+    for (int i = 0; i < fw_params_count(); i++) {
+        cartproto_send_ok(fw_params_name(i), fw_params_value(i));
+    }
+}
 
 static void exec_cmd(const cart_req_t *req)
 {
     switch (req->cmd) {
-    case CART_CMD_QUERY: {
-        cm_mode_t m;
-        cm_reason_t r;
-        portENTER_CRITICAL(&s_lock);
-        m = s_mode;
-        r = s_reason;
-        portEXIT_CRITICAL(&s_lock);
-        push_mode(m, r);
-        break;
-    }
-
-    case CART_CMD_MARK_LEFT: {
-        if (s_mode != CM_DISABLED) {
-            cartproto_send_err("MARK_LEFT");   /* 规格 §2 回执原则 */
-            return;
-        }
-        long e = (long)as5600_position_um();
-#ifdef CONFIG_CARTFSM_TEST_HOOKS
-        e += s_test_loss_bias_um;
-        s_test_loss_bias_um = 0;   /* 一次性注入：标记读数消费即清 */
-#endif
-        s_e_left_um = e;           /* 重复标记即覆盖重开（规格 §2） */
-        s_calib = CAL_LEFT;
-        cartproto_send_ok("MARK_LEFT", e);
-        break;
-    }
-
-    case CART_CMD_MARK_RIGHT: {
-        if (s_mode != CM_DISABLED) {
-            cartproto_send_err("MARK_RIGHT");
-            return;
-        }
-        long e = (long)as5600_position_um();
-#ifdef CONFIG_CARTFSM_TEST_HOOKS
-        e += s_test_loss_bias_um;
-        s_test_loss_bias_um = 0;
-#endif
-        long l = e - s_e_left_um;
-        if (s_calib != CAL_LEFT || !cm_calib_valid(l)) {
-            cartproto_send_err("MARK_RIGHT");  /* 状态保持（规格 §2） */
-            return;
-        }
-        s_calib_l_um = l;
-        s_calib = CAL_DONE;
-        /* E/C 同帧重定基：两标中点为 x=0（引擎停止时整定）。
-         * set_origin 的契约是「当前物理位置此后读 v」——此刻小车
-         * 在右端，传 +L/2 即得「右端=+L/2、中点=0、左端=−L/2」；
-         * C 同步到 E 的新读数，保持 E−C=0 */
-        as5600_set_origin((float)l / 2.0f / 1000.0f);
-        step_engine_set_position(um_to_cmd_steps(l / 2));
-        cartproto_send_ok("MARK_RIGHT", l);
-        break;
-    }
-
-    case CART_CMD_ENABLE: {
-        if (s_mode != CM_DISABLED) {
-            return;   /* READY/FAULT 忽略（规格 §5 矩阵） */
-        }
-        if (s_calib != CAL_DONE) {
-            cartproto_send_err("ENABLE");
-            return;
-        }
-        cm_mode_t m = s_mode;
-        cm_reason_t r = CR_NONE;
-        if (!cm_step(&m, &r, CE_CMD_ENABLE)) {
-            return;
-        }
-        /* C 重锚到 E：先于模式发布——监督任务见 READY 即按拍判定，
-         * 携旧 C 会在首拍 STEP_LOSS 误报（标定后手挪过的窗口） */
-        step_engine_set_position(um_to_cmd_steps((long)as5600_position_um()));
-        bsp_tmc_en_set(true);
-        portENTER_CRITICAL(&s_lock);
-        s_mode = CM_READY;
-        s_reason = CR_NONE;
-        s_last_cmd_v = 0;
-        portEXIT_CRITICAL(&s_lock);
-        push_mode(CM_READY, CR_NONE);
-        break;
-    }
-
-    case CART_CMD_RESET: {
-        cm_mode_t m = s_mode;
-        cm_reason_t r = s_reason;
-        if (!cm_step(&m, &r, CE_CMD_RESET)) {
-            return;   /* 仅 FAULT 生效 */
-        }
-        portENTER_CRITICAL(&s_lock);
-        s_mode = CM_DISABLED;
-        s_reason = CR_NONE;
-        s_fault_settling = false;
-        s_last_cmd_v = 0;
-        portEXIT_CRITICAL(&s_lock);
-
-        step_engine_stop();          /* 斜坡未完也立即急停 */
-        bsp_tmc_en_set(false);
-        params_apply_engine();       /* 恢复 ACC_MAX 档等 */
-        push_mode(CM_DISABLED, CR_NONE);
-        break;
-    }
-
-    case CART_CMD_VEL: {
-        portENTER_CRITICAL(&s_lock);
-        cm_mode_t cur = s_mode;
-        portEXIT_CRITICAL(&s_lock);
-        if (cur != CM_READY) {
-            return;   /* 仅 READY 执行；持锁复查防 FAULT 进入瞬间的在途命令 */
-        }
-        const fw_params_t *p = fw_params();
-        long v = req->v_mm_s;
-        if (v > p->vel_max) {
-            v = p->vel_max;
-        } else if (v < -p->vel_max) {
-            v = -p->vel_max;
-        }
-        long xmin, xmax;
-        soft_window(p, &xmin, &xmax);
-        long eff = cm_soft_limit_clamp((long)as5600_position_um(),
-                                       xmin, xmax, v);
-        s_last_cmd_v = eff;
-        step_engine_vel_target(mmps_to_q16(eff));
-        break;
-    }
-
-    case CART_CMD_CONFIG_SET: {
-        if (!cm_config_set_allowed(s_mode)) {
-            cartproto_send_err(req->name);   /* HOMING/FAULT 拒绝 */
-            return;
-        }
-        if (fw_params_set(req->name, req->value)) {
-            params_apply_one(req->name);
-            cartproto_send_ok(req->name, req->value);   /* 回显归一化值 */
-        } else {
-            cartproto_send_err(req->name);
-        }
-        break;
-    }
-
-    case CART_CMD_CONFIG_DUMP: {
-        for (int i = 0; i < fw_params_count(); i++) {
-            cartproto_send_ok(fw_params_name(i), fw_params_value(i));
-        }
-        break;
-    }
-
+    case CART_CMD_QUERY:       exec_query(); break;
+    case CART_CMD_MARK_LEFT:   exec_mark_left(); break;
+    case CART_CMD_MARK_RIGHT:  exec_mark_right(); break;
+    case CART_CMD_ENABLE:      exec_enable(); break;
+    case CART_CMD_RESET:       exec_reset(); break;
+    case CART_CMD_VEL:         exec_vel(req->v_mm_s); break;
+    case CART_CMD_CONFIG_SET:  exec_config_set(req); break;
+    case CART_CMD_CONFIG_DUMP: exec_config_dump(); break;
     default:
         break;
     }
@@ -366,8 +383,7 @@ static void fsm_task(void *arg)
                  * C 不前进、D 不增长，无误报 */
                 long e_um = (long)as5600_position_um();
 #ifdef CONFIG_CARTFSM_TEST_HOOKS
-                e_um += s_test_loss_bias_um;
-                s_test_loss_bias_um = 0;   /* 一次性注入：判定拍消费即清 */
+                e_um = consume_test_bias(e_um);
 #endif
                 long c_um = cmd_steps_to_um(step_engine_position_steps());
                 if (cm_step_loss(e_um, c_um, p->step_loss_um)) {
