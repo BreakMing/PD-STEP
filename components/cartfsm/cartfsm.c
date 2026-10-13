@@ -21,7 +21,6 @@
 #include "esp_log.h"
 #include "esp_task_wdt.h"
 
-#include "bsp.h"
 #include "settings.h"
 #include "tmc2209.h"
 #include "step_engine.h"
@@ -510,7 +509,10 @@ esp_err_t cartfsm_start(void)
         return ESP_OK;
     }
 
-    /* 上电默认 DISABLED、EN 关 */
+    /* 上电默认 DISABLED、EN 关。tmc2209_enable 的返回值仅在驱动
+     * 未初始化时非 ESP_OK，而 app_main 已先经 ESP_ERROR_CHECK(
+     * tmc2209_init) 完成初始化——本文件全部 EN 调用点
+     * （exec_enable/exec_reset/settling）同此前提，忽略安全。 */
     tmc2209_enable(false);
     params_apply_engine();
 
