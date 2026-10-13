@@ -342,9 +342,10 @@ esp_err_t tmc2209_init(const tmc2209_config_t *cfg)
         return err;
     }
 
-    s_initialized = true;
-
-    /* ---- Apply default register configuration ---- */
+    /* ---- Apply default register configuration ----
+     * 关键寄存器（GCONF/CHOPCONF/IHOLD_IRUN）推送失败即返回错误：
+     * 驱动器停留在出厂默认配置（电流/细分失控风险），调用方按
+     * 启动失败处理。次要寄存器失败仅告警（不影响运动安全）。 */
 
     /* GCONF: pdn_disable=1 (UART mode), mstep_reg_select=1,
      * en_spreadcycle=1（固定 SpreadCycle：全速域统一 chopper，
@@ -352,7 +353,8 @@ esp_err_t tmc2209_init(const tmc2209_config_t *cfg)
     uint32_t gconf = GCONF_PDN_DISABLE | GCONF_MSTEP_REG_SELECT
                    | GCONF_EN_SPREADCYCLE;
     if (!tmc2209_write_reg(REG_GCONF, gconf)) {
-        ESP_LOGW(TAG, "init: GCONF write failed (check wiring?)");
+        ESP_LOGE(TAG, "init: GCONF write failed (check wiring?)");
+        return ESP_FAIL;
     }
 
     /* CHOPCONF: TOFF, TBL, HSTRT, HEND per datasheet StealthChop recommendation;
@@ -372,7 +374,8 @@ esp_err_t tmc2209_init(const tmc2209_config_t *cfg)
         CHOPCONF_INTPOL_MASK;
 
     if (!tmc2209_write_reg(REG_CHOPCONF, chopconf)) {
-        ESP_LOGW(TAG, "init: CHOPCONF write failed (check wiring?)");
+        ESP_LOGE(TAG, "init: CHOPCONF write failed (check wiring?)");
+        return ESP_FAIL;
     }
 
     /* IHOLD_IRUN: current from settings */
@@ -384,15 +387,20 @@ esp_err_t tmc2209_init(const tmc2209_config_t *cfg)
         ((uint32_t)IHOLDDELAY_DEFAULT << IHOLD_IRUN_IHOLDDELAY_SHIFT);
 
     if (!tmc2209_write_reg(REG_IHOLD_IRUN, ihold_irun)) {
-        ESP_LOGW(TAG, "init: IHOLD_IRUN write failed (check wiring?)");
+        ESP_LOGE(TAG, "init: IHOLD_IRUN write failed (check wiring?)");
+        return ESP_FAIL;
     }
 
-    /* TPOWERDOWN: default delay */
-    tmc2209_write_reg(REG_TPOWERDOWN, 20);
+    /* TPOWERDOWN: default delay（静止休眠定时，失败仅影响功耗） */
+    if (!tmc2209_write_reg(REG_TPOWERDOWN, 20)) {
+        ESP_LOGW(TAG, "init: TPOWERDOWN write failed");
+    }
 
     /* TPWMTHRS: 固定 SpreadCycle，此值不参与模式切换
      *（保留写 0 = 寄存器确定状态） */
-    tmc2209_write_reg(REG_TPWMTHRS, 0);
+    if (!tmc2209_write_reg(REG_TPWMTHRS, 0)) {
+        ESP_LOGW(TAG, "init: TPWMTHRS write failed");
+    }
 
     /* PWMCONF: StealthChop2 default parameters
      * pwm_autoscale=1, pwm_autograd=1, freewheel=0, pwm_freq=1 */
@@ -404,7 +412,11 @@ esp_err_t tmc2209_init(const tmc2209_config_t *cfg)
         ((uint32_t)1  << PWMCONF_PWM_AUTOGRAD_SHIFT)  |  /* pwm_autograd */
         ((uint32_t)4  << PWMCONF_PWM_REG_SHIFT)    |  /* pwm_reg */
         ((uint32_t)12 << PWMCONF_PWM_LIM_SHIFT);      /* pwm_lim */
-    tmc2209_write_reg(REG_PWMCONF, pwmconf);
+    if (!tmc2209_write_reg(REG_PWMCONF, pwmconf)) {
+        ESP_LOGW(TAG, "init: PWMCONF write failed");
+    }
+
+    s_initialized = true;
 
     ESP_LOGI(TAG, "initialized: microstep=%d, run=%dmA(CS=%d), hold=%dmA(CS=%d), VSENSE=%d",
              settings_microstep(),

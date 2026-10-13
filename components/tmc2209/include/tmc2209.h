@@ -45,7 +45,12 @@ typedef struct {
  * Also subscribes to settings changes for $0/$3/$4.
  *
  * @param cfg  Configuration structure.
- * @return ESP_OK on success.
+ * @return ESP_OK on success; ESP_ERR_INVALID_ARG if cfg is NULL; a
+ *         driver error code if the UART core fails; ESP_FAIL if any
+ *         critical register write (GCONF / CHOPCONF / IHOLD_IRUN)
+ *         fails — the driver would otherwise run unconfigured.
+ *         Non-critical registers (TPOWERDOWN / TPWMTHRS / PWMCONF)
+ *         failing only logs a warning.
  */
 esp_err_t tmc2209_init(const tmc2209_config_t *cfg);
 
