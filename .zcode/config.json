@@ -1,0 +1,25 @@
+{
+  "mcp": {
+    "servers": {
+      "espressif-documentation": {
+        "type": "http",
+        "url": "https://mcp.espressif.com/docs"
+      },
+      "esp-component-registry": {
+        "type": "http",
+        "url": "https://components.espressif.com/mcp"
+      },
+      "espressif-engineering": {
+        "type": "http",
+        "url": "https://ts-mcp.espressif.com/mcp"
+      },
+      "esp-idf-eim": {
+        "command": "eim",
+        "args": [
+          "run",
+          "idf.py mcp-server"
+        ]
+      }
+    }
+  }
+}
