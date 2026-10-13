@@ -14,7 +14,7 @@
 #include "as5600.h"
 #include "mt6835.h"
 #include "cartproto.h"
-#include "cartfsm.h"
+#include "params.h"
 
 static const char *TAG = "telemetry";
 
@@ -39,7 +39,7 @@ static void telemetry_task(void *arg)
     }
 
     for (;;) {
-        /* 摆角标定作用于组帧点（POLE_ZERO_URAD/POLE_INV，任务 7）：
+        /* 摆角标定作用于组帧点（POLE_ZERO_URAD/POLE_INV）：
          * mt6835 保持纯传感器输出原始角；速度符号随角度翻转。 */
         const fw_params_t *prm = fw_params();
         int32_t theta = mt6835_raw_to_urad(mt6835_last_raw(),

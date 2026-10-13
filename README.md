@@ -30,9 +30,10 @@ namespace `cart`）→ 1600 steps/圈 = 40 steps/mm = 25 µm/step。
 ```
 components/
   bsp/          引脚与外设初始化（UART1/GPIO/I2C/SPI）
+  cartparams/   参数注册表（九项运行参数，纯数据层，无硬件依赖）
   cartproto/    线协议载体：行组装、命令解析（纯函数）、MODE/OK/ERR 应答
   cartfsm/      三态模式机：纯核心（转换表/标定合法性/软限位窗口/丢步）
-                + 参数注册表 + 1 kHz 监督任务（标定状态/编码器失联/
+                + 1 kHz 监督任务（标定状态/编码器失联/
                 丢步/软限位/FAULT 次序）
   step_engine/  GPTimer ISR 速度模式：vel_ramp 每步递推（纯函数）+
                 带符号目标 + 命令看门狗 + 换向经零速
