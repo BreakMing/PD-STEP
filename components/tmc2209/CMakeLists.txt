@@ -1,5 +1,5 @@
 idf_component_register(
     SRCS "tmc2209_hw.c" "tmc2209.c"
     INCLUDE_DIRS "include"
-    REQUIRES driver bsp settings
+    REQUIRES esp_driver_uart freertos bsp settings
 )

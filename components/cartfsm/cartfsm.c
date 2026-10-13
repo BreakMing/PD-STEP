@@ -23,6 +23,7 @@
 
 #include "bsp.h"
 #include "settings.h"
+#include "tmc2209.h"
 #include "step_engine.h"
 #include "as5600.h"
 #include "mt6835.h"
@@ -290,7 +291,7 @@ static void exec_enable(void)
     /* C 重锚到 E：先于模式发布——监督任务见 READY 即按拍判定，
      * 携旧 C 会在首拍 STEP_LOSS 误报（标定后手挪过的窗口） */
     step_engine_set_position(um_to_cmd_steps((long)as5600_position_um()));
-    bsp_tmc_en_set(true);
+    tmc2209_enable(true);
     portENTER_CRITICAL(&s_lock);
     s_mode = CM_READY;
     s_reason = CR_NONE;
@@ -314,7 +315,7 @@ static void exec_reset(void)
     portEXIT_CRITICAL(&s_lock);
 
     step_engine_stop();          /* 斜坡未完也立即急停 */
-    bsp_tmc_en_set(false);
+    tmc2209_enable(false);
     params_apply_engine();       /* 恢复 ACC_MAX 档等 */
     push_mode(CM_DISABLED, CR_NONE);
 }
@@ -427,7 +428,7 @@ static void fsm_task(void *arg)
              * 推 MODE */
             step_engine_vel_halt();
             if (step_engine_vel_now_q16() == 0) {
-                bsp_tmc_en_set(false);
+                tmc2209_enable(false);
                 s_fault_settling = false;
                 cm_reason_t r = s_reason;
                 push_mode(CM_FAULT, r);
@@ -493,7 +494,7 @@ esp_err_t cartfsm_start(void)
     }
 
     /* 上电默认 DISABLED、EN 关 */
-    bsp_tmc_en_set(false);
+    tmc2209_enable(false);
     params_apply_engine();
 
     cartproto_register_exec(exec_cmd);
