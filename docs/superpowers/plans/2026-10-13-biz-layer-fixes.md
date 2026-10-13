@@ -1051,10 +1051,13 @@ git commit -m "注释与实现对齐（UART1 所有权/ISR 核绑定/快照语�
 
 | 任务 | 主工程 | 测试工程 | 宿主 | 上板 | 提交 |
 |---|---|---|---|---|---|
-| Task 1 | | | — | flowtest 回归待 Task 2 | |
-| Task 2 | | | cartfsm_core 回归 | 3c 红绿 + flowtest | |
-| Task 3 | | | — | flowtest + 首步核对 | |
-| Task 4 | | | 六组 + find 新用例 | flowtest CONFIG 路径 | |
-| Task 5 | | | vel_ramp 回归 | [step_engine] 计时对照 | |
-| Task 6 | | | — | [bringup] 核对 | |
-| Task 7 | | | 六组 | — | |
+| Task 1 | complete | cartpole-test.bin | — | flowtest 回归随 Task 2 待上板 | 96ad4b1 |
+| Task 2 | complete | complete | cartfsm_core 79/79 | 3c 红绿 + flowtest 全量待上板 | 905cf93 |
+| Task 3 | complete | complete | — | flowtest 回归 + ENABLE 后首步核对待上板 | 113d16c |
+| Task 4 | complete | complete | 六组 228/228（含 find 8 条先红后绿） | flowtest CONFIG 路径待上板 | b01dfa3 |
+| Task 5 | complete | complete | vel_ramp 48/48 | [step_engine] 计时对照待上板 | 8c1bfe1 |
+| Task 6 | complete | complete | — | [bringup] 寄存器核对待上板 | 754a416 |
+| Task 7 | complete | complete | 六组 228/228（parse 57 为等价锚） | — | b5141cf |
+| 终审修复 | complete | complete | 六组 235/235（parse +7 前缀用例） | 3c 运动态红绿待上板 | 314b205/ece2070 |
+
+终审（fresh-context 评审）：无 Critical；Important 两条已修——flowtest 3c 原静止注入无法证伪旧实现（settling 约 1-2 ms 完成、wait_mode 粒度 5 ms），改运动态注入并重写论证；supervise_soft_limit 清零窗口竞态（预存）条件清零修复。Minor 两条入执行台账延期（tmc2209_enable 调用处前置条件注释、cartfsm.c bsp.h include 顺手清理）。
