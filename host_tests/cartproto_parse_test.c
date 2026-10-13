@@ -95,6 +95,15 @@ static void test_illegal(void)
     CHECK(!p("MARK LEFT extra"), "MARK 多余参数");
     CHECK(!p("MARK  LEFT"), "MARK 双空格分隔");
     CHECK(!p("MARKLEFT"), "MARK 粘连");
+    /* 子集前缀近似词：streq_n 的长度检查锚——退化成裸 strncmp
+     * （丢 strlen 判定）时这些输入会被误解析为对应命令 */
+    CHECK(!p("RESE"), "RESET 前缀截断");
+    CHECK(!p("QUER"), "QUERY 前缀截断");
+    CHECK(!p("ENABL"), "ENABLE 前缀截断");
+    CHECK(!p("CON"), "CONFIG 前缀截断");
+    CHECK(!p("CONF"), "CONFIG? 前缀截断");
+    CHECK(!p("MAR"), "MARK 前缀截断");
+    CHECK(!p("VE 200"), "VEL 前缀带参数");
     CHECK(!p("ENABLE 1"), "ENABLE 带参数");
 }
 

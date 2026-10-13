@@ -12,8 +12,9 @@
  *   5.  FAULT → RESET 回 DISABLED 后标定仍在，直接 ENABLE 恢复。
  *
  * MARK 的两标位置经一次性 loss_bias 注入提供（「手在别处」的替身，
- * 标记读数消费即清）。会开 EN（驱动上电使能）；命令流为 0，小车
- * 不应运动，机械台位在位时请保持警戒。
+ * 标记读数消费即清）。会开 EN（驱动上电使能）；除 3c 建立运动外
+ * 命令流为 0，小车仅 3c 向左小幅移动（<50 mm），机械台位在位时
+ * 请保持警戒。
  * 机械台位在位的标定散布验收见 deploy/v2/onboard-checklist.md
  * （C1/C2/C8，人工执行）。
  */
@@ -197,8 +198,17 @@ TEST_CASE("流程：READY 偏差注入 → FAULT/STEP_LOSS", "[cartfsm][flowtest
 /* 3c. FAULT settling 期间晚到的非零目标：监督每拍重发 halt，
  * 不依赖 WDT 兜底即完成停机次序（EN 关）。
  * 模拟 A3 场景：exec 锁外 vel_target 晚于 enter_fault 的 halt。
- * WDT 拉满 1000 ms——旧实现（无重发 halt）下 300 ms 断言窗内
- * 引擎持续运动、EN 不关，本用例必红。 */
+ *
+ * 时序论证：必须先建立运动再注入失联——静止态 vel_now==0 立
+ * 即成立，settling 在 FAULT 置位后一个监督拍内完成，5 ms 粒度
+ * 的 wait_mode 返回时 EN 已关，目标注入晚于 settling 结束，旧实
+ * 现下用例也绿（无法证伪）。运动态下 WDT_DEC 档减速需 ~100 ms
+ * （500→0 @5000 mm/s²），注入落在减速窗内；WDT_MS 拉满 1000 ms
+ * 后旧实现（无 halt 重发）目标持续存活、引擎运动至 WDT 过期，
+ * 300 ms 断言窗内 EN 不关（必红）；新实现每拍 halt 吃掉写入，
+ * 减速完成即 EN 关（绿，边距约 200 ms）。
+ * 注意：本用例小车自右端向左小幅移动（<50 mm），台位在位时保持
+ * 警戒。 */
 TEST_CASE("流程：FAULT settling 吃掉在途目标（WDT 不兜底）", "[cartfsm][flowtest]")
 {
     to_disabled();
@@ -216,10 +226,23 @@ TEST_CASE("流程：FAULT settling 吃掉在途目标（WDT 不兜底）", "[car
                        .value = 1000 };
     cartfsm_test_exec(&wdt);          /* READY 下 CONFIG SET 允许 */
 
+    /* 建立运动：自右端向左（远离软限位边界） */
+    cart_req_t vel = { .cmd = CART_CMD_VEL, .v_mm_s = -500 };
+    cartfsm_test_exec(&vel);
+    bool moving = false;
+    for (int t = 0; t < 200; t += 5) {
+        if (step_engine_vel_now_q16() != 0) {
+            moving = true;
+            break;
+        }
+        vTaskDelay(pdMS_TO_TICKS(5));
+    }
+    TEST_ASSERT_TRUE_MESSAGE(moving, "运动建立（vel_now != 0）");
+
     cartfsm_test_inject_encoder_fail(1);
     TEST_ASSERT_TRUE_MESSAGE(wait_mode(CM_FAULT, 100), "失联应 FAULT");
 
-    /* 在途写入：settling 进行中注入引擎目标（A3 穿透形态） */
+    /* 在途写入：减速窗内注入引擎目标（A3 穿透形态） */
     step_engine_vel_target(200 << 16);
     TEST_ASSERT_TRUE_MESSAGE(wait_fault_settled(300),
                              "settling 应每拍重发 halt，300 ms 内 EN 关");
