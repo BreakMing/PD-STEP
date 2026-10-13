@@ -18,7 +18,7 @@ config AS5600_INVERT_DIR
         rewired, or $10 (invert_dir) is changed — $10 flips the motor's
         physical direction, which flips the encoder sense as well.
 
-        Implementation: applied in as5600_read_raw() (driver layer), so
+        Implementation: applied in as5600_hw_read_raw() (driver core layer), so
         the pure-logic tracker and its test cases are unaffected.
 
 endmenu

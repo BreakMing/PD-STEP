@@ -1,17 +1,13 @@
 /*
- * AS5600 magnetic encoder — driver + 1 kHz sampling task
+ * AS5600 magnetic encoder — 业务壳：1 kHz 采样任务 + 标定 + settings 订阅
  *
- * !! READ-ONLY DEVICE — RED LINE !!
- *   ZPOS / MPOS / CONF / MANG are one-time-programmable (OTP); a wrong
- *   write permanently destroys the chip.  This file therefore contains
- *   NO register write: the single bus operation is
- *   as5600_read_raw(), which uses i2c_master_transmit_receive()
- *   (register address out + N data bytes in, one transaction — a read).
- *   Do not add i2c_master_transmit() or any write helper here.
+ * !! READ-ONLY DEVICE — RED LINE（红线细则与寄存器图见 as5600_hw.c）!!
+ *   本组件对器件的唯一总线操作是只读的 as5600_hw_read_raw()；
+ *   任何情况下不得向 ZPOS / MPOS / CONF / MANG（OTP）写入。
  *
  * Data path (PLAN §3.1):
  *   as5600_task (1 kHz, prio 3, CPU1)
- *     → read RAW ANGLE 0x0C/0x0D as one 2-byte burst
+ *     → read RAW ANGLE 0x0C/0x0D as one 2-byte burst  (as5600_hw)
  *     → as5600_tracker_update()       (pure logic, multi-turn counts)
  *     → as5600_publish()              (atomic snapshot for T9)
  *
@@ -26,10 +22,12 @@
  * mounting orientation.  CONFIG_AS5600_INVERT_DIR (default y on this
  * build) mirrors the angle so a +X motor move increases the position —
  * without it the commanded position (C) and encoder position (E) carry
- * opposite signs and cannot be compared.  See the Kconfig help.
+ * opposite signs and cannot be compared.  Mirroring happens in the read
+ * layer (as5600_hw); see the Kconfig help.
  */
 
 #include "as5600.h"
+#include "as5600_hw.h"
 #include "bsp.h"
 #include "settings.h"
 
@@ -39,18 +37,17 @@
 #include "esp_log.h"
 #include "esp_check.h"
 #include "esp_task_wdt.h"
-#include "driver/i2c_master.h"
+
+/* Kconfig 布尔在 n 时不定义，统一折算为可用的编译期常量 */
+#ifdef CONFIG_AS5600_INVERT_DIR
+#define AS5600_DIR_INVERTED 1
+#else
+#define AS5600_DIR_INVERTED 0
+#endif
 
 static const char *TAG = "as5600";
 
-/* ---- Register map (READ ONLY — see the red line above) ---- */
-#define AS5600_REG_STATUS       0x0B   /* bit5 MD / bit4 ML / bit3 MH (magnet) */
-#define AS5600_REG_RAW_ANGLE    0x0C   /* 0x0C = [11:8] (low nibble), 0x0D = [7:0] */
-#define AS5600_REG_AGC          0x1A
-#define AS5600_REG_MAGNITUDE    0x1C
-
 /* ---- Timing / limits ---- */
-#define AS5600_I2C_TIMEOUT_MS   50
 #define AS5600_SAMPLE_PERIOD_MS 1      /* 1 kHz (PLAN §3.1/§3.2) */
 #define AS5600_FAIL_LIMIT       10     /* consecutive failures → not OK */
 #define AS5600_TASK_PRIO        3
@@ -83,45 +80,9 @@ typedef struct {
 static portMUX_TYPE   s_lock = portMUX_INITIALIZER_UNLOCKED;
 static as5600_state_t s_state;
 
-static i2c_master_dev_handle_t s_dev = NULL;
 static as5600_tracker_t        s_tracker;
 static volatile bool           s_ok = true;    /* false = I2C failing */
 static bool                    s_initialized = false;
-
-/* ================================================================
- * Read path (the only bus operation in this component)
- * ================================================================ */
-
-/* Read the 12-bit raw angle as a single 2-byte burst.
- * Returns false if the transaction failed (value left untouched). */
-static bool as5600_read_raw(uint16_t *raw_out)
-{
-    const uint8_t reg = AS5600_REG_RAW_ANGLE;
-    uint8_t       buf[2] = { 0, 0 };
-
-    /* READ: write the register address, read 2 bytes back, one transaction.
-     * No data is ever written to the device. */
-    esp_err_t err = i2c_master_transmit_receive(s_dev, &reg, 1,
-                                                buf, sizeof(buf),
-                                                AS5600_I2C_TIMEOUT_MS);
-    if (err != ESP_OK) {
-        return false;
-    }
-
-    uint16_t raw = (uint16_t)(((buf[0] & 0x0F) << 8) | buf[1]);   /* 0..4095 */
-
-#if CONFIG_AS5600_INVERT_DIR
-    /* Mounting calibration — see Kconfig AS5600_INVERT_DIR.
-     * Mirroring the angle reverses the counting sense and keeps the
-     * value inside 0..4095, so a +X motor move increases the reported
-     * position.  Applied here (driver layer) so the pure-logic tracker
-     * and its self-test cases stay hardware-independent. */
-    raw = (uint16_t)((AS5600_COUNTS_PER_REV - 1) - raw);
-#endif
-
-    *raw_out = raw;
-    return true;
-}
 
 /* ================================================================
  * State publication
@@ -204,7 +165,7 @@ static void as5600_task(void *arg)
     while (1) {
         uint16_t raw = 0;
 
-        if (as5600_read_raw(&raw)) {
+        if (as5600_hw_read_raw(&raw)) {
             if (fail_streak >= AS5600_FAIL_LIMIT) {
                 ESP_LOGI(TAG, "I2C recovered after %d consecutive failures",
                          fail_streak);
@@ -247,13 +208,15 @@ esp_err_t as5600_init(void)
         return ESP_ERR_INVALID_STATE;
     }
 
-    i2c_device_config_t dev_cfg = {
-        .dev_addr_length = I2C_ADDR_BIT_LEN_7,
-        .device_address  = CONFIG_BSP_AS5600_I2C_ADDR,
-        .scl_speed_hz    = CONFIG_BSP_I2C_FREQ_HZ,
+    /* 读层（驱动核心）：地址/时钟/方向镜像全由 config 注入 */
+    as5600_hw_config_t hw = {
+        .bus          = bus,
+        .dev_addr     = CONFIG_BSP_AS5600_I2C_ADDR,
+        .scl_speed_hz = CONFIG_BSP_I2C_FREQ_HZ,
+        .invert_dir   = AS5600_DIR_INVERTED,
     };
-    ESP_RETURN_ON_ERROR(i2c_master_bus_add_device(bus, &dev_cfg, &s_dev),
-                        TAG, "i2c_master_bus_add_device failed");
+    ESP_RETURN_ON_ERROR(as5600_hw_init(&hw),
+                        TAG, "as5600_hw_init failed");
 
     as5600_tracker_reset(&s_tracker);
     as5600_refresh_scale();
@@ -266,14 +229,14 @@ esp_err_t as5600_init(void)
     /* Direction calibration status — surface it so the C/E sign
      * question can be answered from the boot log alone. */
     ESP_LOGI(TAG, "counting direction: %s",
-             CONFIG_AS5600_INVERT_DIR
+             AS5600_DIR_INVERTED
                  ? "INVERTED (magnet mounted opposite; +X move counts up)"
                  : "normal (not inverted)");
 
     /* First read: seeds the tracker (position 0 here, D10) and proves the
      * bus works before the task starts hammering it. */
     uint16_t raw = 0;
-    if (as5600_read_raw(&raw)) {
+    if (as5600_hw_read_raw(&raw)) {
         int32_t pos = as5600_tracker_update(&s_tracker, raw);
         as5600_publish(pos, raw);
         ESP_LOGI(TAG, "AS5600 online at 0x%02x — first raw angle=%u (seeded, E=0)",
