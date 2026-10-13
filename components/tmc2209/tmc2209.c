@@ -16,6 +16,7 @@
 #include <math.h>
 
 #include "esp_log.h"
+#include "esp_check.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
@@ -322,31 +323,11 @@ static void settings_change_cb(int idx, float new_value)
  * Init
  * ================================================================ */
 
-esp_err_t tmc2209_init(const tmc2209_config_t *cfg)
+/* 上电默认寄存器配置。关键寄存器（GCONF/CHOPCONF/IHOLD_IRUN）任一
+ * 推送失败返回 ESP_FAIL（驱动将停留在出厂配置，电流/细分失控）；
+ * 次要寄存器失败仅告警。 */
+static esp_err_t apply_default_registers(void)
 {
-    if (cfg == NULL) return ESP_ERR_INVALID_ARG;
-    if (s_initialized) return ESP_OK;
-
-    memcpy(&s_cfg, cfg, sizeof(s_cfg));
-
-    /* UART 驱动与寄存器读写原语（驱动核心层） */
-    tmc2209_hw_config_t hw = {
-        .uart_num   = cfg->uart_num,
-        .tx_pin     = cfg->tx_pin,
-        .rx_pin     = cfg->rx_pin,
-        .baud       = cfg->baud,
-        .slave_addr = cfg->slave_addr,
-    };
-    esp_err_t err = tmc2209_hw_init(&hw);
-    if (err != ESP_OK) {
-        return err;
-    }
-
-    /* ---- Apply default register configuration ----
-     * 关键寄存器（GCONF/CHOPCONF/IHOLD_IRUN）推送失败即返回错误：
-     * 驱动器停留在出厂默认配置（电流/细分失控风险），调用方按
-     * 启动失败处理。次要寄存器失败仅告警（不影响运动安全）。 */
-
     /* GCONF: pdn_disable=1 (UART mode), mstep_reg_select=1,
      * en_spreadcycle=1（固定 SpreadCycle：全速域统一 chopper，
      * TPWMTHRS 不参与模式切换）, shaft=0 */
@@ -362,7 +343,7 @@ esp_err_t tmc2209_init(const tmc2209_config_t *cfg)
     int mres = tmc2209_microstep_to_mres(settings_microstep());
     if (mres < 0) mres = 4; /* default 16 microsteps */
 
-    s_vsense = calc_vsense(settings_run_current_ma(), cfg->r_sense);
+    s_vsense = calc_vsense(settings_run_current_ma(), s_cfg.r_sense);
 
     uint32_t chopconf =
         ((uint32_t)CHOPCONF_TOFF_DEFAULT  << CHOPCONF_TOFF_SHIFT)  |
@@ -379,8 +360,8 @@ esp_err_t tmc2209_init(const tmc2209_config_t *cfg)
     }
 
     /* IHOLD_IRUN: current from settings */
-    int cs_run = tmc2209_ma_to_cs(settings_run_current_ma(), cfg->r_sense);
-    int cs_hold = tmc2209_ma_to_cs(settings_hold_current_ma(), cfg->r_sense);
+    int cs_run = tmc2209_ma_to_cs(settings_run_current_ma(), s_cfg.r_sense);
+    int cs_hold = tmc2209_ma_to_cs(settings_hold_current_ma(), s_cfg.r_sense);
     uint32_t ihold_irun =
         ((uint32_t)cs_hold << IHOLD_IRUN_IHOLD_SHIFT) |
         ((uint32_t)cs_run  << IHOLD_IRUN_IRUN_SHIFT)  |
@@ -416,12 +397,41 @@ esp_err_t tmc2209_init(const tmc2209_config_t *cfg)
         ESP_LOGW(TAG, "init: PWMCONF write failed");
     }
 
+    ESP_LOGD(TAG, "apply_default_registers: run=%dmA(CS=%d) hold=%dmA(CS=%d)",
+             settings_run_current_ma(), cs_run,
+             settings_hold_current_ma(), cs_hold);
+    return ESP_OK;
+}
+
+esp_err_t tmc2209_init(const tmc2209_config_t *cfg)
+{
+    if (cfg == NULL) return ESP_ERR_INVALID_ARG;
+    if (s_initialized) return ESP_OK;
+
+    memcpy(&s_cfg, cfg, sizeof(s_cfg));
+
+    /* UART 驱动与寄存器读写原语（驱动核心层） */
+    tmc2209_hw_config_t hw = {
+        .uart_num   = cfg->uart_num,
+        .tx_pin     = cfg->tx_pin,
+        .rx_pin     = cfg->rx_pin,
+        .baud       = cfg->baud,
+        .slave_addr = cfg->slave_addr,
+    };
+    esp_err_t err = tmc2209_hw_init(&hw);
+    if (err != ESP_OK) {
+        return err;
+    }
+
+    ESP_RETURN_ON_ERROR(apply_default_registers(),
+                        TAG, "default register config failed");
+
     s_initialized = true;
 
-    ESP_LOGI(TAG, "initialized: microstep=%d, run=%dmA(CS=%d), hold=%dmA(CS=%d), VSENSE=%d",
+    ESP_LOGI(TAG, "initialized: microstep=%d, run=%dmA, hold=%dmA, VSENSE=%d",
              settings_microstep(),
-             settings_run_current_ma(), cs_run,
-             settings_hold_current_ma(), cs_hold,
+             settings_run_current_ma(),
+             settings_hold_current_ma(),
              s_vsense ? 1 : 0);
 
     /* Subscribe to settings changes ($0, $3, $4) */
