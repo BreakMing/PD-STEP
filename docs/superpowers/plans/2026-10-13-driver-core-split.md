@@ -58,7 +58,7 @@
 
 分层边界：寄存器**地址与位域语义**（REG_*、CHOPCONF_*、GCONF_*、IHOLD_IRUN_*、DRV_STATUS_*、PWMCONF_*）全部留在 shell——hw 只按地址做通用读写，不含任何寄存器语义。
 
-- [ ] **Step 1: 新建 tmc2209_hw.h（全文）**
+- [x] **Step 1: 新建 tmc2209_hw.h（全文）**
 
 ```c
 /*
@@ -102,7 +102,7 @@ esp_err_t tmc2209_hw_init(const tmc2209_hw_config_t *cfg);
 #endif
 ```
 
-- [ ] **Step 2: 新建 tmc2209_hw.c**
+- [x] **Step 2: 新建 tmc2209_hw.c**
 
 搬移清单（全部自 `tmc2209.c` 原文逐字搬移，仅注明归属）：
 
@@ -176,7 +176,7 @@ esp_err_t tmc2209_hw_init(const tmc2209_hw_config_t *cfg)
 
 hw.c 的 include 白名单（Step 6 审计对象）：`tmc2209_hw.h`、`tmc2209.h`、`<string.h>`、`esp_log.h`、`driver/uart.h`、`freertos/FreeRTOS.h`、`freertos/semphr.h`。不含 settings.h / bsp.h。
 
-- [ ] **Step 3: 瘦身 tmc2209.c 为业务壳**
+- [x] **Step 3: 瘦身 tmc2209.c 为业务壳**
 
 - 删除已搬移段（见 Step 2 清单）；保留全部寄存器地址/位域宏、`tmc2209_ma_to_cs`、`tmc2209_microstep_to_mres`、`calc_vsense`、功能层（set_current/set_microstep/enable/read_status）、`settings_change_cb`、init 的寄存器配置策略段。
 - shell 状态收敛为：`static tmc2209_config_t s_cfg;`（仅 r_sense 被 shell 使用）、`static bool s_initialized;`、`static bool s_vsense;`。
@@ -210,23 +210,23 @@ hw.c 的 include 白名单（Step 6 审计对象）：`tmc2209_hw.h`、`tmc2209.
 - include 清理：删 `driver/uart.h`、`freertos/semphr.h`、`esp_check.h`（shell 不再使用）；新增 `#include "tmc2209_hw.h"`。保留 `string.h`（memcpy）、`math.h`、`esp_log.h`、`freertos/FreeRTOS.h`（enable 的 vTaskDelay）、`bsp.h`、`settings.h`。
 - 文件头注释更新为业务壳职责说明（寄存器策略/settings 订阅；帧与 UART 细节指向 tmc2209_hw.c）。
 
-- [ ] **Step 4: CMake 追加源文件**
+- [x] **Step 4: CMake 追加源文件**
 
 `components/tmc2209/CMakeLists.txt`：`SRCS "tmc2209.c" "tmc2209_hw.c"`。REQUIRES 不变（driver/bsp/settings 仍为组件整体依赖；hw 隔离由 include 白名单保证）。
 
-- [ ] **Step 5: 构建主工程**
+- [x] **Step 5: 构建主工程**
 
 Run: MCP `build_project`（或 `idf.py -B build build`）
 Expected: 构建通过，无未定义符号（read_reg/write_reg/crc8 由 hw.c 提供）。
 
-- [ ] **Step 6: 等价性审计（Review Focus 1/2）**
+- [x] **Step 6: 等价性审计（Review Focus 1/2）**
 
 - 守卫：`tmc2209_read_reg/write_reg` 的 `if (!s_initialized) return false;` 现判 hw 状态；tmc2209_init 未调用前 hw 未初始化 → 行为不变。
 - 失败路径：hw_init 内 mutex 建立成功而 uart 安装失败时返回原错误码、hw 保持未初始化（可重入重建 mutex，与旧代码一致，不修）。
 - `tmc2209_init` 中 `s_initialized = true` 仍在默认寄存器写入之前（旧 :543）→ 功能层守卫时序不变。
 - include 审计：列出 tmc2209_hw.c 全部 `#include`，确认无 settings.h/bsp.h。
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add components/tmc2209 docs/superpowers/plans/2026-10-13-driver-core-split.md
@@ -251,7 +251,7 @@ git commit -m "tmc2209：拆出 UART 帧与寄存器读写驱动核心 tmc2209_h
   - `esp_err_t as5600_hw_init(const as5600_hw_config_t *cfg);`（add_device，含 `I2C_ADDR_BIT_LEN_7`）
   - `bool as5600_hw_read_raw(uint16_t *raw);`（2 字节突发读 12-bit 原始角；失败时 `*raw` 不变）
 
-- [ ] **Step 1: 新建 as5600_hw.h（全文）**
+- [x] **Step 1: 新建 as5600_hw.h（全文）**
 
 ```c
 /*
@@ -306,7 +306,7 @@ bool as5600_hw_read_raw(uint16_t *raw);
 #endif
 ```
 
-- [ ] **Step 2: 新建 as5600_hw.c**
+- [x] **Step 2: 新建 as5600_hw.c**
 
 搬移/改写清单（源 `as5600.c`）：
 
@@ -335,7 +335,7 @@ esp_err_t as5600_hw_init(const as5600_hw_config_t *cfg)
 
 hw.c include 白名单：`as5600_hw.h`、`as5600.h`（`AS5600_COUNTS_PER_REV`）、`esp_log.h`（预留，若最终未用则删）。不含 settings.h / bsp.h。
 
-- [ ] **Step 3: 瘦身 as5600.c 为业务壳**
+- [x] **Step 3: 瘦身 as5600.c 为业务壳**
 
 - 删除已搬移段；保留：状态结构与 s_lock、publish、refresh_scale、settings 回调、采样任务、init 其余段、遥测 getters、set_origin。
 - `as5600_init` 中 bus 获取与 config 填充 + hw_init + 首读（`as5600_hw_read_raw`）：
@@ -368,23 +368,23 @@ hw.c include 白名单：`as5600_hw.h`、`as5600.h`（`AS5600_COUNTS_PER_REV`）
 - include 清理：删 `driver/i2c_master.h`（句柄类型经 as5600_hw.h 引入）；新增 `#include "as5600_hw.h"`。其余保留（bsp.h、settings.h、freertos、esp_task_wdt、esp_log、esp_check、math.h——math.h 若 shell 已无使用则删，以实际审计为准）。
 - 文件头注释：数据路径/CPU1/2 字节突发等任务侧说明保留；只读红线改为一句指向 as5600_hw.c。
 
-- [ ] **Step 4: CMake + Kconfig**
+- [x] **Step 4: CMake + Kconfig**
 
 - CMakeLists：`SRCS "as5600.c" "as5600_tracker.c" "as5600_hw.c"`。
 - Kconfig AS5600_INVERT_DIR help：`applied in as5600_read_raw() (driver layer)` → `applied in as5600_hw_read_raw() (driver core layer)`。
 
-- [ ] **Step 5: 构建主工程**
+- [x] **Step 5: 构建主工程**
 
 Run: MCP `build_project`
 Expected: 通过。
 
-- [ ] **Step 6: 等价性审计（Review Focus 3/5）**
+- [x] **Step 6: 等价性审计（Review Focus 3/5）**
 
 - 首读失败路径：init 首读失败仍走 LOGW 分支并继续（返回 ESP_OK），任务创建与 s_initialized 置位时序不变。
 - 镜像：`invert_dir=true` 时读层输出仍为 `(4095 - raw)`，与 `#if` 版本对同一 Kconfig 取值逐位一致；invert=false 时不镜像。
 - include 审计：as5600_hw.c 无 settings.h / bsp.h / freertos 任务 API。
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add components/as5600
@@ -411,7 +411,7 @@ git commit -m "as5600：拆出 I2C 读层驱动核心 as5600_hw（只读红线�
   - `bool mt6835_hw_read_raw(uint32_t *raw21, uint8_t *status);`
   - `void mt6835_hw_last_failure(mt6835_hw_fail_t *kind, uint8_t frame[MT6835_HW_FRAME_BYTES]);`（最近一次失败快照；kind 可为 NULL，frame 可为 NULL，各自跳过）
 
-- [ ] **Step 1: 新建 mt6835_hw.h（全文）**
+- [x] **Step 1: 新建 mt6835_hw.h（全文）**
 
 ```c
 /*
@@ -474,7 +474,7 @@ void mt6835_hw_last_failure(mt6835_hw_fail_t *kind,
 #endif
 ```
 
-- [ ] **Step 2: 新建 mt6835_hw.c**
+- [x] **Step 2: 新建 mt6835_hw.c**
 
 搬移/改写清单（源 `mt6835.c`）：
 
@@ -507,7 +507,7 @@ esp_err_t mt6835_hw_init(const mt6835_hw_config_t *cfg)
 
 hw.c include 白名单：`mt6835_hw.h`、`mt6835_urad.h`（crc8）、`driver/spi_master.h`。不含 settings.h / bsp.h / esp_log（读路径本无日志）。
 
-- [ ] **Step 3: 瘦身 mt6835.c 为业务壳**
+- [x] **Step 3: 瘦身 mt6835.c 为业务壳**
 
 - 删除已搬移段；保留：状态结构/publish/速度窗、采样任务、init 其余段、遥测 getters。
 - `fail_kind_t` 本地枚举删除；`fail_str` 改为接收 `mt6835_hw_fail_t`（switch 三臂文案不变）；`s_last_fail/s_last_frame` 删除，改经 `mt6835_hw_last_failure` 取快照：
@@ -551,21 +551,21 @@ if (fail_streak == MT6835_FAIL_LIMIT) {
 - `mt6835_read_raw` 两处调用点（任务 :189、init 首读 :255）→ `mt6835_hw_read_raw`。
 - include 清理：删 `driver/spi_master.h`；新增 `#include "mt6835_hw.h"`。`string.h`（memset s_state）、freertos、esp_log、esp_check、esp_task_wdt、bsp.h 保留。文件头注释补一行"SPI 帧层见 mt6835_hw.c"。
 
-- [ ] **Step 4: CMake 追加源文件**
+- [x] **Step 4: CMake 追加源文件**
 
 `SRCS "mt6835.c" "mt6835_urad.c" "mt6835_hw.c"`。
 
-- [ ] **Step 5: 构建主工程**
+- [x] **Step 5: 构建主工程**
 
 Run: MCP `build_project`
 Expected: 通过。
 
-- [ ] **Step 6: 等价性审计（Review Focus 4）**
+- [x] **Step 6: 等价性审计（Review Focus 4）**
 
 - 分诊快照：失败后 task/init 日志打出的 kind 与 6 字节帧原文与旧实现同源（同一 s_last_frame 拷贝）；成功读不清快照（旧代码同样保留上次失败帧）。
 - include 审计：mt6835_hw.c 无 settings.h / bsp.h / freertos。
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add components/mt6835
@@ -582,32 +582,32 @@ git commit -m "mt6835：拆出 SPI 帧层驱动核心 mt6835_hw（host/时钟/CS
 
 **Interfaces:** 无代码接口。
 
-- [ ] **Step 1: 主工程构建**
+- [x] **Step 1: 主工程构建**
 
 Run: MCP `build_project`
 Expected: 通过。
 
-- [ ] **Step 2: 测试工程构建**
+- [x] **Step 2: 测试工程构建**
 
 Run: `powershell -Command ". C:\esp\v6.1\esp-idf\export.ps1; idf.py -C test build"`（或仓库 idf_env.ps1 提供的等价入口）
 Expected: 通过——所有 TEST_COMPONENTS（含三个组件 test/）编入链接，证明 public 符号闭合、测试代码零改动适配。
 
-- [ ] **Step 3: host 纯逻辑测试回归**
+- [x] **Step 3: host 纯逻辑测试回归**
 
 Run（六个宿主测试逐一，wsl gcc，命令模板见 README.md:93-96）:
 `wsl gcc -std=c11 -Wall -Wextra -Werror -Ihost_tests/stub -Icomponents/mt6835/include host_tests/mt6835_crc_test.c components/mt6835/mt6835_urad.c -o /tmp/t && /tmp/t`（urad/crc/cartfsm_core/cartproto_parse/telemetry_format/vel_ramp 同法）
 Expected: 全部退出码 0。
 
-- [ ] **Step 4: include 审计汇总（横切门禁）**
+- [x] **Step 4: include 审计汇总（横切门禁）**
 
 列出三个 `*_hw.c` 的全部 `#include` 并核对白名单（esp 总线/日志头 + 自家 hw.h + public 头 + mt6835_urad.h）；确认无 settings.h / bsp.h / freertos 任务与队列头（tmc2209_hw 的 FreeRTOS/semphr 属 UART 互斥原语，允许）。
 
-- [ ] **Step 5: 未验证项清单（如实汇报，不冒充已验）**
+- [x] **Step 5: 未验证项清单（如实汇报，不冒充已验）**
 
 - 真机行为回归（[bringup] 寄存器核对、as5600 B 组硬件读、mt6835 静止稳定性）需上板运行测试固件，本会话未执行；构建通过仅为编译级证据。
 - `CONFIG_AS5600_INVERT_DIR=n` 分支的编译（旧代码该分支本就不可编译，非本次引入）。
 
-- [ ] **Step 6: 回填与提交**
+- [x] **Step 6: 回填与提交**
 
 勾选本计划各步骤、写入验证记录（日期、环境、命令、结果）；更新记忆 pd-step-driver-coupling（拆分已完成、新接缝名称）。
 
@@ -621,3 +621,25 @@ git commit -m "驱动核心拆分：验证记录回填（主/测试工程构建�
 ## 执行方式说明（会话内已定）
 
 本会话为自主执行模式（用户不实时应答），writing-plans 的"等待用户评审后执行"与自主模式冲突，按系统级指令优先处理：计划先行落档（可事后评审、git 可回退），由本会话按 executing-plans 方式逐任务执行；任务间发现与计划冲突的代码事实时，按实施规则停止该任务并汇报，不静默改语义。
+
+---
+
+## 验证记录（2026-10-13 执行会话回填）
+
+环境：Windows 10 + ESP-IDF v6.1（IDF 于 C:\esp\v6.1\esp-idf，工具与 Python 用 C:\Espressif 的 EIM 安装，激活脚本 Microsoft.v6.1.PowerShell_profile.ps1）。
+
+- 主工程构建：`idf.py -B build build` → Project build complete，退出码 0（Task 1/2/3 各验证一次）。
+- 测试工程构建：`idf.py -C test build` → 生成 test\build\cartpole-test.bin，退出码 0，全部 TEST_COMPONENTS 编入，测试代码零改动适配。注意：不能写 `-C test -B build`——`-B` 相对当前目录解析会指向根工程 build 目录而被 IDF 拒绝。
+- 宿主纯逻辑测试（`wsl gcc -std=c11 -Wall -Wextra -Werror`，退出码全 0）：cartfsm_core 79/79（须同时编译 params.c）、cartproto_parse 57/57、mt6835_crc 2/2、mt6835_urad 19/19、telemetry_format 15/15（需额外 -I as5600/mt6835/settings 的 include）、vel_ramp 48/48。
+- include 审计（三个 _hw.c 的全部 #include）：
+  - tmc2209_hw.c：自家 hw.h、string.h、public tmc2209.h、esp_log.h、driver/uart.h、freertos/FreeRTOS.h、freertos/semphr.h（互斥原语，允许集）
+  - as5600_hw.c：as5600_hw.h、as5600.h
+  - mt6835_hw.c：mt6835_hw.h、mt6835_urad.h
+  - 三者均无 settings.h、无 bsp.h；构建通过为编译级依赖证据。
+- 本会话未执行（上板验证项，不冒充已验）：[bringup] 寄存器核对、[spin] 实转、as5600 B 组硬件读、mt6835 静止稳定性与拔线分诊。真机行为回归需烧录测试固件后按 README 标签运行。
+- 已知既有问题（非本次引入）：CONFIG_AS5600_INVERT_DIR=n 时旧代码本就无法编译（方向日志三目直接引用未定义宏）；本次的 AS5600_DIR_INVERTED 折算不受影响。
+
+执行期裁定（详细过程见最终交接说明）：
+1. 构建入口由计划写的 export.ps1 改为 EIM 激活脚本——export.ps1 会因 Git Bash 自动注入的 MSYSTEM 被 IDF 拒绝，且 EIM Python 与现有 build 缓存匹配。
+2. tmc2209/CMakeLists 的 SRCS 由协作者先行加入 tmc2209_hw.c，与目标一致，保留其书写顺序。
+3. as5600_hw_init 额外存储整个 config（读取时用运行时 invert_dir），是"镜像发生在读层"的必要实现，镜像表达式与原 #if 版本逐位一致。
