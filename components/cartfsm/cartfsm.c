@@ -156,10 +156,20 @@ static void supervise_soft_limit(const fw_params_t *p)
     long eff = cm_soft_limit_clamp((long)as5600_position_um(),
                                    xmin, xmax, cmd);
     if (eff != cmd) {
-        step_engine_vel_halt();
+        /* 条件清零：仅当判定所依据的目标未被新命令覆盖时才停并
+         * 清零。若在判定与清零之间 exec_vel 已提交新目标，清零会
+         * 使 s_last_cmd_v 与引擎实际目标脱钩（记录 0 而引擎仍在
+         * 运动），软限位对该目标持续失效。被覆盖则本拍不动作，
+         * 下一拍以新目标为基准重新钳制。 */
         portENTER_CRITICAL(&s_lock);
-        s_last_cmd_v = 0;
+        bool still_old = (s_last_cmd_v == cmd);
+        if (still_old) {
+            s_last_cmd_v = 0;
+        }
         portEXIT_CRITICAL(&s_lock);
+        if (still_old) {
+            step_engine_vel_halt();
+        }
     }
 }
 
