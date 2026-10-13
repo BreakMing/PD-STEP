@@ -1060,4 +1060,4 @@ git commit -m "注释与实现对齐（UART1 所有权/ISR 核绑定/快照语�
 | Task 7 | complete | complete | 六组 228/228（parse 57 为等价锚） | — | b5141cf |
 | 终审修复 | complete | complete | 六组 235/235（parse +7 前缀用例） | 3c 运动态红绿待上板 | 314b205/ece2070 |
 
-终审（fresh-context 评审）：无 Critical；Important 两条已修——flowtest 3c 原静止注入无法证伪旧实现（settling 约 1-2 ms 完成、wait_mode 粒度 5 ms），改运动态注入并重写论证；supervise_soft_limit 清零窗口竞态（预存）条件清零修复。Minor 两条入执行台账延期（tmc2209_enable 调用处前置条件注释、cartfsm.c bsp.h include 顺手清理）。
+终审（fresh-context 评审）：无 Critical；Important 两条已修——flowtest 3c 原静止注入无法证伪旧实现（settling 约 1-2 ms 完成、wait_mode 粒度 5 ms），改运动态注入并重写论证；supervise_soft_limit 清零窗口竞态（预存）条件清零修复。Minor 两条经用户拍板同轮修复（tmc2209_enable 调用处前置条件说明、删除 cartfsm.c 无调用的 bsp.h include）。
