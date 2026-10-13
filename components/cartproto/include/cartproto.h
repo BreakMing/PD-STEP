@@ -33,7 +33,7 @@ typedef void (*cartproto_line_cb_t)(const char *line);
  * @brief 启动通讯任务。
  *
  * 创建 comm_task（CPU0、优先级 5、4KB 栈），订阅任务看门狗。
- * UART1 以事件队列重新初始化（bsp 先装了无队列驱动），波特率取
+ * 初始化 UART1（事件队列驱动，cartproto 是其唯一所有者），波特率取
  * CONFIG_CARTPROTO_UART_BAUD，引脚取 BSP Kconfig。
  *
  * @return ESP_OK 成功；ESP_ERR_INVALID_STATE 已启动；否则为错误码。

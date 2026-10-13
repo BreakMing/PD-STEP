@@ -96,7 +96,9 @@ static bool validate_locked(int idx, float value)
     return true;
 }
 
-static void notify_locked(int idx, float new_value)
+/* 通知全部订阅方。必须在 s_mutex 之外调用：订阅方回调可能调用
+ * settings_get/is_valid（内部取锁），持锁通知会死锁。 */
+static void notify_all_subscribers(int idx, float new_value)
 {
     for (int i = 0; i < s_subscriber_count; i++) {
         if (s_subscribers[i] != NULL) {
@@ -273,7 +275,7 @@ settings_status_t settings_reset_defaults(void)
             xSemaphoreGive(s_mutex);
             /* 不持互斥通知，避免订阅方回调 settings_get 死锁；
              * 值已在上面写入，稳定。 */
-            notify_locked(i, s_values[i]);
+            notify_all_subscribers(i, s_values[i]);
             xSemaphoreTake(s_mutex, portMAX_DELAY);
         }
     }
@@ -308,11 +310,7 @@ settings_status_t settings_set(int idx, float value)
     xSemaphoreGive(s_mutex);
 
     /* 互斥外通知 */
-    for (int i = 0; i < s_subscriber_count; i++) {
-        if (s_subscribers[i] != NULL) {
-            s_subscribers[i](idx, value);
-        }
-    }
+    notify_all_subscribers(idx, value);
 
     return SETTINGS_OK;
 }

@@ -30,7 +30,7 @@ void app_main(void)
         ESP_ERROR_CHECK(as5600_init());
         ESP_ERROR_CHECK(mt6835_init());
         tmc2209_config_t tmc = {
-            .uart_num = UART_NUM_2,
+            .uart_num = UART_NUM_2,   /* 端口分配：UART0=烧录/日志、UART1=协议、UART2=TMC */
             .tx_pin = CONFIG_BSP_TMC_UART_TX_GPIO,
             .rx_pin = CONFIG_BSP_TMC_UART_RX_GPIO,
             .baud = 115200,

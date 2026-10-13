@@ -11,9 +11,9 @@
  *   The AS5600 ZPOS / MPOS / CONF / MANG registers are one-time
  *   programmable (OTP): a wrong write destroys the chip permanently.
  *   This component therefore issues NO register write of any kind —
- *   its only bus operation is the read helper
- *   i2c_master_transmit_receive() (register address out, data in,
- *   one transaction).  Do not add write helpers here.
+ *   the business layer never touches the bus directly; its only
+ *   read path is as5600_hw_read_raw() (driver core; register-level
+ *   red-line details live in as5600_hw.c).  Do not add write helpers.
  *
  * Hardware facts:
  *   7-bit address 0x36 (CONFIG_BSP_AS5600_I2C_ADDR), I2C_NUM_0,

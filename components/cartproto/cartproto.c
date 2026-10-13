@@ -299,10 +299,6 @@ static void comm_task(void *pvParameters)
             break;
         }
     }
-
-    /* 不可达 */
-    esp_task_wdt_delete(NULL);
-    vTaskDelete(NULL);
 }
 
 /* ================================================================

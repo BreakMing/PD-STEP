@@ -23,7 +23,8 @@ extern "C" {
 /* ---- 公开 API ---- */
 
 /**
- * @brief 初始化：GPTimer @1 MHz、one-shot alarm、ISR 钉在 CPU0。
+ * @brief 初始化：GPTimer @1 MHz、one-shot alarm；中断装在调用 init
+ * 的核（app_main 于 CPU0 启动，CPU0 布局由此保证）。
  *
  * STEP/DIR GPIO 不重复初始化（bsp 已配 OUT LOW），仅记录引脚号。
  * 上电默认：加速度/减速度 4000 steps/s²、看门狗关闭、目标 0。
@@ -78,7 +79,8 @@ void step_engine_vel_halt(void);
  * @brief 当前速度快照（带符号 Q16.16 steps/s，物理域——含方向
  * 反转，与 step_engine_position_steps 同域）。
  *
- * 近似快照（多变量非原子读）；语义上用于判零与符号。
+ * 持锁快照（s_spinlock 内一次读齐 stopped/v/dir/invert）；语义上
+ * 用于判零与符号。
  */
 int64_t step_engine_vel_now_q16(void);
 

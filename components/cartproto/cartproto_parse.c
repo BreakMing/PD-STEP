@@ -7,7 +7,14 @@
 #include "cartproto.h"
 
 #include <stddef.h>
+#include <string.h>
 #include <ctype.h>
+
+/* s 的前 len 字符与字面量 lit 完全相等（长度相等且逐位相等） */
+static bool streq_n(const char *s, size_t len, const char *lit)
+{
+    return strlen(lit) == len && strncmp(s, lit, len) == 0;
+}
 
 /* 行尾空白（空格/制表符）的长度 */
 static size_t trailing_ws(const char *s, size_t len)
@@ -98,27 +105,19 @@ bool cartproto_parse_line(const char *line, cart_req_t *out)
 
     /* 无参数命令 */
     if (cmd_len == len) {
-        if (cmd_len == 5) {
-            if (line[0] == 'R' && line[1] == 'E' && line[2] == 'S'
-                && line[3] == 'E' && line[4] == 'T') {
-                out->cmd = CART_CMD_RESET;
-                return true;
-            }
-            if (line[0] == 'Q' && line[1] == 'U' && line[2] == 'E'
-                && line[3] == 'R' && line[4] == 'Y') {
-                out->cmd = CART_CMD_QUERY;
-                return true;
-            }
+        if (streq_n(line, cmd_len, "RESET")) {
+            out->cmd = CART_CMD_RESET;
+            return true;
         }
-        if (cmd_len == 6 && line[0] == 'E' && line[1] == 'N'
-            && line[2] == 'A' && line[3] == 'B' && line[4] == 'L'
-            && line[5] == 'E') {
+        if (streq_n(line, cmd_len, "QUERY")) {
+            out->cmd = CART_CMD_QUERY;
+            return true;
+        }
+        if (streq_n(line, cmd_len, "ENABLE")) {
             out->cmd = CART_CMD_ENABLE;
             return true;
         }
-        if (cmd_len == 7 && line[0] == 'C' && line[1] == 'O'
-            && line[2] == 'N' && line[3] == 'F' && line[4] == 'I'
-            && line[5] == 'G' && line[6] == '?') {
+        if (streq_n(line, cmd_len, "CONFIG?")) {
             out->cmd = CART_CMD_CONFIG_DUMP;
             return true;
         }
@@ -132,24 +131,20 @@ bool cartproto_parse_line(const char *line, cart_req_t *out)
     }
 
     /* MARK <LEFT|RIGHT>：命令词 + 字面方向词（规格 §2） */
-    if (cmd_len == 4 && line[0] == 'M' && line[1] == 'A'
-        && line[2] == 'R' && line[3] == 'K') {
+    if (streq_n(line, cmd_len, "MARK")) {
         size_t rl = len - rest;
-        if (rl == 4 && line[rest] == 'L' && line[rest + 1] == 'E'
-            && line[rest + 2] == 'F' && line[rest + 3] == 'T') {
+        if (streq_n(&line[rest], rl, "LEFT")) {
             out->cmd = CART_CMD_MARK_LEFT;
             return true;
         }
-        if (rl == 5 && line[rest] == 'R' && line[rest + 1] == 'I'
-            && line[rest + 2] == 'G' && line[rest + 3] == 'H'
-            && line[rest + 4] == 'T') {
+        if (streq_n(&line[rest], rl, "RIGHT")) {
             out->cmd = CART_CMD_MARK_RIGHT;
             return true;
         }
         return false;
     }
 
-    if (cmd_len == 3 && line[0] == 'V' && line[1] == 'E' && line[2] == 'L') {
+    if (streq_n(line, cmd_len, "VEL")) {
         long v;
         if (!parse_long(&line[rest], len - rest, &v)) {
             return false;
@@ -162,8 +157,7 @@ bool cartproto_parse_line(const char *line, cart_req_t *out)
         return true;
     }
 
-    if (cmd_len == 6 && line[0] == 'C' && line[1] == 'O' && line[2] == 'N'
-        && line[3] == 'F' && line[4] == 'I' && line[5] == 'G') {
+    if (streq_n(line, cmd_len, "CONFIG")) {
         /* CONFIG NAME value：NAME 与 value 以单空格分隔 */
         const char *args = &line[rest];
         size_t args_len = len - rest;
