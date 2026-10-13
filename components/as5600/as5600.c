@@ -137,7 +137,7 @@ static void as5600_refresh_scale(void)
 static void as5600_on_settings_change(int idx, float new_value)
 {
     (void)new_value;
-    if (idx == 2) {
+    if (idx == SET_MM_PER_REV) {
         as5600_refresh_scale();
         ESP_LOGI(TAG, "$2 changed — mm_per_count refreshed (%.6f mm/count)",
                  (double)(settings_units_per_rev() / (float)AS5600_COUNTS_PER_REV));

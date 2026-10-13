@@ -216,6 +216,19 @@ static void test_registry_enum(void)
     }
 }
 
+/* ---- fw_params_find（B3 权威化） ---- */
+static void test_fw_params_find(void)
+{
+    CHECK(fw_params_find("VEL_MAX") == FP_VEL_MAX, "find VEL_MAX");
+    CHECK(fw_params_find("ACC_MAX") == FP_ACC_MAX, "find ACC_MAX");
+    CHECK(fw_params_find("WDT_DEC") == FP_WDT_DEC, "find WDT_DEC");
+    CHECK(fw_params_find("STEP_LOSS_UM") == FP_STEP_LOSS_UM, "find 尾项");
+    CHECK(fw_params_find("NOPE") == -1, "未知名 -1");
+    CHECK(fw_params_find("") == -1, "空名 -1");
+    CHECK(fw_params_find(NULL) == -1, "NULL -1");
+    CHECK(fw_params_count() == FP_COUNT, "枚举数与注册表一致");
+}
+
 int main(void)
 {
     test_transitions();
@@ -225,6 +238,7 @@ int main(void)
     test_step_loss();
     test_params_ranges();
     test_registry_enum();
+    test_fw_params_find();
 
     printf("cartfsm_core_test: %d/%d 断言通过\n", s_run - s_fail, s_run);
     return s_fail;

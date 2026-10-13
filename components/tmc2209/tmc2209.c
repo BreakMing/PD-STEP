@@ -305,11 +305,11 @@ static void settings_change_cb(int idx, float new_value)
     if (!s_initialized) return;
 
     switch (idx) {
-    case 0: /* microstep */
+    case SET_MICROSTEP:
         tmc2209_set_microstep((int)new_value);
         break;
-    case 3: /* run_current_mA */
-    case 4: /* hold_current_mA */
+    case SET_RUN_MA:
+    case SET_HOLD_MA:
         tmc2209_set_current(settings_run_current_ma(),
                             settings_hold_current_ma());
         break;

@@ -166,15 +166,20 @@ static void supervise_soft_limit(const fw_params_t *p)
 static void params_apply_one(const char *name)
 {
     const fw_params_t *p = fw_params();
-    if (strcmp(name, "ACC_MAX") == 0) {
+    switch (fw_params_find(name)) {
+    case FP_ACC_MAX:
         step_engine_vel_set_accel(accel_to_steps(p->acc_max));
-    } else if (strcmp(name, "WDT_DEC") == 0) {
+        break;
+    case FP_WDT_DEC:
         step_engine_vel_set_decel(accel_to_steps(p->wdt_dec));
-    } else if (strcmp(name, "WDT_MS") == 0) {
+        break;
+    case FP_WDT_MS:
         step_engine_vel_set_wdt_us((uint32_t)p->wdt_ms * 1000u);
-    } else if (strcmp(name, "X_INV") == 0) {
+        break;
+    case FP_X_INV:
         step_engine_set_dir_invert(p->x_inv != 0);
-    } else if (strcmp(name, "VEL_MAX") == 0) {
+        break;
+    case FP_VEL_MAX:
         /* 运行中收紧 VEL_MAX 立即约束当前运动（protocol.md 收紧语义） */
         portENTER_CRITICAL(&s_lock);
         long cur = s_last_cmd_v;
@@ -183,8 +188,10 @@ static void params_apply_one(const char *name)
             long v = (cur > 0) ? p->vel_max : -p->vel_max;
             clamp_and_commit_velocity(v);
         }
+        break;
+    default:
+        break;   /* 其余参数（X_MARGIN_UM/标定量）为读取点即时生效 */
     }
-    /* 其余参数（X_MARGIN_UM/标定量）为读取点即时生效 */
 }
 
 /* ---- 模式转换辅助 ---- */
