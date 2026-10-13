@@ -124,6 +124,44 @@ static void params_apply_engine(void)
     step_engine_set_dir_invert(p->x_inv != 0);
 }
 
+/* 软限位钳制收口：读当前位置、按窗口钳制 v、持锁提交 s_last_cmd_v、
+ * 锁外下发引擎。exec_vel 与 VEL_MAX 运行中收紧共用。
+ * 引擎调用在 s_lock 之外（不与 step_engine 的 spinlock 嵌套）。 */
+static void clamp_and_commit_velocity(long v_mm_s)
+{
+    const fw_params_t *p = fw_params();
+    long xmin, xmax;
+    soft_window(p, &xmin, &xmax);
+    long eff = cm_soft_limit_clamp((long)as5600_position_um(),
+                                   xmin, xmax, v_mm_s);
+
+    portENTER_CRITICAL(&s_lock);
+    s_last_cmd_v = eff;
+    portEXIT_CRITICAL(&s_lock);
+
+    step_engine_vel_target(mmps_to_q16(eff));
+}
+
+/* 监督拍软限位持续钳制：当前目标被窗口钳为不同值时斜坡停并清
+ * 目标。读/写 s_last_cmd_v 持锁，引擎调用在锁外。 */
+static void supervise_soft_limit(const fw_params_t *p)
+{
+    portENTER_CRITICAL(&s_lock);
+    long cmd = s_last_cmd_v;
+    portEXIT_CRITICAL(&s_lock);
+
+    long xmin, xmax;
+    soft_window(p, &xmin, &xmax);
+    long eff = cm_soft_limit_clamp((long)as5600_position_um(),
+                                   xmin, xmax, cmd);
+    if (eff != cmd) {
+        step_engine_vel_halt();
+        portENTER_CRITICAL(&s_lock);
+        s_last_cmd_v = 0;
+        portEXIT_CRITICAL(&s_lock);
+    }
+}
+
 static void params_apply_one(const char *name)
 {
     const fw_params_t *p = fw_params();
@@ -141,14 +179,8 @@ static void params_apply_one(const char *name)
         long cur = s_last_cmd_v;
         portEXIT_CRITICAL(&s_lock);
         if (cur > p->vel_max || cur < -p->vel_max) {
-            long v = (cur > p->vel_max) ? p->vel_max
-                    : (cur < -p->vel_max) ? -p->vel_max : cur;
-            long xmin, xmax;
-            soft_window(p, &xmin, &xmax);
-            long eff = cm_soft_limit_clamp((long)as5600_position_um(),
-                                           xmin, xmax, v);
-            s_last_cmd_v = eff;
-            step_engine_vel_target(mmps_to_q16(eff));
+            long v = (cur > 0) ? p->vel_max : -p->vel_max;
+            clamp_and_commit_velocity(v);
         }
     }
     /* 其余参数（X_MARGIN_UM/标定量）为读取点即时生效 */
@@ -302,12 +334,7 @@ static void exec_vel(int32_t v_mm_s)
     } else if (v < -p->vel_max) {
         v = -p->vel_max;
     }
-    long xmin, xmax;
-    soft_window(p, &xmin, &xmax);
-    long eff = cm_soft_limit_clamp((long)as5600_position_um(),
-                                   xmin, xmax, v);
-    s_last_cmd_v = eff;
-    step_engine_vel_target(mmps_to_q16(eff));
+    clamp_and_commit_velocity(v);
 }
 
 static void exec_config_set(const cart_req_t *req)
@@ -390,19 +417,15 @@ static void fsm_task(void *arg)
                     enter_fault(CR_STEP_LOSS);
                 } else {
                     /* 软限位持续钳制（运行中收紧立即生效） */
-                    long xmin, xmax;
-                    soft_window(p, &xmin, &xmax);
-                    long eff = cm_soft_limit_clamp(
-                        (long)as5600_position_um(), xmin, xmax,
-                        s_last_cmd_v);
-                    if (eff != s_last_cmd_v) {
-                        step_engine_vel_halt();
-                        s_last_cmd_v = 0;
-                    }
+                    supervise_soft_limit(p);
                 }
             }
         } else if (mode == CM_FAULT && s_fault_settling) {
-            /* 次序 ②③：等零 → EN 关 → 推 MODE */
+            /* 次序 ②③：每拍重发斜坡停——吃掉 FAULT 进入后仍在途的
+             * 目标写入（exec_vel 锁外 vel_target 可晚于 enter_fault
+             * 的 halt，穿透后不能只靠 WDT 兜底）→ 等零 → EN 关 →
+             * 推 MODE */
+            step_engine_vel_halt();
             if (step_engine_vel_now_q16() == 0) {
                 bsp_tmc_en_set(false);
                 s_fault_settling = false;

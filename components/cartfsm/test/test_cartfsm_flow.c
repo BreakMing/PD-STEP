@@ -7,6 +7,7 @@
  *   1c. 上电未标定（reset_calib 模拟断电）即 ENABLE：拒；
  *   2.  重新标定：CAL_DONE 后 MARK LEFT 覆盖重开；
  *   3.  READY 注入 |E−C| 偏差 → FAULT/STEP_LOSS；
+ *   3c. FAULT settling 吃掉在途目标；
  *   4.  READY 注入 AS5600 失联 → FAULT/AS5600（既有口径）；
  *   5.  FAULT → RESET 回 DISABLED 后标定仍在，直接 ENABLE 恢复。
  *
@@ -190,6 +191,39 @@ TEST_CASE("流程：READY 偏差注入 → FAULT/STEP_LOSS", "[cartfsm][flowtest
     TEST_ASSERT_TRUE_MESSAGE(wait_mode(CM_FAULT, 500), "偏差超阈值应 FAULT");
     TEST_ASSERT_EQUAL_INT(CR_STEP_LOSS, cartfsm_reason());
     TEST_ASSERT_TRUE_MESSAGE(wait_fault_settled(2000), "EN 关");
+    to_disabled();
+}
+
+/* 3c. FAULT settling 期间晚到的非零目标：监督每拍重发 halt，
+ * 不依赖 WDT 兜底即完成停机次序（EN 关）。
+ * 模拟 A3 场景：exec 锁外 vel_target 晚于 enter_fault 的 halt。
+ * WDT 拉满 1000 ms——旧实现（无重发 halt）下 300 ms 断言窗内
+ * 引擎持续运动、EN 不关，本用例必红。 */
+TEST_CASE("流程：FAULT settling 吃掉在途目标（WDT 不兜底）", "[cartfsm][flowtest]")
+{
+    to_disabled();
+    cartfsm_test_reset_calib();
+    cart_req_t ml = { .cmd = CART_CMD_MARK_LEFT };
+    cartfsm_test_exec(&ml);
+    cartfsm_test_inject_loss_bias(500000);
+    cart_req_t mr = { .cmd = CART_CMD_MARK_RIGHT };
+    cartfsm_test_exec(&mr);
+    cart_req_t en = { .cmd = CART_CMD_ENABLE };
+    cartfsm_test_exec(&en);
+    TEST_ASSERT_TRUE_MESSAGE(wait_mode(CM_READY, 200), "进入 READY");
+
+    cart_req_t wdt = { .cmd = CART_CMD_CONFIG_SET, .name = "WDT_MS",
+                       .value = 1000 };
+    cartfsm_test_exec(&wdt);          /* READY 下 CONFIG SET 允许 */
+
+    cartfsm_test_inject_encoder_fail(1);
+    TEST_ASSERT_TRUE_MESSAGE(wait_mode(CM_FAULT, 100), "失联应 FAULT");
+
+    /* 在途写入：settling 进行中注入引擎目标（A3 穿透形态） */
+    step_engine_vel_target(200 << 16);
+    TEST_ASSERT_TRUE_MESSAGE(wait_fault_settled(300),
+                             "settling 应每拍重发 halt，300 ms 内 EN 关");
+    cartfsm_test_inject_encoder_fail(0);
     to_disabled();
 }
 
