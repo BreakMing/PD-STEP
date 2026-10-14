@@ -1415,7 +1415,7 @@ git commit -m "cartaxis 换算纯函数：mm↔steps 四条换算（lround 语�
 - Consumes: Task 3 四条 `cartaxis_conv_*`；`tmc2209_*`、`step_engine_*` 现签名
 - Produces: `motor_handle_t` 与 motor 契约十二函数；`motor_tmc2209_init(cfg, &h)`；cartaxis 十一函数（业务面）；`tmc2209_config_t` 增三个 init 字段
 
-- [ ] **Step 1: motor 契约与实现 steps 域化**
+- [x] **Step 1: motor 契约与实现 steps 域化**
 
 `components/motor/include/motor.h` 整体替换：
 
@@ -1649,7 +1649,7 @@ idf_component_register(SRCS ${motor_srcs}
                     PRIV_REQUIRES step_engine)
 ```
 
-- [ ] **Step 2: tmc2209 去 settings（初值经 config 注入）**
+- [x] **Step 2: tmc2209 去 settings（初值经 config 注入）**
 
 `components/tmc2209/include/tmc2209.h`：`tmc2209_config_t` 增三个字段（置于 r_sense 之后）：
 
@@ -1663,11 +1663,11 @@ idf_component_register(SRCS ${motor_srcs}
 
 `components/tmc2209/tmc2209.c`：删除 `#include "settings.h"`、`settings_change_cb` 函数与 init 末尾的订阅块；`apply_default_registers` 与 init 日志中 `settings_microstep()` / `settings_run_current_ma()` / `settings_hold_current_ma()` 分别替换为 `s_cfg.init_microstep` / `s_cfg.init_run_ma` / `s_cfg.init_hold_ma`。`components/tmc2209/CMakeLists.txt` 的 REQUIRES 去掉 `settings`。
 
-- [ ] **Step 3: step_engine 删除方向反转机制**
+- [x] **Step 3: step_engine 删除方向反转机制**
 
 [step_engine.c](../../../components/step_engine/step_engine.c)：删除 `s_dir_invert` 声明（:59）与 `step_engine_set_dir_invert`（:503-511）；三处 XOR 退化——:130 `bool physical = logical_dir ^ s_dir_invert;` → `bool physical = logical_dir;`，:246 `if (s_dir ^ s_dir_invert)` → `if (s_dir)`，vel_now 快照处删除 `invert` 局部量、`return (dir ^ invert) ? … : …` → `return dir ? (int64_t)v : -(int64_t)v;`（以 grep invert 清零为准）。[step_engine.h](../../../components/step_engine/include/step_engine.h)：删除 `step_engine_set_dir_invert` 声明及其注释块；文件头与 vel/position 注释中「物理域」措辞删除（域即引擎逻辑域）。[test_step_engine.c](../../../components/step_engine/test/test_step_engine.c)：删除用例 7「方向反转：DIR 电平即时翻转与计数反向」整段（其锚定的「陈旧 DIR 电平」问题在符号上收后结构性消失，见计划头部偏差记录 1）。
 
-- [ ] **Step 4: cartaxis 接线组件**
+- [x] **Step 4: cartaxis 接线组件**
 
 `components/cartaxis/include/cartaxis.h`：
 
@@ -1860,13 +1860,13 @@ idf_component_register(SRCS "cartaxis_conv.c" "cartaxis.c"
                     REQUIRES motor settings cartparams)
 ```
 
-- [ ] **Step 5: cartfsm 与 flowtest 调用面切换**
+- [x] **Step 5: cartfsm 与 flowtest 调用面切换**
 
 [cartfsm.c](../../../components/cartfsm/cartfsm.c)：include `motor.h` → `cartaxis.h`；全部 `motor_` 前缀改 `cartaxis_`（params_apply_engine、clamp_and_commit_velocity、supervise_soft_limit、params_apply_one、enter_fault、exec_mark_right、exec_enable、exec_reset、fsm_task settling 段、cartfsm_start）；**删除** params_apply_engine 的 `motor_set_dir_invert(...)` 行与 params_apply_one 的 `FP_X_INV` case（X_INV 由 cartaxis 读时取反，两处不再有作用点）；文件头注释「motor / cartproto」措辞改「cartaxis / cartproto」。`components/cartfsm/CMakeLists.txt`：REQUIRES 中 `motor` 改 `cartaxis`。
 
 [test_cartfsm_flow.c](../../../components/cartfsm/test/test_cartfsm_flow.c)：include `motor.h` → `cartaxis.h`；:234 `motor_at_rest()` → `cartaxis_at_rest()`；:246 `motor_set_vel_mm_s(200)` → `cartaxis_set_vel_mm_s(200)`。
 
-- [ ] **Step 6: 组装点切换与 $3/$4 中转**
+- [x] **Step 6: 组装点切换与 $3/$4 中转**
 
 `main/app_main.c`：include 区改（`motor_tmc2209.h` 保留、增 `cartaxis.h` 与 `motor.h`——中转电流用）；motor 组装块替换为：
 
@@ -1918,7 +1918,7 @@ static void on_driver_settings(int idx, float new_value)
 
 启动次序注释同步（cartpos/poleang/cartaxis 解释组件 + 组装点订阅）。`main/CMakeLists.txt` REQUIRES：`bsp cartproto settings magnetic_encoder cartpos poleang motor cartaxis telemetry cartfsm`。`test/main/test_app_main.c` 同样替换（含 s_mot 与中转）；`test/main/CMakeLists.txt` REQUIRES：`bsp settings magnetic_encoder cartpos poleang motor cartaxis cartproto cartfsm telemetry`。
 
-- [ ] **Step 7: 构建与 host 验证**
+- [x] **Step 7: 构建与 host 验证**
 
 构建命令同 Task 1 Step 5，预期 MAIN=0、TEST=0。host 复跑 cartfsm_core（t1=0，87/87）与 vel_ramp（t6=0，48/48）：
 
@@ -1926,7 +1926,7 @@ static void on_driver_settings(int idx, float new_value)
 wsl -e bash -c "cd /mnt/c/Users/84580/workspace/cld/PD-STEP && gcc -std=c11 -Wall -Wextra -Icomponents/cartfsm/include -Icomponents/cartparams/include host_tests/cartfsm_core_test.c components/cartfsm/cartfsm_core.c components/cartparams/params.c -o /tmp/t1 && /tmp/t1; echo t1=\$?; gcc -std=c11 -Wall -Wextra -Icomponents/step_engine/include host_tests/vel_ramp_test.c components/step_engine/vel_ramp.c -o /tmp/t6 && /tmp/t6; echo t6=\$?"
 ```
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add components/motor components/tmc2209 components/step_engine components/cartaxis components/cartfsm main test host_tests

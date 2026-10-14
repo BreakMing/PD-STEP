@@ -25,12 +25,15 @@ extern "C" {
 typedef struct {
     int      uart_num;     /* UART port number, e.g. UART_NUM_2 */
     int      tx_pin;       /* TX GPIO (through 1kΩ to PDN_UART) */
-    int      rx_pin;       /* RX GPIO (direct from PDN_UART) */
+    int      rx_pin;       /* RX GPIO (direct from PDN_UART node) */
     int      en_gpio;      /* ENN (active low); pin direction is configured
                               by bsp_init, only the level is driven here */
     int      baud;         /* Baud rate, default 115200 */
     uint8_t  slave_addr;   /* Slave address, default 0 */
     float    r_sense;      /* Sense resistor value in ohms */
+    int      init_microstep;  /* 上电细分档（组装点从 settings 读取注入） */
+    int      init_run_ma;     /* 上电运行电流 mA */
+    int      init_hold_ma;    /* 上电保持电流 mA */
 } tmc2209_config_t;
 
 /* ================================================================
@@ -42,9 +45,8 @@ typedef struct {
  *
  * Installs UART driver, applies default register configuration
  * (GCONF, CHOPCONF, IHOLD_IRUN, PWMCONF, TPWMTHRS), and sets
- * initial current / microstep from settings.
- *
- * Also subscribes to settings changes for $0/$3/$4.
+ * initial current / microstep from the config (the assembly point
+ * fills them from settings).
  *
  * @param cfg  Configuration structure.
  * @return ESP_OK on success; ESP_ERR_INVALID_ARG if cfg is NULL; a

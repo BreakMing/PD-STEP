@@ -17,6 +17,8 @@
 #include "bsp.h"
 #include "settings.h"
 #include "motor_tmc2209.h"
+#include "motor.h"
+#include "cartaxis.h"
 #include "magnetic_encoder_as5600.h"
 #include "cartpos.h"
 #include "magnetic_encoder_mt6835.h"
@@ -24,6 +26,20 @@
 #include "telemetry.h"
 #include "cartproto.h"
 #include "cartfsm.h"
+
+static motor_handle_t s_mot;   /* $3/$4 中转用（app_main 单次启动） */
+
+static void on_driver_settings(int idx, float new_value)
+{
+    (void)new_value;
+    if (idx == SET_RUN_MA || idx == SET_HOLD_MA) {
+        esp_err_t err = motor_set_current(s_mot, settings_run_current_ma(),
+                                          settings_hold_current_ma());
+        if (err != ESP_OK) {
+            ESP_LOGE("test_main", "电流写入失败（%d）——保持旧值", err);
+        }
+    }
+}
 
 void app_main(void)
 {
@@ -48,7 +64,8 @@ void app_main(void)
     };
     ESP_ERROR_CHECK(magnetic_encoder_mt6835_init(&pcfg, &enc_pole));
     poleang_init(enc_pole);
-    motor_tmc2209_config_t mot = {
+    motor_handle_t mot;
+    motor_tmc2209_config_t mcfg = {
         .tmc = {
             .uart_num = UART_NUM_2,
             .tx_pin = CONFIG_BSP_TMC_UART_TX_GPIO,
@@ -57,11 +74,21 @@ void app_main(void)
             .baud = 115200,
             .slave_addr = 0,
             .r_sense = CONFIG_TMC2209_RSENSE,
+            .init_microstep = settings_microstep(),
+            .init_run_ma = settings_run_current_ma(),
+            .init_hold_ma = settings_hold_current_ma(),
         },
         .step_gpio = CONFIG_BSP_STEP_GPIO,
         .dir_gpio = CONFIG_BSP_DIR_GPIO,
     };
-    ESP_ERROR_CHECK(motor_tmc2209_init(&mot));
+    ESP_ERROR_CHECK(motor_tmc2209_init(&mcfg, &mot));
+    cartaxis_init(mot);
+    /* $3/$4 中转：纯驱动器参数由组装点推送（返回值接住并告警，
+     * 消灭旧订阅回调吞返回值的脱钩窗口） */
+    s_mot = mot;
+    if (!settings_subscribe(on_driver_settings)) {
+        ESP_LOGW("test_main", "settings 订阅失败（槽满）——$3/$4 变更不会生效");
+    }
     ESP_ERROR_CHECK(cartproto_start());
     ESP_ERROR_CHECK(cartfsm_start());
     ESP_ERROR_CHECK(telemetry_start());

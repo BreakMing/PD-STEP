@@ -1,13 +1,14 @@
 /*
- * tmc2209 设备组件：寄存器配置策略 + $0/$3/$4 订阅；EN 引脚经
- * config 的 en_gpio 注入（引脚方向由 bsp_init 配置，本组件只驱动电平）。
+ * tmc2209 设备组件：寄存器配置策略；EN 引脚经 config 的 en_gpio 注入
+ * （引脚方向由 bsp_init 配置，本组件只驱动电平）。
  *
  * UART 帧格式、回声处理与通用寄存器读写原语在 tmc2209_hw.c
  * （驱动核心层：参数全由 config 注入，不碰 settings/bsp/任务）。
  * 本文件持有：寄存器地址与位域语义、上电默认配置策略（GCONF/
  * CHOPCONF/IHOLD_IRUN/TPOWERDOWN/TPWMTHRS/PWMCONF）、电流与细分
- * 功能层（含 VSENSE 自动分档）、EN 使能以及 $0/$3/$4 的
- * settings 订阅。
+ * 功能层（含 VSENSE 自动分档）与 EN 使能。上电细分/电流初值经
+ * config 注入（组装点从 settings 读取填入）；本组件不订阅任何
+ * settings 项。
  */
 
 #include "tmc2209.h"
@@ -22,7 +23,6 @@
 #include "freertos/task.h"
 
 #include "driver/gpio.h"
-#include "settings.h"
 
 static const char *TAG = "tmc2209";
 
@@ -123,7 +123,7 @@ static const char *TAG = "tmc2209";
  * Internal state
  * ================================================================ */
 
-static tmc2209_config_t s_cfg;      /* 只使用其中的 r_sense 与 en_gpio */
+static tmc2209_config_t s_cfg;      /* 只使用其中的 r_sense、en_gpio 与三个 init 初值 */
 static bool s_initialized = false;
 static bool s_vsense = false;   /* Current VSENSE setting (cached) */
 
@@ -300,28 +300,6 @@ bool tmc2209_read_status(tmc2209_status_t *st)
 }
 
 /* ================================================================
- * Settings change callback
- * ================================================================ */
-
-static void settings_change_cb(int idx, float new_value)
-{
-    if (!s_initialized) return;
-
-    switch (idx) {
-    case SET_MICROSTEP:
-        tmc2209_set_microstep((int)new_value);
-        break;
-    case SET_RUN_MA:
-    case SET_HOLD_MA:
-        tmc2209_set_current(settings_run_current_ma(),
-                            settings_hold_current_ma());
-        break;
-    default:
-        break;
-    }
-}
-
-/* ================================================================
  * Init
  * ================================================================ */
 
@@ -341,11 +319,11 @@ static esp_err_t apply_default_registers(void)
     }
 
     /* CHOPCONF: TOFF, TBL, HSTRT, HEND per datasheet StealthChop recommendation;
-     * MRES default from settings; INTPOL=1 */
-    int mres = tmc2209_microstep_to_mres(settings_microstep());
+     * MRES from config; INTPOL=1 */
+    int mres = tmc2209_microstep_to_mres(s_cfg.init_microstep);
     if (mres < 0) mres = 4; /* default 16 microsteps */
 
-    s_vsense = calc_vsense(settings_run_current_ma(), s_cfg.r_sense);
+    s_vsense = calc_vsense(s_cfg.init_run_ma, s_cfg.r_sense);
 
     uint32_t chopconf =
         ((uint32_t)CHOPCONF_TOFF_DEFAULT  << CHOPCONF_TOFF_SHIFT)  |
@@ -361,9 +339,9 @@ static esp_err_t apply_default_registers(void)
         return ESP_FAIL;
     }
 
-    /* IHOLD_IRUN: current from settings */
-    int cs_run = tmc2209_ma_to_cs(settings_run_current_ma(), s_cfg.r_sense);
-    int cs_hold = tmc2209_ma_to_cs(settings_hold_current_ma(), s_cfg.r_sense);
+    /* IHOLD_IRUN: current from config */
+    int cs_run = tmc2209_ma_to_cs(s_cfg.init_run_ma, s_cfg.r_sense);
+    int cs_hold = tmc2209_ma_to_cs(s_cfg.init_hold_ma, s_cfg.r_sense);
     uint32_t ihold_irun =
         ((uint32_t)cs_hold << IHOLD_IRUN_IHOLD_SHIFT) |
         ((uint32_t)cs_run  << IHOLD_IRUN_IRUN_SHIFT)  |
@@ -400,8 +378,7 @@ static esp_err_t apply_default_registers(void)
     }
 
     ESP_LOGD(TAG, "apply_default_registers: run=%dmA(CS=%d) hold=%dmA(CS=%d)",
-             settings_run_current_ma(), cs_run,
-             settings_hold_current_ma(), cs_hold);
+             s_cfg.init_run_ma, cs_run, s_cfg.init_hold_ma, cs_hold);
     return ESP_OK;
 }
 
@@ -431,15 +408,10 @@ esp_err_t tmc2209_init(const tmc2209_config_t *cfg)
     s_initialized = true;
 
     ESP_LOGI(TAG, "initialized: microstep=%d, run=%dmA, hold=%dmA, VSENSE=%d",
-             settings_microstep(),
-             settings_run_current_ma(),
-             settings_hold_current_ma(),
+             s_cfg.init_microstep,
+             s_cfg.init_run_ma,
+             s_cfg.init_hold_ma,
              s_vsense ? 1 : 0);
-
-    /* Subscribe to settings changes ($0, $3, $4) */
-    if (!settings_subscribe(settings_change_cb)) {
-        ESP_LOGW(TAG, "settings_subscribe failed (slot full)");
-    }
 
     return ESP_OK;
 }

@@ -1,84 +1,107 @@
 /*
- * motor_tmc2209 — motor 域接口的 TMC2209 + GPTimer 实现（链接期绑定）
+ * motor_tmc2209 — motor 契约的 TMC2209 + GPTimer 实现（单实例）
+ *
+ * steps 域直通 step_engine（速度目标以 steps/s×65536 的定点值下发，
+ * 整数 steps/s 恰为定点值的 65536 倍，无损）；细分与电流经 tmc2209
+ * 功能层（含 VSENSE 分档）。
  */
 #include "motor.h"
 #include "motor_tmc2209.h"
-#include "motor_conv.h"
 
 #include "tmc2209.h"
 #include "step_engine.h"
-#include "settings.h"
 
-/* 换算即时生效：每次调用读当前派生值（$0/$1/$2 变更后即用新值） */
-static double spm(void)
-{
-    return (double)settings_steps_per_mm();
-}
+static struct motor_s {
+    int unused;   /* 单实例句柄载体 */
+} s_inst;
 
-esp_err_t motor_tmc2209_init(const motor_tmc2209_config_t *cfg)
+esp_err_t motor_tmc2209_init(const motor_tmc2209_config_t *cfg,
+                             motor_handle_t *handle_out)
 {
-    if (cfg == NULL) {
+    if (cfg == NULL || handle_out == NULL) {
         return ESP_ERR_INVALID_ARG;
     }
     esp_err_t err = tmc2209_init(&cfg->tmc);
     if (err != ESP_OK) {
         return err;
     }
-    return step_engine_init(cfg->step_gpio, cfg->dir_gpio);
+    err = step_engine_init(cfg->step_gpio, cfg->dir_gpio);
+    if (err != ESP_OK) {
+        return err;
+    }
+    *handle_out = &s_inst;
+    return ESP_OK;
 }
 
-esp_err_t motor_enable(bool en)
+esp_err_t motor_enable(motor_handle_t m, bool en)
 {
+    (void)m;
     return tmc2209_enable(en);
 }
 
-void motor_set_vel_mm_s(long v_mm_s)
+void motor_set_vel(motor_handle_t m, long steps_per_s)
 {
-    step_engine_vel_target(motor_conv_mmps_to_q16(v_mm_s, spm()));
+    (void)m;
+    step_engine_vel_target((int64_t)steps_per_s * 65536);
 }
 
-void motor_halt(void)
+void motor_halt(motor_handle_t m)
 {
+    (void)m;
     step_engine_vel_halt();
 }
 
-void motor_stop(void)
+void motor_stop(motor_handle_t m)
 {
+    (void)m;
     step_engine_stop();
 }
 
-bool motor_at_rest(void)
+bool motor_at_rest(motor_handle_t m)
 {
-    /* 精确判零：不经 mm/s 整数舍入（残余速度不得提前判停） */
+    /* 精确判零：引擎内部定点域（残余速度不得提前判停） */
+    (void)m;
     return step_engine_vel_now_q16() == 0;
 }
 
-int64_t motor_cmd_position_um(void)
+int32_t motor_position_steps(motor_handle_t m)
 {
-    return motor_conv_steps_to_um(step_engine_position_steps(), spm());
+    (void)m;
+    return step_engine_position_steps();
 }
 
-void motor_set_position_um(long um)
+void motor_set_position(motor_handle_t m, int32_t steps)
 {
-    step_engine_set_position(motor_conv_um_to_steps(um, spm()));
+    (void)m;
+    step_engine_set_position(steps);
 }
 
-void motor_set_accel_mm_s2(long a_mm_s2)
+void motor_set_accel(motor_handle_t m, uint32_t steps_per_s2)
 {
-    step_engine_vel_set_accel(motor_conv_accel_to_steps(a_mm_s2, spm()));
+    (void)m;
+    step_engine_vel_set_accel(steps_per_s2);
 }
 
-void motor_set_decel_mm_s2(long d_mm_s2)
+void motor_set_decel(motor_handle_t m, uint32_t steps_per_s2)
 {
-    step_engine_vel_set_decel(motor_conv_accel_to_steps(d_mm_s2, spm()));
+    (void)m;
+    step_engine_vel_set_decel(steps_per_s2);
 }
 
-void motor_set_wdt_ms(long t_ms)
+void motor_set_wdt_ms(motor_handle_t m, uint32_t ms)
 {
-    step_engine_vel_set_wdt_us((uint32_t)t_ms * 1000u);
+    (void)m;
+    step_engine_vel_set_wdt_us(ms * 1000u);
 }
 
-void motor_set_dir_invert(bool invert)
+esp_err_t motor_set_microstep(motor_handle_t m, int microstep)
 {
-    step_engine_set_dir_invert(invert);
+    (void)m;
+    return tmc2209_set_microstep(microstep);
+}
+
+esp_err_t motor_set_current(motor_handle_t m, int run_ma, int hold_ma)
+{
+    (void)m;
+    return tmc2209_set_current(run_ma, hold_ma);
 }

@@ -28,7 +28,7 @@
 #include "driver/gpio.h"
 
 #include "cartpos.h"
-#include "motor.h"
+#include "cartaxis.h"
 
 static const char *TAG = "cartfsm_flowtest";
 
@@ -231,7 +231,7 @@ TEST_CASE("流程：FAULT settling 吃掉在途目标（WDT 不兜底）", "[car
     cartfsm_test_exec(&vel);
     bool moving = false;
     for (int t = 0; t < 200; t += 5) {
-        if (!motor_at_rest()) {
+        if (!cartaxis_at_rest()) {
             moving = true;
             break;
         }
@@ -243,7 +243,7 @@ TEST_CASE("流程：FAULT settling 吃掉在途目标（WDT 不兜底）", "[car
     TEST_ASSERT_TRUE_MESSAGE(wait_mode(CM_FAULT, 100), "失联应 FAULT");
 
     /* 在途写入：减速窗内注入电机目标（A3 穿透形态；经域接口仍达引擎） */
-    motor_set_vel_mm_s(200);
+    cartaxis_set_vel_mm_s(200);
     TEST_ASSERT_TRUE_MESSAGE(wait_fault_settled(300),
                              "settling 应每拍重发 halt，300 ms 内 EN 关");
     cartfsm_test_inject_encoder_fail(0);

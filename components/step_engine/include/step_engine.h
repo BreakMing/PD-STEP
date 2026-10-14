@@ -76,10 +76,10 @@ void step_engine_vel_target(int64_t v_q16);
 void step_engine_vel_halt(void);
 
 /**
- * @brief 当前速度快照（带符号 Q16.16 steps/s，物理域——含方向
- * 反转，与 step_engine_position_steps 同域）。
+ * @brief 当前速度快照（带符号 Q16.16 steps/s，与
+ * step_engine_position_steps 同域）。
  *
- * 持锁快照（s_spinlock 内一次读齐 stopped/v/dir/invert）；语义上
+ * 持锁快照（s_spinlock 内一次读齐 stopped/v/dir）；语义上
  * 用于判零与符号。
  */
 int64_t step_engine_vel_now_q16(void);
@@ -87,26 +87,18 @@ int64_t step_engine_vel_now_q16(void);
 /* ---- 遥测快照 ---- */
 
 /**
- * @brief 指令位置（带符号累计 steps，物理域）。32 位对齐读原子。
+ * @brief 指令位置（带符号累计 steps）。32 位对齐读原子。
  */
 int32_t step_engine_position_steps(void);
 
 /**
- * @brief 重定基指令位置（带符号累计 steps，物理域）。
+ * @brief 重定基指令位置（带符号累计 steps）。
  *
  * 供回零完成时与编码器原点（cartpos_set_origin_mm）同帧重定基：
  * E/C 域对齐后 |E−C| 丢步判定才有意义。必须在引擎停止
  * （step_engine_stop 之后、无脉冲）时调用。
  */
 void step_engine_set_position(int32_t steps);
-
-/**
- * @brief 设置方向反转（X_INV）。
- *
- * 输出层 XOR 生效：DIR 物理电平与位置计数同时翻转。
- * 运动中调用：后续脉冲生效（换向减速仍按原方向完成）。
- */
-void step_engine_set_dir_invert(bool invert);
 
 /* ---- 测试钩子插桩（仅 CONFIG_STEP_ENGINE_TEST_HOOKS=y；测试工程启用） ---- */
 

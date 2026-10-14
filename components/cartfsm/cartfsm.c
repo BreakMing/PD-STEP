@@ -3,7 +3,7 @@
  *
  * 并发布局：exec 回调运行在 comm_task（CPU0）；监督任务运行在
  * CPU1。共享状态用 s_lock 自旋锁保护写入；模式枚举读取原子。
- * motor / cartproto 发送均为线程安全接口。
+ * cartaxis / cartproto 发送均为线程安全接口。
  *
  * FAULT 停机次序（契约）：目标斜坡置 0（电机加速度临时切到
  * WDT_DEC 档）→ 监督任务等速度精确为零 → EN 关 → 推 MODE 行。
@@ -22,7 +22,7 @@
 
 #include "cartpos.h"
 #include "poleang.h"
-#include "motor.h"
+#include "cartaxis.h"
 #include "cartproto.h"
 
 static const char *TAG = "cartfsm";
@@ -85,10 +85,9 @@ static void soft_window(const fw_params_t *p, long *min_um, long *max_um)
 static void params_apply_engine(void)
 {
     const fw_params_t *p = fw_params();
-    motor_set_accel_mm_s2(p->acc_max);
-    motor_set_decel_mm_s2(p->wdt_dec);
-    motor_set_wdt_ms(p->wdt_ms);
-    motor_set_dir_invert(p->x_inv != 0);
+    cartaxis_set_accel_mm_s2(p->acc_max);
+    cartaxis_set_decel_mm_s2(p->wdt_dec);
+    cartaxis_set_wdt_ms(p->wdt_ms);
 }
 
 /* 软限位钳制收口：读当前位置、按窗口钳制 v、持锁提交 s_last_cmd_v、
@@ -106,7 +105,7 @@ static void clamp_and_commit_velocity(long v_mm_s)
     s_last_cmd_v = eff;
     portEXIT_CRITICAL(&s_lock);
 
-    motor_set_vel_mm_s(eff);
+    cartaxis_set_vel_mm_s(eff);
 }
 
 /* 监督拍软限位持续钳制：当前目标被窗口钳为不同值时斜坡停并清
@@ -134,7 +133,7 @@ static void supervise_soft_limit(const fw_params_t *p)
         }
         portEXIT_CRITICAL(&s_lock);
         if (still_old) {
-            motor_halt();
+            cartaxis_halt();
         }
     }
 }
@@ -144,16 +143,13 @@ static void params_apply_one(const char *name)
     const fw_params_t *p = fw_params();
     switch (fw_params_find(name)) {
     case FP_ACC_MAX:
-        motor_set_accel_mm_s2(p->acc_max);
+        cartaxis_set_accel_mm_s2(p->acc_max);
         break;
     case FP_WDT_DEC:
-        motor_set_decel_mm_s2(p->wdt_dec);
+        cartaxis_set_decel_mm_s2(p->wdt_dec);
         break;
     case FP_WDT_MS:
-        motor_set_wdt_ms(p->wdt_ms);
-        break;
-    case FP_X_INV:
-        motor_set_dir_invert(p->x_inv != 0);
+        cartaxis_set_wdt_ms(p->wdt_ms);
         break;
     case FP_VEL_MAX:
         /* 运行中收紧 VEL_MAX 立即约束当前运动（protocol.md 收紧语义） */
@@ -187,8 +183,8 @@ static void enter_fault(cm_reason_t r)
 
     /* 次序 ①：目标斜坡置 0，以 WDT_DEC 档减速 */
     const fw_params_t *p = fw_params();
-    motor_set_accel_mm_s2(p->wdt_dec);
-    motor_halt();
+    cartaxis_set_accel_mm_s2(p->wdt_dec);
+    cartaxis_halt();
     /* ②③（等 vel_now==0 → EN 关 → 推 MODE）由监督任务完成 */
 }
 
@@ -253,7 +249,7 @@ static void exec_mark_right(void)
      * 在右端，传 +L/2 即得「右端=+L/2、中点=0、左端=−L/2」；
      * C 同步到 E 的新读数，保持 E−C=0 */
     cartpos_set_origin_mm((float)l / 2.0f / 1000.0f);
-    motor_set_position_um(l / 2);
+    cartaxis_set_position_um(l / 2);
     cartproto_send_ok("MARK_RIGHT", l);
 }
 
@@ -273,8 +269,8 @@ static void exec_enable(void)
     }
     /* C 重锚到 E：先于模式发布——监督任务见 READY 即按拍判定，
      * 携旧 C 会在首拍 STEP_LOSS 误报（标定后手挪过的窗口） */
-    motor_set_position_um((long)cartpos_position_um());
-    motor_enable(true);
+    cartaxis_set_position_um((long)cartpos_position_um());
+    cartaxis_enable(true);
     portENTER_CRITICAL(&s_lock);
     s_mode = CM_READY;
     s_reason = CR_NONE;
@@ -297,8 +293,8 @@ static void exec_reset(void)
     s_last_cmd_v = 0;
     portEXIT_CRITICAL(&s_lock);
 
-    motor_stop();               /* 斜坡未完也立即急停 */
-    motor_enable(false);
+    cartaxis_stop();               /* 斜坡未完也立即急停 */
+    cartaxis_enable(false);
     params_apply_engine();       /* 恢复 ACC_MAX 档等 */
     push_mode(CM_DISABLED, CR_NONE);
 }
@@ -396,7 +392,7 @@ static void fsm_task(void *arg)
 #ifdef CONFIG_CARTFSM_TEST_HOOKS
                 e_um = consume_test_bias(e_um);
 #endif
-                long c_um = (long)motor_cmd_position_um();
+                long c_um = (long)cartaxis_cmd_position_um();
                 if (cm_step_loss(e_um, c_um, p->step_loss_um)) {
                     enter_fault(CR_STEP_LOSS);
                 } else {
@@ -409,9 +405,9 @@ static void fsm_task(void *arg)
              * 目标写入（exec_vel 锁外 set_vel 可晚于 enter_fault
              * 的 halt，穿透后不能只靠 WDT 兜底）→ 等零 → EN 关 →
              * 推 MODE */
-            motor_halt();
-            if (motor_at_rest()) {
-                motor_enable(false);
+            cartaxis_halt();
+            if (cartaxis_at_rest()) {
+                cartaxis_enable(false);
                 s_fault_settling = false;
                 cm_reason_t r = s_reason;
                 push_mode(CM_FAULT, r);
@@ -476,11 +472,11 @@ esp_err_t cartfsm_start(void)
         return ESP_OK;
     }
 
-    /* 上电默认 DISABLED、EN 关。motor_enable 的返回值仅在电机实现
+    /* 上电默认 DISABLED、EN 关。cartaxis_enable 的返回值仅在电机实现
      * 未初始化时非 ESP_OK，而 app_main 已先经 ESP_ERROR_CHECK(
      * motor_tmc2209_init) 完成初始化——本文件全部 EN 调用点
      * （exec_enable/exec_reset/settling）同此前提，忽略安全。 */
-    motor_enable(false);
+    cartaxis_enable(false);
     params_apply_engine();
 
     cartproto_register_exec(exec_cmd);

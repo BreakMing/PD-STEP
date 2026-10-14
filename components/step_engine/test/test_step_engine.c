@@ -2,8 +2,8 @@
  * step_engine 单元测试（官方 test/ 子目录约定，仅测试工程编入）
  *
  * 纯函数向量（不依赖电机）+ ISR 级行为（间隔采样、看门狗、换向、
- * 急停、方向反转）。ISR 级用例只需脉冲发生器工作，电机可不使能、
- * 可不加 12V；位置计数与间隔采样均为逻辑量。
+ * 急停）。ISR 级用例只需脉冲发生器工作，电机可不使能、可不加 12V；
+ * 位置计数与间隔采样均为逻辑量。
  *
  * 依赖 CONFIG_STEP_ENGINE_TEST_HOOKS=y（测试工程默认开启）：ISR
  * 间隔采样与周期计数插桩。
@@ -14,7 +14,6 @@
 
 #include "unity.h"
 #include "esp_log.h"
-#include "driver/gpio.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
@@ -278,33 +277,5 @@ TEST_CASE("急停立即冻结且可重启", "[step]")
 
     step_engine_vel_halt();
     TEST_ASSERT_TRUE_MESSAGE(wait_stopped(2000), "收尾停");
-    log_isr_stats();
-}
-
-/* ---- 7. 方向反转（X_INV 作用点）：开关立即翻转 DIR 电平（评审
- *      Critical 回归锚点：陈旧电平使首个同向运动转向与计数相反），
- *      且 +200 命令位置应减少 ---- */
-TEST_CASE("方向反转：DIR 电平即时翻转与计数反向", "[step]")
-{
-    settle();
-    int lvl0 = gpio_get_level(CONFIG_BSP_DIR_GPIO);
-    step_engine_set_dir_invert(true);
-    TEST_ASSERT_TRUE_MESSAGE(gpio_get_level(CONFIG_BSP_DIR_GPIO) != lvl0,
-                             "翻转 X_INV 应立即翻转 DIR 电平");
-
-    step_engine_vel_set_accel(2000);
-    step_engine_vel_target(STEPS(200));
-    vTaskDelay(pdMS_TO_TICKS(400));
-
-    int32_t p0 = step_engine_position_steps();
-    vTaskDelay(pdMS_TO_TICKS(200));
-    TEST_ASSERT_TRUE_MESSAGE(step_engine_position_steps() < p0,
-                             "反转后 +命令 应使位置减少");
-
-    step_engine_vel_halt();
-    TEST_ASSERT_TRUE_MESSAGE(wait_stopped(2000), "收尾停");
-    step_engine_set_dir_invert(false);
-    TEST_ASSERT_TRUE_MESSAGE(gpio_get_level(CONFIG_BSP_DIR_GPIO) == lvl0,
-                             "恢复 X_INV 电平复原");
     log_isr_stats();
 }

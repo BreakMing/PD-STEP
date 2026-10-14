@@ -13,8 +13,7 @@
  * STEP 脉冲：HIGH → 1 µs → LOW。DIR 换向先置 DIR，第一拍 dt 加
  * 2 µs setup（不在 ISR 里忙等，由定时时间保证建立时间）。
  *
- * 位置计数：物理域（逻辑方向 ^ 反转），DIR 高 = 正。32 位对齐写，
- * 任务上下文原子读。
+ * 位置计数：DIR 高 = 正。32 位对齐写，任务上下文原子读。
  */
 
 #include "step_engine.h"
@@ -55,10 +54,7 @@ static const char *TAG = "step_engine";
 static int s_step_gpio = -1;
 static int s_dir_gpio  = -1;
 
-/* 方向反转（X_INV，cartfsm 写） */
-static volatile bool s_dir_invert = false;
-
-/* 最近一次输出的物理 DIR 电平（换向 setup 检测用） */
+/* 最近一次输出的 DIR 电平（换向 setup 检测用） */
 static bool s_last_out_dir = false;
 
 /* ---- 速度模式状态 ----
@@ -70,13 +66,13 @@ static bool s_last_out_dir = false;
 static volatile uint64_t s_target_q16 = 0;   /* 目标速率幅值 */
 static volatile bool     s_target_dir = true;
 static uint64_t s_v_q16 = 0;                 /* 最近一步速率幅值 */
-static bool     s_dir = false;               /* 当前运动方向（逻辑域） */
+static bool     s_dir = false;               /* 当前运动方向 */
 static uint32_t s_accel = DEFAULT_ACCEL;     /* steps/s² */
 static uint32_t s_decel = DEFAULT_ACCEL;
 static uint32_t s_wdt_us = 0;                /* 0 = 看门狗关闭 */
 static volatile uint64_t s_last_kick_us = 0; /* 最近喂狗时刻（µs 域） */
 
-/* 位置计数（物理域，带符号累计） */
+/* 位置计数（带符号累计） */
 static volatile int32_t s_position = 0;
 
 /* 停止标志（ISR 首先检查） */
@@ -127,9 +123,8 @@ static volatile uint32_t s_isr_pulse_count = 0;
 
 static inline void set_dir_physical(bool logical_dir)
 {
-    bool physical = logical_dir ^ s_dir_invert;
-    gpio_set_level((gpio_num_t)s_dir_gpio, physical ? 1 : 0);
-    s_last_out_dir = physical;
+    gpio_set_level((gpio_num_t)s_dir_gpio, logical_dir ? 1 : 0);
+    s_last_out_dir = logical_dir;
 }
 
 /* ================================================================
@@ -242,8 +237,8 @@ static bool gptimer_alarm_cb(gptimer_handle_t timer,
     esp_rom_delay_us(1);
     gpio_set_level((gpio_num_t)s_step_gpio, 0);
 
-    /* 位置计数：物理域（DIR 高 = 正） */
-    if (s_dir ^ s_dir_invert) {
+    /* 位置计数（DIR 高 = 正） */
+    if (s_dir) {
         s_position++;
     } else {
         s_position--;
@@ -461,13 +456,12 @@ int64_t step_engine_vel_now_q16(void)
     bool stopped = s_stopped;
     uint64_t v = s_v_q16;
     bool dir = s_dir;
-    bool invert = s_dir_invert;
     portEXIT_CRITICAL(&s_spinlock);
 
     if (stopped || v == 0) {
         return 0;
     }
-    return (dir ^ invert) ? (int64_t)v : -(int64_t)v;
+    return dir ? (int64_t)v : -(int64_t)v;
 }
 
 void step_engine_stop(void)
@@ -498,16 +492,6 @@ void step_engine_set_position(int32_t steps)
     /* 调用约定：引擎停止时调用（回零完成路径），无 ISR 竞争；
      * 32 位对齐写本身原子 */
     s_position = steps;
-}
-
-void step_engine_set_dir_invert(bool invert)
-{
-    /* 立即刷新 DIR 引脚电平：只改标志会留陈旧电平，首个同向运动
-     * （如 X_INV=1 台位上电即 HOME）实际转向与位置计数相反。 */
-    portENTER_CRITICAL(&s_spinlock);
-    s_dir_invert = invert;
-    set_dir_physical(s_dir);
-    portEXIT_CRITICAL(&s_spinlock);
 }
 
 /* ================================================================
