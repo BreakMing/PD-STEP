@@ -275,12 +275,3 @@ spi_host_device_t bsp_get_spi_host(void)
 {
     return s_spi_initialized ? BSP_SPI_HOST : (spi_host_device_t)-1;
 }
-
-/* ================================================================
- * TMC2209 EN control
- * ================================================================ */
-void bsp_tmc_en_set(bool enable)
-{
-    /* ENN is active low: enable=true → GPIO low */
-    gpio_set_level(BSP_PIN_EN, enable ? 0 : 1);
-}
