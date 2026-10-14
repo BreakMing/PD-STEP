@@ -668,7 +668,7 @@ int main(void)
 - [ ] **Step 2: 跑测试确认失败**
 
 ```bash
-gcc -std=c11 -Wall -Wextra -Icomponents/motor/include host_tests/motor_conv_test.c components/motor/motor_conv.c -o /tmp/mct && /tmp/mct; echo exit=$?
+gcc -std=c11 -Wall -Wextra -Icomponents/motor/include host_tests/motor_conv_test.c components/motor/motor_conv.c -lm -o /tmp/mct && /tmp/mct; echo exit=$?
 ```
 
 预期：编译失败 `motor_conv.h: No such file or directory`（红）。
@@ -750,7 +750,7 @@ idf_component_register(SRCS "motor_conv.c"
 - [ ] **Step 4: 跑测试确认通过**
 
 ```bash
-gcc -std=c11 -Wall -Wextra -Icomponents/motor/include host_tests/motor_conv_test.c components/motor/motor_conv.c -o /tmp/mct && /tmp/mct; echo exit=$?
+gcc -std=c11 -Wall -Wextra -Icomponents/motor/include host_tests/motor_conv_test.c components/motor/motor_conv.c -lm -o /tmp/mct && /tmp/mct; echo exit=$?
 ```
 
 预期：`PASS: 15 用例, 0 失败`，exit=0。
@@ -1191,7 +1191,7 @@ gcc -std=c11 -Wall -Wextra -Icomponents/mt6835/include host_tests/mt6835_crc_tes
 gcc -std=c11 -Wall -Wextra -Icomponents/mt6835/include host_tests/mt6835_urad_test.c components/mt6835/mt6835_urad.c -o /tmp/t4 && /tmp/t4; echo t4=\$?; \
 gcc -std=c11 -Wall -Wextra -Ihost_tests/stub -Icomponents/as5600/include -Icomponents/telemetry/include host_tests/telemetry_format_test.c components/telemetry/telemetry_format.c -o /tmp/t5 && /tmp/t5; echo t5=\$?; \
 gcc -std=c11 -Wall -Wextra -Icomponents/step_engine/include host_tests/vel_ramp_test.c components/step_engine/vel_ramp.c -o /tmp/t6 && /tmp/t6; echo t6=\$?; \
-gcc -std=c11 -Wall -Wextra -Icomponents/motor/include host_tests/motor_conv_test.c components/motor/motor_conv.c -o /tmp/t7 && /tmp/t7; echo t7=\$?"
+gcc -std=c11 -Wall -Wextra -Icomponents/motor/include host_tests/motor_conv_test.c components/motor/motor_conv.c -lm -o /tmp/t7 && /tmp/t7; echo t7=\$?"
 ```
 
 预期：七个全部退出码 0。
