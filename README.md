@@ -35,14 +35,20 @@ components/
   cartfsm/      三态模式机：纯核心（转换表/标定合法性/软限位窗口/丢步）
                 + 1 kHz 监督任务（标定状态/编码器失联/
                 丢步/软限位/FAULT 次序）
+  cartpos/      小车位置域：契约头 + AS5600 实现（Kconfig choice）
+  poleang/      摆角域：契约头 + MT6835 实现（含 POLE_ZERO/POLE_INV 标定）
+  motor/        电机运动域：契约头 + TMC2209+GPTimer 实现 + mm↔steps
+                换算纯函数（motor_conv，宿主可测）
   step_engine/  GPTimer ISR 速度模式：vel_ramp 每步递推（纯函数）+
-                带符号目标 + 命令看门狗 + 换向经零速
+                带符号目标 + 命令看门狗 + 换向经零速（器件驱动，经 motor 组合）
   as5600/       小车编码器 1 kHz 采样（多圈计数 + 16 ms 速度窗）
+                （器件驱动，经 cartpos 组合）
   mt6835/       摆角编码器 1 kHz SPI 采样（帧格式抄录见
                 docs/reviews/T4-brief.md）+ ±π 环绕换算（纯函数）
+                （器件驱动，经 poleang 组合）
   telemetry/    200 Hz STATE 组帧（纯函数 + 常开任务）
   settings/     NVS 机械参数（$0–$4：细分/整步/每转行程/电流）
-  tmc2209/      驱动配置（电流/细分）
+  tmc2209/      驱动配置（电流/细分/EN）（器件驱动，经 motor 组合）
   <每个组件>/test/  组件单元测试（Unity，仅测试工程编入）
 main/app_main.c 启动接线（纯业务，无测试代码）
 test/           独立测试工程（TEST_COMPONENTS + Unity 菜单）

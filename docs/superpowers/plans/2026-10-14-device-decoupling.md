@@ -1241,11 +1241,13 @@ git commit -m "解耦收尾：README 工程结构补三域组件，计划验证�
 
 ## 附录 B：验证记录回填
 
+环境：Windows 11 + ESP-IDF v6.1（`C:\esp\v6.1\esp-idf`）+ Ninja；宿主测试 WSL gcc 13.3.0。构建与宿主命令见 Global Constraints 与 Task 6 Step 1。
+
 | 任务 | 日期 | 环境 | 命令与结果 | 上板项 |
 |---|---|---|---|---|
-| Task 1 | 待填 | 待填 | 待填 | 附录 A 1 |
-| Task 2 | 待填 | 待填 | 待填 | 附录 A 2 |
-| Task 3 | 待填 | 待填 | 待填 | — |
-| Task 4 | 待填 | 待填 | 待填 | 附录 A 6 |
-| Task 5 | 待填 | 待填 | 待填 | 附录 A 4/5 |
-| Task 6 | 待填 | 待填 | 待填 | 附录 A 全部 |
+| Task 1 | 2026-10-14 | 同上 | 主工程 `idf.py -B build build` → Project build complete；测试工程 `idf.py -C test build` → Project build complete | 附录 A 1 待上板 |
+| Task 2 | 2026-10-14 | 同上 | 双工程 build → Project build complete；telemetry_format 宿主 15/15（exit=0，含 i2c_master 桩） | 附录 A 2 待上板 |
+| Task 3 | 2026-10-14 | 同上 | motor_conv 宿主 RED（头文件缺失）→ GREEN PASS 15/15（exit=0）；主工程 build → Project build complete | — |
+| Task 4 | 2026-10-14 | 同上 | 双工程 build → Project build complete | 附录 A 6 待上板 |
+| Task 5 | 2026-10-14 | 同上 | 双工程 build → Project build complete；cartfsm_core+params 宿主 87/87（exit=0） | 附录 A 4/5 待上板 |
+| Task 6 | 2026-10-14 | 同上 | host 七测全绿：87/64/2/19/15/48/15（exit=0 × 7）；双工程 build → Project build complete × 2 | 附录 A 全部待上板 |
