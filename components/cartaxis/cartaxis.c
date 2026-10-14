@@ -5,11 +5,19 @@
  * 即时生效）；$0 变更时静止则回调内立即「推细分→按新单位重定基
  * （µm 值不变）」，运动中先斜坡停并挂起，此后任意入口在静止时应用
  * （cartfsm 监督任务 1 kHz 调用读数，滞后 ≤ 数拍；DISABLED 必静止，
- * 回调内即完成）。细分写失败放弃本次并告警（多为链路故障，bringup
- * 诊断后重设 $0 恢复）。
+ * 回调内即完成）。细分写失败放弃本次并告警，链路恢复后重设 $0 恢复。
+ *
+ * 换算单一权威：steps_per_mm 用已写入芯片的细分档（s_applied_
+ * microstep）与当前 $1/$2 派生。settings 的值提交先于通知到达
+ * （settings.c：s_values[idx] 赋值后才 notify），$0 变更回调里
+ * settings_steps_per_mm() 已是新档——直接使用会把旧档步数按新系数
+ * 换算，µm 不保持；按 applied 档派生则挂起等待与写失败期间读数
+ * 都保持旧档换算，应用完成后 µm 无跳变。
  */
 #include "cartaxis.h"
 #include "cartaxis_conv.h"
+
+#include "freertos/FreeRTOS.h"
 
 #include "esp_log.h"
 
@@ -19,11 +27,18 @@
 static const char *TAG = "cartaxis";
 
 static motor_handle_t s_m;
+static int s_applied_microstep;               /* 已写入芯片的细分档 */
 static volatile bool s_pending_microstep = false;
+
+/* apply 串行化：settings 回调（通讯任务上下文）与 cartaxis 入口
+ * （监督/通讯任务）可并发到达；后到者直接返回，语义由先到者完成 */
+static portMUX_TYPE s_apply_lock = portMUX_INITIALIZER_UNLOCKED;
+static bool s_apply_busy = false;
 
 static double spm(void)
 {
-    return (double)settings_steps_per_mm();
+    return (double)settings_full_steps() * (double)s_applied_microstep
+           / (double)settings_units_per_rev();
 }
 
 static long sgn(void)
@@ -39,15 +54,34 @@ static long raw_cmd_um(void)
 
 static void apply_microstep_now(void)
 {
-    s_pending_microstep = false;
-    long um = raw_cmd_um();
-
-    esp_err_t err = motor_set_microstep(s_m, settings_microstep());
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "细分写入失败（%d）——保持旧档，链路恢复后重设 $0", err);
+    portENTER_CRITICAL(&s_apply_lock);
+    if (s_apply_busy) {
+        portEXIT_CRITICAL(&s_apply_lock);
         return;
     }
+    s_apply_busy = true;
+    portEXIT_CRITICAL(&s_apply_lock);
+
+    s_pending_microstep = false;
+    long um = raw_cmd_um();   /* 旧档换算（s_applied_microstep 尚未更新） */
+
+    int ms = settings_microstep();
+    esp_err_t err = motor_set_microstep(s_m, ms);
+    if (err != ESP_OK) {
+        /* 芯片档与换算一并保持旧值（applied 未更新）——读数仍自洽 */
+        ESP_LOGE(TAG, "细分写入失败（%d）——保持旧档 %d，换算不变，"
+                      "链路恢复后重设 $0 恢复", err, s_applied_microstep);
+        portENTER_CRITICAL(&s_apply_lock);
+        s_apply_busy = false;
+        portEXIT_CRITICAL(&s_apply_lock);
+        return;
+    }
+    s_applied_microstep = ms;
     cartaxis_set_position_um(um);   /* 静止下按新单位重定基，µm 值不变 */
+
+    portENTER_CRITICAL(&s_apply_lock);
+    s_apply_busy = false;
+    portEXIT_CRITICAL(&s_apply_lock);
 }
 
 static void maybe_apply_pending(void)
@@ -74,6 +108,10 @@ static void on_settings_change(int idx, float new_value)
 void cartaxis_init(motor_handle_t m)
 {
     s_m = m;
+    /* tmc2209 上电经 config（组装点从 settings 读取）已推同值 */
+    s_applied_microstep = settings_microstep();
+    ESP_LOGI(TAG, "细分档 %d 已生效，steps_per_mm=%.1f（换算按已生效档）",
+             s_applied_microstep, spm());
     if (!settings_subscribe(on_settings_change)) {
         ESP_LOGW(TAG, "settings 订阅失败（槽满）——$0 变更不会生效");
     }

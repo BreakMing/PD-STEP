@@ -246,9 +246,19 @@ TEST_CASE("theta 合法域 ±π 与解释层对拍", "[mt6835]")
         TEST_ASSERT_TRUE_MESSAGE(vth > -1000000 && vth < 1000000,
                                  "vth 应为有限值");
         if (i % 500 == 0) {
-            TEST_ASSERT_EQUAL_INT(
-                mt6835_raw_to_urad(magnetic_encoder_mt6835_last_raw(h), 0, false),
-                th);
+            /* 两读竞态：theta 与 last_raw 各自取锁，两次读取间 1 kHz
+             * 采样可插入新样本（运动中恰跨 ±π 环绕点更甚）——按
+             * ±1 count（≈3 µrad）环绕感知容差断言 */
+            int32_t expect = mt6835_raw_to_urad(
+                magnetic_encoder_mt6835_last_raw(h), 0, false);
+            int64_t d = (int64_t)expect - th;
+            if (d > 3141593) {
+                d -= 6283185;
+            } else if (d < -3141593) {
+                d += 6283185;
+            }
+            TEST_ASSERT_TRUE_MESSAGE(d >= -4 && d <= 4,
+                                     "对拍差超 ±1 count 容差");
         }
         vTaskDelay(pdMS_TO_TICKS(1));
     }

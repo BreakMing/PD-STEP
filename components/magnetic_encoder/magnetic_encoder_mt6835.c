@@ -48,7 +48,7 @@ typedef struct {
     struct magnetic_encoder_s ops;
     uint32_t raw21;                  /* 最新原始角 */
     int64_t  pos_counts;             /* 多圈连续位置 */
-    int32_t  hist[ME_MT6835_HIST_LEN];
+    int64_t  hist[ME_MT6835_HIST_LEN];   /* 速度窗样本与位置同为 64 位域 */
     int      hist_head;
     int      hist_fill;
     int32_t  vel_counts_per_s;
@@ -92,7 +92,7 @@ static void publish(uint32_t raw21, uint8_t status)
     s_state.pos_counts += diff;
 
     s_state.hist_head = (s_state.hist_head + 1) % ME_MT6835_HIST_LEN;
-    s_state.hist[s_state.hist_head] = (int32_t)s_state.pos_counts;
+    s_state.hist[s_state.hist_head] = s_state.pos_counts;
     if (s_state.hist_fill < ME_MT6835_HIST_LEN) {
         s_state.hist_fill++;
     }

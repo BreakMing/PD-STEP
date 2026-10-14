@@ -1,4 +1,4 @@
-menu "motor - 电机运动域"
+menu "motor - 步进电机类别"
 
 choice MOTOR_IMPL
     prompt "电机驱动实现"
