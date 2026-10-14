@@ -56,6 +56,9 @@ static void apply_microstep_now(void)
 {
     portENTER_CRITICAL(&s_apply_lock);
     if (s_apply_busy) {
+        /* 并发到达的第二条 $0 变更挂起待补推（幂等：下次入口重记 µm
+         * → 重推 settings 当前档 → µm 不变），不得静默丢弃 */
+        s_pending_microstep = true;
         portEXIT_CRITICAL(&s_apply_lock);
         return;
     }

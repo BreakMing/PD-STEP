@@ -168,11 +168,17 @@ int main(void)
     CHECK_EQ(g_pos_steps, 6400);                   /* 位置不重写 */
     CHECK_EQ(cartaxis_cmd_position_um(), 40000);   /* 旧档换算读数自洽 */
 
-    /* ---- E $2 变更：仅系数即时变化（spm 160→320），不推细分 ---- */
+    /* ---- D2 写失败后重设 $0 恢复（附录 C 恢复语义锚定） ---- */
     g_write_fail = 0;
+    stub_settings_set(SET_MICROSTEP, 8);
+    CHECK_EQ(g_chip_ms, 8);                        /* 重设即走正常应用路径 */
+    CHECK_EQ(g_pos_steps, 1600);                   /* 40000 µm × 40 / 1000 */
+    CHECK_EQ(cartaxis_cmd_position_um(), 40000);   /* µm 仍不变 */
+
+    /* ---- E $2 变更：仅系数即时变化（spm 40→80），不推细分 ---- */
     stub_settings_set(SET_MM_PER_REV, 20.0f);
-    CHECK_EQ(g_chip_ms, 32);                       /* 不推细分 */
-    CHECK_EQ(cartaxis_cmd_position_um(), 20000);   /* 6400 × 1000 / 320：行程定义减半 */
+    CHECK_EQ(g_chip_ms, 8);                        /* 不推细分 */
+    CHECK_EQ(cartaxis_cmd_position_um(), 20000);   /* 1600 × 1000 / 80：行程定义减半 */
 
     printf("%s: %d 用例, %d 失败\n", s_fail ? "FAIL" : "PASS", s_run, s_fail);
     return s_fail;
