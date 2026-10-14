@@ -26,6 +26,8 @@ typedef struct {
     int      uart_num;     /* UART port number, e.g. UART_NUM_2 */
     int      tx_pin;       /* TX GPIO (through 1kΩ to PDN_UART) */
     int      rx_pin;       /* RX GPIO (direct from PDN_UART) */
+    int      en_gpio;      /* ENN (active low); pin direction is configured
+                              by bsp_init, only the level is driven here */
     int      baud;         /* Baud rate, default 115200 */
     uint8_t  slave_addr;   /* Slave address, default 0 */
     float    r_sense;      /* Sense resistor value in ohms */

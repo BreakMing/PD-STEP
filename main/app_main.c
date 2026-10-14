@@ -3,8 +3,8 @@
  *
  * 启动次序：bsp_early_init（EN 拉高 = 电机不使能，任何外设动作之前）
  * → settings_init → bsp_init → cartpos_as5600_init →
- * poleang_mt6835_init → tmc2209_init → cartproto_start →
- * step_engine_init → cartfsm_start → telemetry_start。测试代码不编入
+ * poleang_mt6835_init → motor_tmc2209_init → cartproto_start →
+ * cartfsm_start → telemetry_start。测试代码不编入
  * 正式固件（见 test/ 独立测试工程）。
  */
 
@@ -12,8 +12,7 @@
 #include "driver/uart.h"
 #include "bsp.h"
 #include "settings.h"
-#include "tmc2209.h"
-#include "step_engine.h"
+#include "motor_tmc2209.h"
 #include "cartpos_as5600.h"
 #include "poleang_mt6835.h"
 #include "telemetry.h"
@@ -41,17 +40,21 @@ void app_main(void)
             .spics_io_num  = CONFIG_BSP_MT6835_CS_GPIO,
         };
         ESP_ERROR_CHECK(poleang_mt6835_init(&pol));
-        tmc2209_config_t tmc = {
-            .uart_num = UART_NUM_2,   /* 端口分配：UART0=烧录/日志、UART1=协议、UART2=TMC */
-            .tx_pin = CONFIG_BSP_TMC_UART_TX_GPIO,
-            .rx_pin = CONFIG_BSP_TMC_UART_RX_GPIO,
-            .baud = 115200,
-            .slave_addr = 0,
-            .r_sense = CONFIG_TMC2209_RSENSE,
+        motor_tmc2209_config_t mot = {
+            .tmc = {
+                .uart_num = UART_NUM_2,   /* 端口分配：UART0=烧录/日志、UART1=协议、UART2=TMC */
+                .tx_pin = CONFIG_BSP_TMC_UART_TX_GPIO,
+                .rx_pin = CONFIG_BSP_TMC_UART_RX_GPIO,
+                .en_gpio = CONFIG_BSP_EN_GPIO,
+                .baud = 115200,
+                .slave_addr = 0,
+                .r_sense = CONFIG_TMC2209_RSENSE,
+            },
+            .step_gpio = CONFIG_BSP_STEP_GPIO,
+            .dir_gpio = CONFIG_BSP_DIR_GPIO,
         };
-        ESP_ERROR_CHECK(tmc2209_init(&tmc));
+        ESP_ERROR_CHECK(motor_tmc2209_init(&mot));
         ESP_ERROR_CHECK(cartproto_start());
-        ESP_ERROR_CHECK(step_engine_init(CONFIG_BSP_STEP_GPIO, CONFIG_BSP_DIR_GPIO));
         ESP_ERROR_CHECK(cartfsm_start());
         ESP_ERROR_CHECK(telemetry_start());
     }

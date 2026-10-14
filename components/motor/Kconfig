@@ -1,0 +1,12 @@
+menu "motor - 电机运动域"
+
+choice MOTOR_IMPL
+    prompt "电机驱动实现"
+    default MOTOR_IMPL_TMC2209
+
+config MOTOR_IMPL_TMC2209
+    bool "TMC2209（UART）+ GPTimer STEP/DIR 引擎"
+
+endchoice
+
+endmenu

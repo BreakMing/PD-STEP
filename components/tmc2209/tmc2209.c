@@ -1,11 +1,12 @@
 /*
- * TMC2209 — 业务壳：寄存器配置策略 + settings 订阅
+ * tmc2209 设备组件：寄存器配置策略 + $0/$3/$4 订阅；EN 引脚经
+ * config 的 en_gpio 注入（引脚方向由 bsp_init 配置，本组件只驱动电平）。
  *
  * UART 帧格式、回声处理与通用寄存器读写原语在 tmc2209_hw.c
  * （驱动核心层：参数全由 config 注入，不碰 settings/bsp/任务）。
  * 本文件持有：寄存器地址与位域语义、上电默认配置策略（GCONF/
  * CHOPCONF/IHOLD_IRUN/TPOWERDOWN/TPWMTHRS/PWMCONF）、电流与细分
- * 功能层（含 VSENSE 自动分档）、EN 引脚（bsp）以及 $0/$3/$4 的
+ * 功能层（含 VSENSE 自动分档）、EN 使能以及 $0/$3/$4 的
  * settings 订阅。
  */
 
@@ -20,7 +21,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
-#include "bsp.h"
+#include "driver/gpio.h"
 #include "settings.h"
 
 static const char *TAG = "tmc2209";
@@ -122,7 +123,7 @@ static const char *TAG = "tmc2209";
  * Internal state
  * ================================================================ */
 
-static tmc2209_config_t s_cfg;      /* 业务壳只使用其中的 r_sense */
+static tmc2209_config_t s_cfg;      /* 只使用其中的 r_sense 与 en_gpio */
 static bool s_initialized = false;
 static bool s_vsense = false;   /* Current VSENSE setting (cached) */
 
@@ -261,7 +262,8 @@ esp_err_t tmc2209_enable(bool en)
 {
     if (!s_initialized) return ESP_ERR_INVALID_STATE;
 
-    bsp_tmc_en_set(en);
+    /* ENN 低有效；引脚方向由 bsp_init 配置，这里只驱动电平 */
+    gpio_set_level(s_cfg.en_gpio, en ? 0 : 1);
 
     if (en) {
         /* Datasheet: wait for driver to wake up after EN low */
