@@ -16,18 +16,22 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include "esp_err.h"
+#include "driver/spi_master.h"
 #include "mt6835_urad.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-/**
- * @brief 在 bsp 的 SPI 总线上添加设备并启动 1 kHz 采样任务。幂等。
- *
- * @return ESP_OK；ESP_ERR_INVALID_STATE 总线未初始化；否则 SPI/任务错误。
- */
-esp_err_t mt6835_init(void);
+/* 接线参数（组装点读取 Kconfig 宏与 bsp 主机号后注入） */
+typedef struct {
+    spi_host_device_t host;
+    int               clock_speed_hz;
+    int               spics_io_num;
+} mt6835_config_t;
+
+/** 幂等。接线经 config 注入并启动 1 kHz 采样任务。 */
+esp_err_t mt6835_init(const mt6835_config_t *cfg);
 
 /**
  * @brief 最新摆角（±π 环绕 µrad，标定前原始角）。

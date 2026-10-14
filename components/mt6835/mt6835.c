@@ -1,9 +1,10 @@
 /*
- * mt6835 — 业务壳：1 kHz 采样任务 + 多圈位置/速度估计
+ * mt6835 设备组件：1 kHz 采样任务 + 多圈位置/速度估计；接线经
+ * mt6835_config_t 注入（组装点读 Kconfig 宏与 bsp 主机号）。
  *
  * 纯传感器职责：读原始 21-bit 角、±π 环绕换算（标定前的原始角）、
  * 16 样本窗口角速度估计、连续失败 ≥10 次的 is_ok。零位/符号标定
- * （POLE_ZERO_URAD / POLE_INV）由 telemetry 组帧时应用，
+ * （POLE_ZERO_URAD / POLE_INV）由 poleang 域实现应用，
  * 本组件不读参数。
  *
  * SPI 帧格式与校验（OP_ANGLE/ANGLE1 突发、全零帧与 CRC 拒收、
@@ -25,8 +26,6 @@
 #include "esp_log.h"
 #include "esp_check.h"
 #include "esp_task_wdt.h"
-
-#include "bsp.h"
 
 static const char *TAG = "mt6835";
 
@@ -165,23 +164,20 @@ static void mt6835_task(void *arg)
  * 生命周期
  * ================================================================ */
 
-esp_err_t mt6835_init(void)
+esp_err_t mt6835_init(const mt6835_config_t *cfg)
 {
     if (s_initialized) {
         return ESP_OK;
     }
-
-    spi_host_device_t host = bsp_get_spi_host();
-    if (host < 0) {
-        ESP_LOGE(TAG, "SPI 总线未初始化（bsp_get_spi_host() < 0）");
-        return ESP_ERR_INVALID_STATE;
+    if (cfg == NULL || cfg->host < 0) {
+        return ESP_ERR_INVALID_ARG;
     }
 
     /* 帧层（驱动核心）：时钟/CS 由 config 注入 */
     mt6835_hw_config_t hw = {
-        .host          = host,
-        .clock_speed_hz = CONFIG_BSP_MT6835_SPI_HZ,
-        .spics_io_num  = CONFIG_BSP_MT6835_CS_GPIO,
+        .host          = cfg->host,
+        .clock_speed_hz = cfg->clock_speed_hz,
+        .spics_io_num  = cfg->spics_io_num,
     };
     ESP_RETURN_ON_ERROR(mt6835_hw_init(&hw), TAG, "mt6835_hw_init 失败");
 

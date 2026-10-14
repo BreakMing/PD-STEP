@@ -1,0 +1,12 @@
+menu "poleang - 摆角域"
+
+choice POLEANG_IMPL
+    prompt "摆角编码器实现"
+    default POLEANG_IMPL_MT6835
+
+config POLEANG_IMPL_MT6835
+    bool "MT6835（SPI 磁编码器，21-bit）"
+
+endchoice
+
+endmenu

@@ -19,7 +19,7 @@
 #include "tmc2209.h"
 #include "step_engine.h"
 #include "cartpos_as5600.h"
-#include "mt6835.h"
+#include "poleang_mt6835.h"
 #include "telemetry.h"
 #include "cartproto.h"
 #include "cartfsm.h"
@@ -37,7 +37,12 @@ void app_main(void)
         .invert_dir   = cartpos_as5600_invert_dir_default(),
     };
     ESP_ERROR_CHECK(cartpos_as5600_init(&cpos));
-    ESP_ERROR_CHECK(mt6835_init());
+    poleang_mt6835_config_t pol = {
+        .host          = bsp_get_spi_host(),
+        .clock_speed_hz = CONFIG_BSP_MT6835_SPI_HZ,
+        .spics_io_num  = CONFIG_BSP_MT6835_CS_GPIO,
+    };
+    ESP_ERROR_CHECK(poleang_mt6835_init(&pol));
     tmc2209_config_t tmc = {
         .uart_num = UART_NUM_2,
         .tx_pin = CONFIG_BSP_TMC_UART_TX_GPIO,
