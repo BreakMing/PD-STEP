@@ -1,0 +1,12 @@
+menu "cartpos - 小车位置域"
+
+choice CARTPOS_IMPL
+    prompt "小车位置传感器实现"
+    default CARTPOS_IMPL_AS5600
+
+config CARTPOS_IMPL_AS5600
+    bool "AS5600（I2C 磁编码器，4096 counts/rev）"
+
+endchoice
+
+endmenu

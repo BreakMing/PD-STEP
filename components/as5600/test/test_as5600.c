@@ -196,8 +196,14 @@ TEST_CASE("A12 +2 圈再 −2 圈 → 0（方向对称）", "[as5600]")
 
 TEST_CASE("B13 I2C 总线在位 + as5600_init() OK", "[as5600]")
 {
+    as5600_config_t cfg = {
+        .bus          = bsp_get_i2c_bus(),
+        .dev_addr     = CONFIG_BSP_AS5600_I2C_ADDR,
+        .scl_speed_hz = CONFIG_BSP_I2C_FREQ_HZ,
+        .invert_dir   = AS5600_INVERT_DIR_DEFAULT != 0,
+    };
     TEST_ASSERT_NOT_NULL(bsp_get_i2c_bus());
-    TEST_ASSERT_EQUAL(ESP_OK, as5600_init());
+    TEST_ASSERT_EQUAL(ESP_OK, as5600_init(&cfg));
 }
 
 /* 只读（见 as5600.c 红线） */

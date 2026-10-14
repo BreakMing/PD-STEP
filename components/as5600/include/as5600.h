@@ -31,6 +31,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include "esp_err.h"
+#include "driver/i2c_master.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -75,17 +76,30 @@ int32_t as5600_tracker_update(as5600_tracker_t *t, uint16_t raw);
  * Driver + sampling task
  * ================================================================ */
 
+/* Kconfig 布尔在 n 时不定义，统一折算为编译期常量（组装点使用） */
+#ifdef CONFIG_AS5600_INVERT_DIR
+#define AS5600_INVERT_DIR_DEFAULT 1
+#else
+#define AS5600_INVERT_DIR_DEFAULT 0
+#endif
+
+/* 接线参数（组装点读取 Kconfig 宏与 bsp 总线句柄后注入） */
+typedef struct {
+    i2c_master_bus_handle_t bus;
+    uint16_t                dev_addr;
+    uint32_t                scl_speed_hz;
+    bool                    invert_dir;
+} as5600_config_t;
+
 /**
- * @brief Add the I2C device on the BSP bus and start the 1 kHz task.
+ * @brief 注入接线参数并启动 1 kHz 采样任务。幂等。
  *
- * Idempotent.  Uses bsp_get_i2c_bus() (must already be initialized by
- * bsp_init()).  mm/count comes from settings $2 and tracks runtime
- * changes via one settings subscription slot.
+ * mm/count 来自 settings $2，经一个订阅槽跟踪运行中变更。
  *
- * @return ESP_OK, ESP_ERR_INVALID_STATE if the bus is not ready,
- *         or an I2C / task-creation error.
+ * @return ESP_OK；cfg 为 NULL 或 bus 为 NULL 返回 ESP_ERR_INVALID_ARG；
+ *         其余错误码与迁移前一致（I2C / 任务创建错误）。
  */
-esp_err_t as5600_init(void);
+esp_err_t as5600_init(const as5600_config_t *cfg);
 
 /* ================================================================
  * Telemetry (consumed by T9 monitor)

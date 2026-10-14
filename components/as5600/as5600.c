@@ -1,5 +1,6 @@
 /*
- * AS5600 magnetic encoder — 业务壳：1 kHz 采样任务 + 标定 + settings 订阅
+ * AS5600 设备组件：1 kHz 采样任务 + 原点偏移 + $2 订阅；接线经
+ * as5600_config_t 注入（组装点读 Kconfig 宏与 bsp 总线句柄）。
  *
  * !! READ-ONLY DEVICE — RED LINE（红线细则与寄存器图见 as5600_hw.c）!!
  *   本组件对器件的唯一总线操作是只读的 as5600_hw_read_raw()；
@@ -28,7 +29,6 @@
 
 #include "as5600.h"
 #include "as5600_hw.h"
-#include "bsp.h"
 #include "settings.h"
 
 #include <math.h>
@@ -37,13 +37,6 @@
 #include "esp_log.h"
 #include "esp_check.h"
 #include "esp_task_wdt.h"
-
-/* Kconfig 布尔在 n 时不定义，统一折算为可用的编译期常量 */
-#ifdef CONFIG_AS5600_INVERT_DIR
-#define AS5600_DIR_INVERTED 1
-#else
-#define AS5600_DIR_INVERTED 0
-#endif
 
 static const char *TAG = "as5600";
 
@@ -196,24 +189,21 @@ static void as5600_task(void *arg)
 /* ================================================================
  * Lifecycle
  * ================================================================ */
-esp_err_t as5600_init(void)
+esp_err_t as5600_init(const as5600_config_t *cfg)
 {
     if (s_initialized) {
         return ESP_OK;
     }
-
-    i2c_master_bus_handle_t bus = bsp_get_i2c_bus();
-    if (bus == NULL) {
-        ESP_LOGE(TAG, "I2C bus not initialized (bsp_get_i2c_bus() == NULL)");
-        return ESP_ERR_INVALID_STATE;
+    if (cfg == NULL || cfg->bus == NULL) {
+        return ESP_ERR_INVALID_ARG;
     }
 
     /* 读层（驱动核心）：地址/时钟/方向镜像全由 config 注入 */
     as5600_hw_config_t hw = {
-        .bus          = bus,
-        .dev_addr     = CONFIG_BSP_AS5600_I2C_ADDR,
-        .scl_speed_hz = CONFIG_BSP_I2C_FREQ_HZ,
-        .invert_dir   = AS5600_DIR_INVERTED,
+        .bus          = cfg->bus,
+        .dev_addr     = cfg->dev_addr,
+        .scl_speed_hz = cfg->scl_speed_hz,
+        .invert_dir   = cfg->invert_dir,
     };
     ESP_RETURN_ON_ERROR(as5600_hw_init(&hw),
                         TAG, "as5600_hw_init failed");
@@ -229,7 +219,7 @@ esp_err_t as5600_init(void)
     /* Direction calibration status — surface it so the C/E sign
      * question can be answered from the boot log alone. */
     ESP_LOGI(TAG, "counting direction: %s",
-             AS5600_DIR_INVERTED
+             cfg->invert_dir
                  ? "INVERTED (magnet mounted opposite; +X move counts up)"
                  : "normal (not inverted)");
 
@@ -240,10 +230,10 @@ esp_err_t as5600_init(void)
         int32_t pos = as5600_tracker_update(&s_tracker, raw);
         as5600_publish(pos, raw);
         ESP_LOGI(TAG, "AS5600 online at 0x%02x — first raw angle=%u (seeded, E=0)",
-                 CONFIG_BSP_AS5600_I2C_ADDR, raw);
+                 cfg->dev_addr, raw);
     } else {
         ESP_LOGW(TAG, "first RAW ANGLE read at 0x%02x failed — task will retry",
-                 CONFIG_BSP_AS5600_I2C_ADDR);
+                 cfg->dev_addr);
     }
 
     BaseType_t ok = xTaskCreatePinnedToCore(as5600_task, "as5600",

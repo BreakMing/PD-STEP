@@ -18,7 +18,7 @@
 #include "settings.h"
 #include "tmc2209.h"
 #include "step_engine.h"
-#include "as5600.h"
+#include "cartpos_as5600.h"
 #include "mt6835.h"
 #include "telemetry.h"
 #include "cartproto.h"
@@ -30,7 +30,13 @@ void app_main(void)
     bsp_early_init();
     ESP_ERROR_CHECK(settings_init());
     ESP_ERROR_CHECK(bsp_init());
-    ESP_ERROR_CHECK(as5600_init());
+    cartpos_as5600_config_t cpos = {
+        .bus          = bsp_get_i2c_bus(),
+        .dev_addr     = CONFIG_BSP_AS5600_I2C_ADDR,
+        .scl_speed_hz = CONFIG_BSP_I2C_FREQ_HZ,
+        .invert_dir   = cartpos_as5600_invert_dir_default(),
+    };
+    ESP_ERROR_CHECK(cartpos_as5600_init(&cpos));
     ESP_ERROR_CHECK(mt6835_init());
     tmc2209_config_t tmc = {
         .uart_num = UART_NUM_2,
