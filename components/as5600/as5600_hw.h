@@ -10,7 +10,7 @@
  *
  * 层内约束：参数全部由 as5600_hw_init 的 config 注入；不 include
  * settings.h；不调用 bsp；不创建任务。方向镜像（invert_dir，
- * 磁铁安装标定）发生在本读层，业务壳与纯逻辑 tracker 只见
+ * 磁铁安装标定）发生在本读层，设备组件与纯逻辑 tracker 只见
  * 0..4095 的已定向读数。
  */
 
@@ -26,7 +26,7 @@ extern "C" {
 #endif
 
 typedef struct {
-    i2c_master_bus_handle_t bus;     /* 已初始化的 I2C 总线（业务壳从 bsp 获取） */
+    i2c_master_bus_handle_t bus;     /* 已初始化的 I2C 总线（组装点从 bsp 获取） */
     uint16_t                dev_addr;     /* 7-bit 从机地址 */
     uint32_t                scl_speed_hz; /* 总线时钟 */
     bool                    invert_dir;   /* true = 镜像 raw 角（安装方向标定） */

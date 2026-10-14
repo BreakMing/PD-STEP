@@ -4,7 +4,7 @@
  * 纯数据层（无 ESP 依赖，宿主可测）：默认值、合法范围、按名设置。
  * 名称/默认值/范围的权威来源：protocol.md 参数注册表。
  * 固件按注册表默认值上电；参数权威在端侧，会话开始时推送覆盖。
- * 运行中收紧限制立即约束当前运动（外壳负责作用点）。
+ * 运行中收紧限制立即约束当前运动（cartfsm 负责作用点）。
  */
 
 #pragma once
@@ -18,7 +18,7 @@ extern "C" {
 
 /* 参数索引（注册表顺序，CONFIG? dump 按此序）。
  * 注册表数组以指定初始化器与本枚举锁定一致；作用点分派一律
- * 经 fw_params_find，不得在外壳重复参数名字面量。 */
+ * 经 fw_params_find，不得在 cartfsm.c 重复参数名字面量。 */
 enum {
     FP_VEL_MAX = 0, FP_ACC_MAX, FP_WDT_MS, FP_WDT_DEC,
     FP_X_MARGIN_UM, FP_POLE_ZERO_URAD, FP_POLE_INV,
@@ -36,7 +36,7 @@ const fw_params_t *fw_params(void);
 
 /**
  * @brief 按名设置参数（范围校验）。未知 NAME 或超范围返回 false。
- *        成功即生效于后续读取；硬件作用点由外壳执行。
+ *        成功即生效于后续读取；硬件作用点由 cartfsm 执行。
  */
 bool fw_params_set(const char *name, long value);
 

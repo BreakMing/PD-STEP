@@ -1,9 +1,9 @@
 /*
- * cartfsm — cartpole 模式机外壳（纯核心 cartfsm_core + 硬件作用点）
+ * cartfsm — 模式机：监督任务与命令执行（纯核心 cartfsm_core + 域接口作用点）
  *
  * 1 kHz 监督任务（CPU1、优先级 4）：手动两点标定状态与使能、编码器
- * 失联、丢步（µm 域 |E−C|）、软限位窗口持续钳制、FAULT 停机次序
- * （目标斜坡置 0 → vel_now==0 → EN 关 → 推 MODE）。
+ * 失联、丢步（编码器实测位置与指令位置的偏差）、软限位窗口持续钳制、
+ * FAULT 停机次序（目标斜坡置 0 → 速度精确为零 → EN 关 → 推 MODE）。
  * 命令执行回调（cartproto exec，CPU0）：命令×模式矩阵 + CONFIG
  * 注册表作用点。上电 DISABLED、EN 关。
  */

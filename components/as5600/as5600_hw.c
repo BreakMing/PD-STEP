@@ -11,7 +11,7 @@
  *
  * 层内约束：参数全部由 as5600_hw_init 的 config 注入；不 include
  * settings.h；不调用 bsp；不创建任务。方向镜像（invert_dir，磁铁
- * 安装标定）发生在本读层，业务壳与纯逻辑 tracker 只见 0..4095
+ * 安装标定）发生在本读层，设备组件与纯逻辑 tracker 只见 0..4095
  * 的已定向读数。
  */
 
@@ -74,7 +74,7 @@ bool as5600_hw_read_raw(uint16_t *raw_out)
     uint16_t raw = (uint16_t)(((buf[0] & 0x0F) << 8) | buf[1]);   /* 0..4095 */
 
     if (s_cfg.invert_dir) {
-        /* Mounting calibration — invert_dir 由业务壳按 Kconfig
+        /* Mounting calibration — invert_dir 由组装点按 Kconfig
          * AS5600_INVERT_DIR 注入。Mirroring the angle reverses the
          * counting sense and keeps the value inside 0..4095, so a +X
          * motor move increases the reported position.  Applied here

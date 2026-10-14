@@ -2,7 +2,7 @@
  * params — 参数注册表实现（默认值与范围：protocol.md §参数注册表）
  *
  * 纯数据层：fw_params_set 只做范围校验与写值；写硬件的作用点
- * （引擎加速度/看门狗/方向反转）由 cartfsm 外壳执行。
+ * （电机加速度/看门狗/方向反转）由 cartfsm 执行。
  */
 
 #include "params.h"

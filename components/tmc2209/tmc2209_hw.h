@@ -1,10 +1,10 @@
 /*
  * tmc2209_hw — UART 帧与寄存器读写原语（驱动核心层，组件私有）
  *
- * 仅同组件业务壳 tmc2209.c 包含本头文件；不进入 include/。
+ * 仅同组件 tmc2209.c 包含本头文件；不进入 include/。
  * 层内约束：参数全部由 tmc2209_hw_init 的 config 注入；不 include
  * settings.h；不调用 bsp；不创建任务；不触碰 GPIO（EN 等板级操作
- * 由业务壳负责）。寄存器地址与位域语义由业务壳组装，本层只按
+ * 由 tmc2209.c 负责）。寄存器地址与位域语义由 tmc2209.c 组装，本层只按
  * 地址提供通用 32-bit 寄存器读写。
  *
  * public API（tmc2209.h 声明）中的 tmc2209_read_reg / tmc2209_write_reg /

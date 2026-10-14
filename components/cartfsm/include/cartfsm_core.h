@@ -5,7 +5,7 @@
  * 坐标由手动两点标定建立：MARK LEFT/MARK RIGHT
  * 完成后中点为 x=0；ENABLE 是 DISABLED→READY 的唯一路径。
  * 纯核心只做状态判定与数值钳位；EN 控制、MODE 行推送、标定动作
- * 由 cartfsm.c 的外壳按核心判定结果执行。
+ * 由 cartfsm.c 按核心判定结果执行。
  */
 
 #pragma once
@@ -34,7 +34,7 @@ typedef enum {
 /**
  * @brief 处理一个事件，按转换表更新 mode/reason。
  *
- * @return true = 发生模式转换（外壳需执行伴随动作并推送 MODE 行）；
+ * @return true = 发生模式转换（cartfsm.c 需执行伴随动作并推送 MODE 行）；
  *         false = 事件在当前态被忽略。
  */
 bool cm_step(cm_mode_t *mode, cm_reason_t *reason, cm_event_t ev);
@@ -49,7 +49,7 @@ bool cm_config_set_allowed(cm_mode_t mode);
 long cm_soft_limit_clamp(long x_um, long x_min_um, long x_max_um,
                          long v_mm_s);
 
-/** 丢步判定（µm 域）：|E−C| 超过阈值即丢步。 */
+/** 丢步判定（µm 域）：编码器实测位置与指令位置的偏差超过阈值即丢步。 */
 bool cm_step_loss(long e_um, long c_um, long step_loss_um);
 
 /**

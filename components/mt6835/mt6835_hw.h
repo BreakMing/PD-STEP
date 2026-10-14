@@ -7,7 +7,7 @@
  *   RX: [2]=ANGLE[20:13] [3]=ANGLE[12:5]
  *       [4]=ANGLE[4:0]<<3 | STATUS[2:0]  [5]=器件 CRC8
  * 帧校验：全零帧（MISO 悬空）与 CRC 不符均判失败，并留存帧原文
- * 供业务壳分诊日志。
+ * 供设备组件分诊日志。
  *
  * 层内约束：参数全部由 mt6835_hw_init 的 config 注入；不 include
  * settings.h；不调用 bsp；不创建任务。
@@ -26,7 +26,7 @@ extern "C" {
 
 #define MT6835_HW_FRAME_BYTES 6
 
-/* 失败分类（分诊字符串由业务壳维护） */
+/* 失败分类（分诊字符串由设备组件维护） */
 typedef enum {
     MT6835_HW_FAIL_SPI_ERR = 0,  /* SPI 事务错误 */
     MT6835_HW_FAIL_ALL_ZERO,     /* 全零帧（MISO 悬空/器件未应答） */
@@ -34,7 +34,7 @@ typedef enum {
 } mt6835_hw_fail_t;
 
 typedef struct {
-    spi_host_device_t host;        /* SPI 主机编号（如 SPI3_HOST；业务壳从 bsp 获取，须已初始化） */
+    spi_host_device_t host;        /* SPI 主机编号（如 SPI3_HOST；组装点从 bsp 获取，须已初始化） */
     int               clock_speed_hz;
     int               spics_io_num;
 } mt6835_hw_config_t;

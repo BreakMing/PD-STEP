@@ -1,18 +1,17 @@
 /*
- * cartfsm — 模式机外壳实现
+ * cartfsm — 模式机实现：监督任务与命令执行
  *
  * 并发布局：exec 回调运行在 comm_task（CPU0）；监督任务运行在
  * CPU1。共享状态用 s_lock 自旋锁保护写入；模式枚举读取原子。
- * step_engine / cartproto 发送均为线程安全接口。
+ * motor / cartproto 发送均为线程安全接口。
  *
- * FAULT 停机次序（契约）：目标斜坡置 0（引擎加速度临时切到
- * WDT_DEC 档）→ 监督任务等 vel_now == 0 → EN 关 → 推 MODE 行。
- * RESET 离开 FAULT 时恢复 ACC_MAX 档并清引擎状态。
+ * FAULT 停机次序（契约）：目标斜坡置 0（电机加速度临时切到
+ * WDT_DEC 档）→ 监督任务等速度精确为零 → EN 关 → 推 MODE 行。
+ * RESET 离开 FAULT 时恢复 ACC_MAX 档并清电机状态。
  */
 
 #include "cartfsm.h"
 
-#include <math.h>
 #include <stddef.h>
 #include <string.h>
 
@@ -21,11 +20,9 @@
 #include "esp_log.h"
 #include "esp_task_wdt.h"
 
-#include "settings.h"
-#include "tmc2209.h"
-#include "step_engine.h"
-#include "as5600.h"
-#include "mt6835.h"
+#include "cartpos.h"
+#include "poleang.h"
+#include "motor.h"
 #include "cartproto.h"
 
 static const char *TAG = "cartfsm";
@@ -76,36 +73,6 @@ static const char *reason_str(cm_reason_t r)
     }
 }
 
-/* ---- 换算（任务上下文，mm 域 ↔ steps 域） ---- */
-
-/* mm/s → Q16.16 steps/s（steps/mm 来自 settings，细分 8 下为 40） */
-static int64_t mmps_to_q16(long v_mm_s)
-{
-    double spm = (double)settings_steps_per_mm();
-    return (int64_t)llround((double)v_mm_s * spm * 65536.0);
-}
-
-/* mm/s² → steps/s² */
-static uint32_t accel_to_steps(long a_mm_s2)
-{
-    double spm = (double)settings_steps_per_mm();
-    return (uint32_t)llround((double)a_mm_s2 * spm);
-}
-
-/* 指令位置 steps → µm（与 AS5600 的 E 同域） */
-static long cmd_steps_to_um(int32_t steps)
-{
-    double spm = (double)settings_steps_per_mm();
-    return (long)llround((double)steps * 1000.0 / spm);
-}
-
-/* µm → 指令位置 steps（cmd_steps_to_um 的逆；回零重定基用） */
-static int32_t um_to_cmd_steps(long um)
-{
-    double spm = (double)settings_steps_per_mm();
-    return (int32_t)llround((double)um * spm / 1000.0);
-}
-
 /* ---- 参数作用点 ---- */
 
 /* 软限位窗口：[-L/2+m, +L/2-m] */
@@ -118,32 +85,32 @@ static void soft_window(const fw_params_t *p, long *min_um, long *max_um)
 static void params_apply_engine(void)
 {
     const fw_params_t *p = fw_params();
-    step_engine_vel_set_accel(accel_to_steps(p->acc_max));
-    step_engine_vel_set_decel(accel_to_steps(p->wdt_dec));
-    step_engine_vel_set_wdt_us((uint32_t)p->wdt_ms * 1000u);
-    step_engine_set_dir_invert(p->x_inv != 0);
+    motor_set_accel_mm_s2(p->acc_max);
+    motor_set_decel_mm_s2(p->wdt_dec);
+    motor_set_wdt_ms(p->wdt_ms);
+    motor_set_dir_invert(p->x_inv != 0);
 }
 
 /* 软限位钳制收口：读当前位置、按窗口钳制 v、持锁提交 s_last_cmd_v、
- * 锁外下发引擎。exec_vel 与 VEL_MAX 运行中收紧共用。
- * 引擎调用在 s_lock 之外（不与 step_engine 的 spinlock 嵌套）。 */
+ * 锁外下发电机。exec_vel 与 VEL_MAX 运行中收紧共用。
+ * 电机调用在 s_lock 之外（不与电机实现内部的锁嵌套）。 */
 static void clamp_and_commit_velocity(long v_mm_s)
 {
     const fw_params_t *p = fw_params();
     long xmin, xmax;
     soft_window(p, &xmin, &xmax);
-    long eff = cm_soft_limit_clamp((long)as5600_position_um(),
+    long eff = cm_soft_limit_clamp((long)cartpos_position_um(),
                                    xmin, xmax, v_mm_s);
 
     portENTER_CRITICAL(&s_lock);
     s_last_cmd_v = eff;
     portEXIT_CRITICAL(&s_lock);
 
-    step_engine_vel_target(mmps_to_q16(eff));
+    motor_set_vel_mm_s(eff);
 }
 
 /* 监督拍软限位持续钳制：当前目标被窗口钳为不同值时斜坡停并清
- * 目标。读/写 s_last_cmd_v 持锁，引擎调用在锁外。 */
+ * 目标。读/写 s_last_cmd_v 持锁，电机调用在锁外。 */
 static void supervise_soft_limit(const fw_params_t *p)
 {
     portENTER_CRITICAL(&s_lock);
@@ -152,12 +119,12 @@ static void supervise_soft_limit(const fw_params_t *p)
 
     long xmin, xmax;
     soft_window(p, &xmin, &xmax);
-    long eff = cm_soft_limit_clamp((long)as5600_position_um(),
+    long eff = cm_soft_limit_clamp((long)cartpos_position_um(),
                                    xmin, xmax, cmd);
     if (eff != cmd) {
         /* 条件清零：仅当判定所依据的目标未被新命令覆盖时才停并
          * 清零。若在判定与清零之间 exec_vel 已提交新目标，清零会
-         * 使 s_last_cmd_v 与引擎实际目标脱钩（记录 0 而引擎仍在
+         * 使 s_last_cmd_v 与电机实际目标脱钩（记录 0 而电机仍在
          * 运动），软限位对该目标持续失效。被覆盖则本拍不动作，
          * 下一拍以新目标为基准重新钳制。 */
         portENTER_CRITICAL(&s_lock);
@@ -167,7 +134,7 @@ static void supervise_soft_limit(const fw_params_t *p)
         }
         portEXIT_CRITICAL(&s_lock);
         if (still_old) {
-            step_engine_vel_halt();
+            motor_halt();
         }
     }
 }
@@ -177,16 +144,16 @@ static void params_apply_one(const char *name)
     const fw_params_t *p = fw_params();
     switch (fw_params_find(name)) {
     case FP_ACC_MAX:
-        step_engine_vel_set_accel(accel_to_steps(p->acc_max));
+        motor_set_accel_mm_s2(p->acc_max);
         break;
     case FP_WDT_DEC:
-        step_engine_vel_set_decel(accel_to_steps(p->wdt_dec));
+        motor_set_decel_mm_s2(p->wdt_dec);
         break;
     case FP_WDT_MS:
-        step_engine_vel_set_wdt_us((uint32_t)p->wdt_ms * 1000u);
+        motor_set_wdt_ms(p->wdt_ms);
         break;
     case FP_X_INV:
-        step_engine_set_dir_invert(p->x_inv != 0);
+        motor_set_dir_invert(p->x_inv != 0);
         break;
     case FP_VEL_MAX:
         /* 运行中收紧 VEL_MAX 立即约束当前运动（protocol.md 收紧语义） */
@@ -220,8 +187,8 @@ static void enter_fault(cm_reason_t r)
 
     /* 次序 ①：目标斜坡置 0，以 WDT_DEC 档减速 */
     const fw_params_t *p = fw_params();
-    step_engine_vel_set_accel(accel_to_steps(p->wdt_dec));
-    step_engine_vel_halt();
+    motor_set_accel_mm_s2(p->wdt_dec);
+    motor_halt();
     /* ②③（等 vel_now==0 → EN 关 → 推 MODE）由监督任务完成 */
 }
 
@@ -255,7 +222,7 @@ static void exec_mark_left(void)
         cartproto_send_err("MARK_LEFT");   /* 规格 §2 回执原则 */
         return;
     }
-    long e = (long)as5600_position_um();
+    long e = (long)cartpos_position_um();
 #ifdef CONFIG_CARTFSM_TEST_HOOKS
     e = consume_test_bias(e);
 #endif
@@ -270,7 +237,7 @@ static void exec_mark_right(void)
         cartproto_send_err("MARK_RIGHT");
         return;
     }
-    long e = (long)as5600_position_um();
+    long e = (long)cartpos_position_um();
 #ifdef CONFIG_CARTFSM_TEST_HOOKS
     e = consume_test_bias(e);
 #endif
@@ -285,8 +252,8 @@ static void exec_mark_right(void)
      * set_origin 的契约是「当前物理位置此后读 v」——此刻小车
      * 在右端，传 +L/2 即得「右端=+L/2、中点=0、左端=−L/2」；
      * C 同步到 E 的新读数，保持 E−C=0 */
-    as5600_set_origin((float)l / 2.0f / 1000.0f);
-    step_engine_set_position(um_to_cmd_steps(l / 2));
+    cartpos_set_origin_mm((float)l / 2.0f / 1000.0f);
+    motor_set_position_um(l / 2);
     cartproto_send_ok("MARK_RIGHT", l);
 }
 
@@ -306,8 +273,8 @@ static void exec_enable(void)
     }
     /* C 重锚到 E：先于模式发布——监督任务见 READY 即按拍判定，
      * 携旧 C 会在首拍 STEP_LOSS 误报（标定后手挪过的窗口） */
-    step_engine_set_position(um_to_cmd_steps((long)as5600_position_um()));
-    tmc2209_enable(true);
+    motor_set_position_um((long)cartpos_position_um());
+    motor_enable(true);
     portENTER_CRITICAL(&s_lock);
     s_mode = CM_READY;
     s_reason = CR_NONE;
@@ -330,8 +297,8 @@ static void exec_reset(void)
     s_last_cmd_v = 0;
     portEXIT_CRITICAL(&s_lock);
 
-    step_engine_stop();          /* 斜坡未完也立即急停 */
-    tmc2209_enable(false);
+    motor_stop();               /* 斜坡未完也立即急停 */
+    motor_enable(false);
     params_apply_engine();       /* 恢复 ACC_MAX 档等 */
     push_mode(CM_DISABLED, CR_NONE);
 }
@@ -409,11 +376,11 @@ static void fsm_task(void *arg)
         cm_mode_t mode = s_mode;
 
 #ifdef CONFIG_CARTFSM_TEST_HOOKS
-        bool a5600_ok = (s_test_enc_fail == 1) ? false : as5600_is_ok();
-        bool m6835_ok = (s_test_enc_fail == 2) ? false : mt6835_is_ok();
+        bool a5600_ok = (s_test_enc_fail == 1) ? false : cartpos_is_ok();
+        bool m6835_ok = (s_test_enc_fail == 2) ? false : poleang_is_ok();
 #else
-        bool a5600_ok = as5600_is_ok();
-        bool m6835_ok = mt6835_is_ok();
+        bool a5600_ok = cartpos_is_ok();
+        bool m6835_ok = poleang_is_ok();
 #endif
 
         if (mode == CM_READY) {
@@ -425,11 +392,11 @@ static void fsm_task(void *arg)
                 /* 丢步判定：µm 域 |E−C|（流程自测可注入 E 偏置）。
                  * 运行中堵转由它捕获；回零后抵挡块静止属正常——
                  * C 不前进、D 不增长，无误报 */
-                long e_um = (long)as5600_position_um();
+                long e_um = (long)cartpos_position_um();
 #ifdef CONFIG_CARTFSM_TEST_HOOKS
                 e_um = consume_test_bias(e_um);
 #endif
-                long c_um = cmd_steps_to_um(step_engine_position_steps());
+                long c_um = (long)motor_cmd_position_um();
                 if (cm_step_loss(e_um, c_um, p->step_loss_um)) {
                     enter_fault(CR_STEP_LOSS);
                 } else {
@@ -439,12 +406,12 @@ static void fsm_task(void *arg)
             }
         } else if (mode == CM_FAULT && s_fault_settling) {
             /* 次序 ②③：每拍重发斜坡停——吃掉 FAULT 进入后仍在途的
-             * 目标写入（exec_vel 锁外 vel_target 可晚于 enter_fault
+             * 目标写入（exec_vel 锁外 set_vel 可晚于 enter_fault
              * 的 halt，穿透后不能只靠 WDT 兜底）→ 等零 → EN 关 →
              * 推 MODE */
-            step_engine_vel_halt();
-            if (step_engine_vel_now_q16() == 0) {
-                tmc2209_enable(false);
+            motor_halt();
+            if (motor_at_rest()) {
+                motor_enable(false);
                 s_fault_settling = false;
                 cm_reason_t r = s_reason;
                 push_mode(CM_FAULT, r);
@@ -509,11 +476,11 @@ esp_err_t cartfsm_start(void)
         return ESP_OK;
     }
 
-    /* 上电默认 DISABLED、EN 关。tmc2209_enable 的返回值仅在驱动
+    /* 上电默认 DISABLED、EN 关。motor_enable 的返回值仅在电机实现
      * 未初始化时非 ESP_OK，而 app_main 已先经 ESP_ERROR_CHECK(
-     * tmc2209_init) 完成初始化——本文件全部 EN 调用点
+     * motor_tmc2209_init) 完成初始化——本文件全部 EN 调用点
      * （exec_enable/exec_reset/settling）同此前提，忽略安全。 */
-    tmc2209_enable(false);
+    motor_enable(false);
     params_apply_engine();
 
     cartproto_register_exec(exec_cmd);

@@ -27,8 +27,8 @@
 #include "freertos/task.h"
 #include "driver/gpio.h"
 
-#include "as5600.h"
-#include "step_engine.h"
+#include "cartpos.h"
+#include "motor.h"
 
 static const char *TAG = "cartfsm_flowtest";
 
@@ -102,7 +102,7 @@ TEST_CASE("流程：两 MARK + ENABLE → READY 无误报", "[cartfsm][flowtest]
      * set_origin 语义是「当前物理位置此后读 v」，右端即当前位
      * 置；读数错位意味着软限位窗口整体偏移（右端不设防） */
     vTaskDelay(pdMS_TO_TICKS(50));
-    int64_t x_right = as5600_position_um();
+    int64_t x_right = cartpos_position_um();
     TEST_ASSERT_TRUE_MESSAGE(x_right > 249000 && x_right < 251000,
                              "重定基后右端应读 +250000 µm 附近");
 
@@ -231,19 +231,19 @@ TEST_CASE("流程：FAULT settling 吃掉在途目标（WDT 不兜底）", "[car
     cartfsm_test_exec(&vel);
     bool moving = false;
     for (int t = 0; t < 200; t += 5) {
-        if (step_engine_vel_now_q16() != 0) {
+        if (!motor_at_rest()) {
             moving = true;
             break;
         }
         vTaskDelay(pdMS_TO_TICKS(5));
     }
-    TEST_ASSERT_TRUE_MESSAGE(moving, "运动建立（vel_now != 0）");
+    TEST_ASSERT_TRUE_MESSAGE(moving, "运动建立（速度非零）");
 
     cartfsm_test_inject_encoder_fail(1);
     TEST_ASSERT_TRUE_MESSAGE(wait_mode(CM_FAULT, 100), "失联应 FAULT");
 
-    /* 在途写入：减速窗内注入引擎目标（A3 穿透形态） */
-    step_engine_vel_target(200 << 16);
+    /* 在途写入：减速窗内注入电机目标（A3 穿透形态；经域接口仍达引擎） */
+    motor_set_vel_mm_s(200);
     TEST_ASSERT_TRUE_MESSAGE(wait_fault_settled(300),
                              "settling 应每拍重发 halt，300 ms 内 EN 关");
     cartfsm_test_inject_encoder_fail(0);

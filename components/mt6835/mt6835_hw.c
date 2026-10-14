@@ -11,7 +11,7 @@
  *   STATUS：bit0 过速、bit1 磁场弱、bit2 欠压（仅记录，不上报协议）。
  *   CRC8（poly 0x07、init 0x00）与器件回传寄存器 0x006 比较。
  *   帧校验：拔线时 MISO 悬空常读全零——CRC 与全零帧一并拒绝，
- *   失败帧原文留存（mt6835_hw_last_failure）供业务壳分诊。
+ *   失败帧原文留存（mt6835_hw_last_failure）供设备组件分诊。
  *
  * 层内约束：参数全部由 mt6835_hw_init 的 config 注入；不 include
  * settings.h；不调用 bsp；不创建任务。
@@ -27,7 +27,7 @@
 
 static spi_device_handle_t s_dev = NULL;
 
-/* 失败分诊：SPI 错误 / 全零帧 / CRC 不符；进入失败态时由业务壳 dump 一次 */
+/* 失败分诊：SPI 错误 / 全零帧 / CRC 不符；进入失败态时由设备组件 dump 一次 */
 static mt6835_hw_fail_t s_last_fail = MT6835_HW_FAIL_SPI_ERR;
 static uint8_t s_last_frame[MT6835_HW_FRAME_BYTES];
 

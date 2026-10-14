@@ -1,5 +1,5 @@
 idf_component_register(
     SRCS "cartfsm.c" "cartfsm_core.c"
     INCLUDE_DIRS "include"
-    REQUIRES cartparams bsp settings tmc2209 step_engine as5600 mt6835 cartproto freertos
+    REQUIRES cartpos poleang motor cartparams cartproto freertos
 )
