@@ -1939,7 +1939,7 @@ git commit -m "motor 类别契约切 steps 域（句柄式）：cartaxis 解释�
 - Modify: `README.md`（工程结构节）
 - Modify: 本计划附录 B（验证记录回填）
 
-- [ ] **Step 1: host 测试全量**
+- [x] **Step 1: host 测试全量**
 
 ```bash
 wsl -e bash -c "cd /mnt/c/Users/84580/workspace/cld/PD-STEP && \
@@ -1954,7 +1954,7 @@ gcc -std=c11 -Wall -Wextra -Icomponents/cartaxis/include host_tests/cartaxis_con
 
 预期：七个全部退出码 0（t4 为 18/18、t5 为 11/11、t7 为 17/17，其余不变）。
 
-- [ ] **Step 2: 依赖规则构建期验证（Review Focus 5）**
+- [x] **Step 2: 依赖规则构建期验证（Review Focus 5）**
 
 ```bash
 grep -n "REQUIRES" components/magnetic_encoder/CMakeLists.txt components/motor/CMakeLists.txt components/as5600/CMakeLists.txt components/mt6835/CMakeLists.txt components/tmc2209/CMakeLists.txt components/step_engine/CMakeLists.txt components/cartpos/CMakeLists.txt components/poleang/CMakeLists.txt components/cartaxis/CMakeLists.txt components/cartfsm/CMakeLists.txt components/telemetry/CMakeLists.txt main/CMakeLists.txt
@@ -1962,11 +1962,11 @@ grep -n "REQUIRES" components/magnetic_encoder/CMakeLists.txt components/motor/C
 
 逐条对照规格依赖规则 1–6：类别实现与器件组件的 REQUIRES 中不得出现 `settings`、`cartparams`、`bsp`；cartfsm 不得出现 `motor`/`magnetic_encoder`/器件；解释层不得出现器件组件。
 
-- [ ] **Step 3: 双工程最终构建**
+- [x] **Step 3: 双工程最终构建**
 
 构建命令同 Task 1 Step 5，预期 MAIN=0、TEST=0。
 
-- [ ] **Step 4: README 工程结构更新 + 附录回填 + Commit**
+- [x] **Step 4: README 工程结构更新 + 附录回填 + Commit**
 
 「工程结构」树更新：`magnetic_encoder/`（磁编码器类别：契约 + AS5600/MT6835 实现，句柄式）、`cartaxis/`（直线轴解释：mm↔steps、$0 单一写者）两行新增；`cartpos/`、`poleang/`、`motor/` 行描述改为解释组件 / steps 域类别组件表述；as5600/mt6835 行注明「（驱动核心，经类别组件组合）」；任务/CPU 布局段核对（任务集合不变，任务名 me_as5600/me_mt6835）。回填附录 B 后提交：
 
@@ -1994,8 +1994,8 @@ git commit -m "类别抽象收尾：README 工程结构更新（magnetic_encoder
 
 | 任务 | 日期 | 环境 | 命令与结果 | 上板项 |
 |---|---|---|---|---|
-| Task 1 | | | | 附录 A 1/2 待上板 |
-| Task 2 | | | | 附录 A 1/2/3 待上板 |
-| Task 3 | | | | — |
-| Task 4 | | | | 附录 A 4/5/6/7/8 待上板 |
-| Task 5 | | | | 附录 A 全部待上板 |
+| Task 1 | 2026-10-14（d5b6853） | 同上 | 双工程构建 MAIN=0 TEST=0；host t1=0（87/87）、t5=0（10/10——被删 counts_to_um 段实为 5 条断言，见偏差记录 5） | 附录 A 1/2 待上板 |
+| Task 2 | 2026-10-14（0af7b84） | 同上 | 双工程构建 MAIN=0 TEST=0；host t3=0（2/2）、t4=0（16/16——被删 counts_to_mrad_s 段实为 3 条断言，见偏差记录 5）；契约改操作表分发见偏差记录 4 | 附录 A 1/2/3 待上板 |
+| Task 3 | 2026-10-14（f8f5e23） | 同上 | TDD 红灯（cartaxis_conv.h 不存在编译失败）→ 绿灯 t7=0（18/18——计划写 17 系计数笔误）；主工程 MAIN=0 | — |
+| Task 4 | 2026-10-14（5521dd6） | 同上 | 双工程构建 MAIN=0 TEST=0；host t1=0（87/87）、t6=0（48/48） | 附录 A 4/5/6/7/8 待上板 |
+| Task 5 | 2026-10-14 | 同上 | host 七测全量：t1=0（87/87）、t2=0（64/64）、t3=0（2/2）、t4=0（16/16）、t5=0（10/10）、t6=0（48/48）、t7=0（18/18）；依赖规则 grep 逐条核对通过（规则 1–6）；双工程构建沿用 Task 4 结果（此后仅文档改动） | 附录 A 全部待上板 |

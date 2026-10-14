@@ -35,22 +35,31 @@ components/
   cartfsm/      三态模式机：纯核心（转换表/标定合法性/软限位窗口/丢步）
                 + 1 kHz 监督任务（标定状态/编码器失联/
                 丢步/软限位/FAULT 次序）
-  cartpos/      小车位置域：契约头 + AS5600 实现（Kconfig choice）
-  poleang/      摆角域：契约头 + MT6835 实现（含 POLE_ZERO/POLE_INV 标定）
-  motor/        电机运动域：契约头 + TMC2209+GPTimer 实现 + mm↔steps
-                换算纯函数（motor_conv，宿主可测）
+  magnetic_encoder/ 磁编码器类别：契约（句柄式、原生单位 counts）
+                + AS5600/MT6835 实现（1 kHz 采样任务/失败计数/
+                16 ms 速度窗；两实例并存，契约经操作表分发）
+  motor/        步进电机类别：契约（句柄式、steps 域）+ TMC2209+
+                GPTimer 实现（Kconfig choice）
+  cartpos/      小车位置解释组件：encoder counts → x_um（$2 比例、
+                原点偏移归本层）
+  poleang/      摆角解释组件：encoder 角量 → 已标定 θ（POLE_ZERO/
+                POLE_INV 归本层，µrad 算术与 mt6835_urad 逐位一致）
+  cartaxis/     直线轴解释组件：mm↔steps 换算（纯函数，宿主可测）、
+                steps_per_mm 即读即算、$0 单一写者、X_INV 指令与
+                读数统一取反
   step_engine/  GPTimer ISR 速度模式：vel_ramp 每步递推（纯函数）+
                 带符号目标 + 命令看门狗 + 换向经零速（器件驱动，经 motor 组合）
-  as5600/       小车编码器 1 kHz 采样（多圈计数 + 16 ms 速度窗）
-                （器件驱动，经 cartpos 组合）
-  mt6835/       摆角编码器 1 kHz SPI 采样（帧格式抄录见
-                docs/reviews/T4-brief.md）+ ±π 环绕换算（纯函数）
-                （器件驱动，经 poleang 组合）
+  as5600/       AS5600 I2C 读层 + 多圈 tracker 纯逻辑（驱动核心，经
+                magnetic_encoder 组合）
+  mt6835/       MT6835 SPI 帧层 + ±π 环绕换算纯函数（驱动核心，经
+                magnetic_encoder 组合；帧格式抄录见
+                docs/reviews/T4-brief.md）
   telemetry/    200 Hz STATE 组帧（纯函数 + 常开任务）
   settings/     NVS 机械参数（$0–$4：细分/整步/每转行程/电流）
-  tmc2209/      驱动配置（电流/细分/EN）（器件驱动，经 motor 组合）
+  tmc2209/      驱动配置（电流/细分/EN，初值经 config 注入）（器件
+                驱动，经 motor 组合）
   <每个组件>/test/  组件单元测试（Unity，仅测试工程编入）
-main/app_main.c 启动接线（纯业务，无测试代码）
+main/app_main.c 启动接线（创建全部实例、分发句柄、$3/$4 中转）
 test/           独立测试工程（TEST_COMPONENTS + Unity 菜单）
 host_tests/     宿主可跑的纯逻辑测试（gcc，无 ESP 依赖）
 tools/          cartpole_host.py 联调工具
@@ -58,7 +67,7 @@ docs/reviews/   抄录与上板验收记录
 ```
 
 任务/CPU 布局：CPU0 = cartproto 通讯（prio 5）+ STEP ISR；
-CPU1 = as5600/mt6835 采样（prio 3）、cartfsm 监督（prio 4）、
+CPU1 = me_as5600/me_mt6835 采样（prio 3）、cartfsm 监督（prio 4）、
 telemetry 组帧（prio 2）。全部订阅任务看门狗。
 
 ## 构建
