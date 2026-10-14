@@ -19,7 +19,8 @@
 #include "motor_tmc2209.h"
 #include "magnetic_encoder_as5600.h"
 #include "cartpos.h"
-#include "poleang_mt6835.h"
+#include "magnetic_encoder_mt6835.h"
+#include "poleang.h"
 #include "telemetry.h"
 #include "cartproto.h"
 #include "cartfsm.h"
@@ -39,12 +40,14 @@ void app_main(void)
     };
     ESP_ERROR_CHECK(magnetic_encoder_as5600_init(&ecfg, &enc_cart));
     cartpos_init(enc_cart);
-    poleang_mt6835_config_t pol = {
+    magnetic_encoder_handle_t enc_pole;
+    magnetic_encoder_mt6835_config_t pcfg = {
         .host          = bsp_get_spi_host(),
         .clock_speed_hz = CONFIG_BSP_MT6835_SPI_HZ,
         .spics_io_num  = CONFIG_BSP_MT6835_CS_GPIO,
     };
-    ESP_ERROR_CHECK(poleang_mt6835_init(&pol));
+    ESP_ERROR_CHECK(magnetic_encoder_mt6835_init(&pcfg, &enc_pole));
+    poleang_init(enc_pole);
     motor_tmc2209_config_t mot = {
         .tmc = {
             .uart_num = UART_NUM_2,

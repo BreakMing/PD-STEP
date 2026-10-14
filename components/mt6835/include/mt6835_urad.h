@@ -36,13 +36,6 @@ int32_t mt6835_raw_to_urad(uint32_t raw21, int32_t zero_urad, bool invert);
 int32_t mt6835_unwrap_diff(uint32_t a, uint32_t b);
 
 /**
- * @brief 计数差 × 时间窗 → 角速度（mrad/s）。
- *
- * v = Δcounts × (2π µrad / 2^21) / window_ms，单位恰为 µrad/ms = mrad/s。
- */
-int32_t mt6835_counts_to_mrad_s(int64_t delta_counts, uint32_t window_ms);
-
-/**
  * @brief 角度帧 CRC8（T4-brief：poly X⁸+X²+X+1 = 0x07、init 0x00、
  *        输入 24 bit = ANGLE[20:0]<<3 | STATUS[2:0]，MSB 先行）。
  *

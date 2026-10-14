@@ -5,6 +5,8 @@
  *  - B13/B14/B15 走类别实现面（init / last_raw / is_ok）；
  *  - B16 静止速度改为 counts/s 口径（5 mm/s ≡ 512 counts/s @40 mm/4096）；
  *  - B17/B18 转测 cartpos 解释层（比例一致性、原点重置）。
+ * [mt6835] 段承接原 test_mt6835.c 硬件用例（静止稳定性、theta 合法域
+ * 与 poleang 解释层对拍、A10 手动段）。
  * 实例由 test_app_main 创建（幂等 init 返回既有句柄）。
  */
 
@@ -12,7 +14,10 @@
 
 #include "magnetic_encoder.h"
 #include "magnetic_encoder_as5600.h"
+#include "magnetic_encoder_mt6835.h"
+#include "mt6835_urad.h"
 #include "cartpos.h"
+#include "poleang.h"
 
 #include "unity.h"
 #include "esp_log.h"
@@ -21,6 +26,7 @@
 
 #include "bsp.h"
 #include "settings.h"
+#include "params.h"
 
 static const char *TAG = "me_test";
 
@@ -34,6 +40,18 @@ static magnetic_encoder_handle_t enc(void)
         .invert_dir   = magnetic_encoder_as5600_invert_dir_default(),
     };
     TEST_ASSERT_EQUAL(ESP_OK, magnetic_encoder_as5600_init(&cfg, &h));
+    return h;
+}
+
+static magnetic_encoder_handle_t mt6835_enc(void)
+{
+    magnetic_encoder_handle_t h = NULL;
+    magnetic_encoder_mt6835_config_t cfg = {
+        .host          = bsp_get_spi_host(),
+        .clock_speed_hz = CONFIG_BSP_MT6835_SPI_HZ,
+        .spics_io_num  = CONFIG_BSP_MT6835_CS_GPIO,
+    };
+    TEST_ASSERT_EQUAL(ESP_OK, magnetic_encoder_mt6835_init(&cfg, &h));
     return h;
 }
 
@@ -166,5 +184,116 @@ TEST_CASE("人工：手转 3 圈观察 x_um 变化", "[as5600][manual]")
 
     if (fabsf(delta) < 1.0f) {
         ESP_LOGI(TAG, "(未检测到转动——没转属正常)");
+    }
+}
+
+/* ================= [mt6835] 段（承接原 test_mt6835.c 硬件用例） ================= */
+
+/* 静止稳定性：等 |v| < 50 mrad/s（≡ 16700 counts/s）持续 300 ms，
+ * 再测 1 s 内 raw21 抖动 ≤2 count。 */
+TEST_CASE("静止稳定性：1 s 内 raw21 抖动 ≤2 count", "[mt6835]")
+{
+    magnetic_encoder_handle_t h = mt6835_enc();
+    bool calm = false;
+    for (int t = 0; t < 10000 && !calm; t += 10) {
+        int32_t v = magnetic_encoder_velocity_counts_per_s(h);
+        if (v > -16700 && v < 16700) {
+            calm = true;
+            for (int k = 0; k < 30; k++) {
+                vTaskDelay(pdMS_TO_TICKS(10));
+                v = magnetic_encoder_velocity_counts_per_s(h);
+                if (v <= -16700 || v >= 16700) {
+                    calm = false;
+                    break;
+                }
+            }
+        } else {
+            vTaskDelay(pdMS_TO_TICKS(10));
+        }
+    }
+    if (!calm) {
+        ESP_LOGW(TAG, "10 s 内未稳定（%d counts/s）——扶稳摆杆后重试",
+                 magnetic_encoder_velocity_counts_per_s(h));
+    }
+
+    uint32_t min_r = 0xFFFFFFFFu, max_r = 0;
+    for (int i = 0; i < 1000; i++) {
+        uint32_t r = magnetic_encoder_mt6835_last_raw(h);
+        if (r < min_r) min_r = r;
+        if (r > max_r) max_r = r;
+        vTaskDelay(pdMS_TO_TICKS(1));
+    }
+    TEST_ASSERT_TRUE(magnetic_encoder_is_ok(h));
+    ESP_LOGI(TAG, "静止 raw21 范围 [%u, %u]（抖动 %u）",
+             min_r, max_r, max_r - min_r);
+    TEST_ASSERT_TRUE_MESSAGE(max_r - min_r <= 2, "静止抖动应 ≤ 2 count");
+}
+
+/* theta 合法域与速度有限性（2 s 连续读，poleang 解释层）+
+ * 算术对拍：zero=0/inv=0 下 poleang 与 mt6835_urad 纯函数同值
+ * （Review Focus 2 的锚——常量算术逐位一致）。 */
+TEST_CASE("theta 合法域 ±π 与解释层对拍", "[mt6835]")
+{
+    fw_params_set("POLE_ZERO_URAD", 0);
+    fw_params_set("POLE_INV", 0);
+    magnetic_encoder_handle_t h = mt6835_enc();
+
+    for (int i = 0; i < 2000; i++) {
+        int32_t th = poleang_theta_urad();
+        int32_t vth = poleang_vth_mrad_s();
+        TEST_ASSERT_TRUE_MESSAGE(th >= -3141593 && th <= 3141593,
+                                 "theta 应在 ±π 内");
+        TEST_ASSERT_TRUE_MESSAGE(vth > -1000000 && vth < 1000000,
+                                 "vth 应为有限值");
+        if (i % 500 == 0) {
+            TEST_ASSERT_EQUAL_INT(
+                mt6835_raw_to_urad(magnetic_encoder_mt6835_last_raw(h), 0, false),
+                th);
+        }
+        vTaskDelay(pdMS_TO_TICKS(1));
+    }
+    TEST_ASSERT_TRUE(magnetic_encoder_is_ok(h));
+}
+
+/* ---- A10：手转摆杆一整圈（圈数守恒判定逻辑与原用例一致） ---- */
+TEST_CASE("人工 A10：手转摆杆一圈圈数守恒", "[mt6835][manual]")
+{
+    magnetic_encoder_handle_t h = mt6835_enc();
+    const int secs = 15;
+    const int32_t REV = 2097152;
+
+    ESP_LOGI(TAG, "请将摆杆缓慢转一整圈后回到出发点，现在开始（采样 %d s）", secs);
+
+    int32_t start = (int32_t)magnetic_encoder_position_counts(h);
+    int32_t lo = start, hi = start;
+
+    for (int sec = 1; sec <= secs; sec++) {
+        vTaskDelay(pdMS_TO_TICKS(1000));
+        int32_t p = (int32_t)magnetic_encoder_position_counts(h);
+        if (p < lo) lo = p;
+        if (p > hi) hi = p;
+        ESP_LOGI(TAG, "  t=%2ds  pos=%+d counts（theta=%d µrad）",
+                 sec, p, poleang_theta_urad());
+    }
+
+    int32_t net = (int32_t)magnetic_encoder_position_counts(h) - start;
+    int32_t excursion = hi - lo;
+    int32_t k = (net >= 0) ? (net + REV / 2) / REV : (net - REV / 2) / REV;
+    int32_t resid = net - k * REV;
+    double resid_deg = (double)resid * 360.0 / (double)REV;
+
+    ESP_LOGI(TAG, "结果：行程 %d counts（%.2f 圈），净变化 %d counts"
+                  "（%d 圈 + 残余 %+d counts ≈ %+.2f°）",
+             excursion, (double)excursion / (double)REV, net, k, resid, resid_deg);
+
+    if (excursion < REV / 10) {
+        ESP_LOGI(TAG, "A10 判定：未检测到整圈转动（没转属正常）");
+    } else if (excursion < REV - REV / 10) {
+        ESP_LOGW(TAG, "A10 判定：行程不足——请转满一圈再试");
+    } else if (resid > REV / 120 || resid < -REV / 120) {
+        ESP_LOGW(TAG, "A10 判定：未回到出发点角度（残余 %+.2f° 超过 ±3°）",
+                 resid_deg);
+    } else {
+        ESP_LOGI(TAG, "A10 判定：圈数守恒 OK（检测到 %d 圈）", k);
     }
 }

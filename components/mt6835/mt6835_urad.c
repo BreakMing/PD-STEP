@@ -34,16 +34,6 @@ int32_t mt6835_unwrap_diff(uint32_t a, uint32_t b)
     return diff;
 }
 
-int32_t mt6835_counts_to_mrad_s(int64_t delta_counts, uint32_t window_ms)
-{
-    if (window_ms == 0) {
-        return 0;   /* 防御 */
-    }
-    /* µrad/ms 恰为 mrad/s */
-    return (int32_t)(delta_counts * MT6835_2PI_URAD
-                     / (int64_t)MT6835_COUNTS_PER_REV / (int64_t)window_ms);
-}
-
 uint8_t mt6835_crc8(uint32_t angle21, uint8_t status)
 {
     uint32_t payload = (angle21 << 3) | (status & 0x07);

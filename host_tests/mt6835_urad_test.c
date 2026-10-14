@@ -66,24 +66,12 @@ static void test_unwrap_diff(void)
     CHECK_EQ(mt6835_unwrap_diff(0, 1048576u), -1048576);
 }
 
-/* 角速度：Δcounts × 2π µrad / 2^21 / window_ms = mrad/s */
-static void test_counts_to_mrad_s(void)
-{
-    /* 一整圈 / 16 ms → 6283185/16 = 392699 */
-    CHECK_EQ(mt6835_counts_to_mrad_s(2097152, 16), 392699);
-    /* −1/64 圈 / 16 ms → −98174/16 = −6135（floor −6135.92） */
-    CHECK_EQ(mt6835_counts_to_mrad_s(-32768, 16), -6135);
-    /* 0 */
-    CHECK_EQ(mt6835_counts_to_mrad_s(0, 16), 0);
-}
-
 int main(void)
 {
     test_raw_to_urad();
     test_zero_offset();
     test_invert();
     test_unwrap_diff();
-    test_counts_to_mrad_s();
 
     printf("mt6835_urad_test: %d/%d 断言通过\n", s_run - s_fail, s_run);
     return s_fail;

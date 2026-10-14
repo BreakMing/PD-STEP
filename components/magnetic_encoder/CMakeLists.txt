@@ -6,6 +6,10 @@ if(CONFIG_MAGNETIC_ENCODER_AS5600)
     list(APPEND me_srcs "magnetic_encoder_as5600.c")
 endif()
 
+if(CONFIG_MAGNETIC_ENCODER_MT6835)
+    list(APPEND me_srcs "magnetic_encoder_mt6835.c")
+endif()
+
 idf_component_register(SRCS ${me_srcs}
                     INCLUDE_DIRS "include"
                     REQUIRES freertos esp_driver_i2c esp_driver_spi

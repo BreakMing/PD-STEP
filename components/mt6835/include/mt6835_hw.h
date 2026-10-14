@@ -1,5 +1,6 @@
 /*
- * mt6835_hw — SPI 角度帧层（驱动核心层，组件私有）
+ * mt6835_hw — SPI 角度帧层（驱动核心层；公共头，magnetic_encoder
+ * 类别实现消费）
  *
  * 48-bit 单次事务（MODE3、MSB 先行；帧格式抄录与 CRC8 见
  * mt6835_urad.h 与 docs/reviews/T4-brief.md）：

@@ -3,9 +3,9 @@
  *
  * 启动次序：bsp_early_init（EN 拉高 = 电机不使能，任何外设动作之前）
  * → settings_init → bsp_init → magnetic_encoder_as5600_init +
- * cartpos_init → poleang_mt6835_init → motor_tmc2209_init →
- * cartproto_start → cartfsm_start → telemetry_start。测试代码不编入
- * 正式固件（见 test/ 独立测试工程）。
+ * cartpos_init → magnetic_encoder_mt6835_init + poleang_init →
+ * motor_tmc2209_init → cartproto_start → cartfsm_start →
+ * telemetry_start。测试代码不编入正式固件（见 test/ 独立测试工程）。
  */
 
 #include "esp_log.h"
@@ -15,7 +15,8 @@
 #include "motor_tmc2209.h"
 #include "magnetic_encoder_as5600.h"
 #include "cartpos.h"
-#include "poleang_mt6835.h"
+#include "magnetic_encoder_mt6835.h"
+#include "poleang.h"
 #include "telemetry.h"
 #include "cartproto.h"
 #include "cartfsm.h"
@@ -37,12 +38,14 @@ void app_main(void)
         };
         ESP_ERROR_CHECK(magnetic_encoder_as5600_init(&ecfg, &enc_cart));
         cartpos_init(enc_cart);
-        poleang_mt6835_config_t pol = {
+        magnetic_encoder_handle_t enc_pole;
+        magnetic_encoder_mt6835_config_t pcfg = {
             .host          = bsp_get_spi_host(),
             .clock_speed_hz = CONFIG_BSP_MT6835_SPI_HZ,
             .spics_io_num  = CONFIG_BSP_MT6835_CS_GPIO,
         };
-        ESP_ERROR_CHECK(poleang_mt6835_init(&pol));
+        ESP_ERROR_CHECK(magnetic_encoder_mt6835_init(&pcfg, &enc_pole));
+        poleang_init(enc_pole);
         motor_tmc2209_config_t mot = {
             .tmc = {
                 .uart_num = UART_NUM_2,   /* 端口分配：UART0=烧录/日志、UART1=协议、UART2=TMC */

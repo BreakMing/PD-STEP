@@ -34,8 +34,15 @@ static const char *TAG = "me_as5600";
 #define ME_AS5600_SPEED_WINDOW     16
 #define ME_AS5600_HIST_LEN         (ME_AS5600_SPEED_WINDOW + 1)
 
-/* ---- 发布状态（s_lock 保护） ---- */
-typedef struct magnetic_encoder_s {
+/* ---- 操作表函数（单实例：直接读写本文件静态状态） ---- */
+static int32_t me_counts_per_rev(magnetic_encoder_handle_t enc);
+static int64_t  me_position_counts(magnetic_encoder_handle_t enc);
+static int32_t  me_velocity_counts_per_s(magnetic_encoder_handle_t enc);
+static bool     me_is_ok(magnetic_encoder_handle_t enc);
+
+/* ---- 发布状态（s_lock 保护；操作表为首成员，句柄即其地址） ---- */
+typedef struct {
+    struct magnetic_encoder_s ops;
     int64_t  pos_counts;             /* 多圈累计（accumulator） */
     int32_t  hist[ME_AS5600_HIST_LEN];
     int      hist_head;
@@ -44,8 +51,16 @@ typedef struct magnetic_encoder_s {
     uint16_t last_raw;
 } me_state_t;
 
+static me_state_t s_state = {
+    .ops = {
+        .counts_per_rev        = me_counts_per_rev,
+        .position_counts       = me_position_counts,
+        .velocity_counts_per_s = me_velocity_counts_per_s,
+        .is_ok                 = me_is_ok,
+    },
+};
+
 static portMUX_TYPE s_lock = portMUX_INITIALIZER_UNLOCKED;
-static me_state_t s_state;
 static as5600_tracker_t s_tracker;
 static volatile bool s_ok = true;        /* false = I2C failing */
 static bool s_initialized = false;
@@ -121,15 +136,15 @@ static void me_task(void *arg)
     }
 }
 
-/* ---- 契约函数 ---- */
+/* ---- 契约操作表函数 ---- */
 
-int32_t magnetic_encoder_counts_per_rev(magnetic_encoder_handle_t enc)
+static int32_t me_counts_per_rev(magnetic_encoder_handle_t enc)
 {
     (void)enc;
     return AS5600_COUNTS_PER_REV;
 }
 
-int64_t magnetic_encoder_position_counts(magnetic_encoder_handle_t enc)
+static int64_t me_position_counts(magnetic_encoder_handle_t enc)
 {
     (void)enc;
     portENTER_CRITICAL(&s_lock);
@@ -138,7 +153,7 @@ int64_t magnetic_encoder_position_counts(magnetic_encoder_handle_t enc)
     return p;
 }
 
-int32_t magnetic_encoder_velocity_counts_per_s(magnetic_encoder_handle_t enc)
+static int32_t me_velocity_counts_per_s(magnetic_encoder_handle_t enc)
 {
     (void)enc;
     portENTER_CRITICAL(&s_lock);
@@ -147,11 +162,13 @@ int32_t magnetic_encoder_velocity_counts_per_s(magnetic_encoder_handle_t enc)
     return v;
 }
 
-bool magnetic_encoder_is_ok(magnetic_encoder_handle_t enc)
+static bool me_is_ok(magnetic_encoder_handle_t enc)
 {
     (void)enc;
     return s_ok;
 }
+
+/* ---- 器件自测面 ---- */
 
 uint16_t magnetic_encoder_as5600_last_raw(magnetic_encoder_handle_t enc)
 {

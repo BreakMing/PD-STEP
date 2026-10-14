@@ -1,19 +1,23 @@
 /*
- * poleang — 摆角域契约（已标定摆角）
+ * poleang — 摆角解释组件（已标定摆角）
  *
- * 链接期绑定：实现源文件在同组件内（当前实现 poleang_mt6835.c，
- * 经 Kconfig choice 选择）。零位/符号标定（POLE_ZERO_URAD / POLE_INV）
- * 在实现内应用——消费方读到的是标定后角度。
- * 语义：docs/superpowers/specs/2026-10-14-device-decoupling-design.md。
+ * 持有 magnetic_encoder 句柄，把原始角量解释为已标定摆角：
+ * 零位与符号（POLE_ZERO_URAD / POLE_INV，来自 cartparams 注册表）
+ * 在读取时应用。消费方读到的是标定后角度。
+ * 语义：docs/superpowers/specs/2026-10-14-device-category-abstraction.md。
  */
 #pragma once
 
 #include <stdint.h>
 #include <stdbool.h>
+#include "magnetic_encoder.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+/** 绑定编码器实例。 */
+void poleang_init(magnetic_encoder_handle_t enc);
 
 /** 已标定摆角（±π 环绕 µrad）；首样本前为 0。 */
 int32_t poleang_theta_urad(void);
