@@ -16,7 +16,12 @@ typedef struct {
     int               spics_io_num;
 } poleang_mt6835_config_t;
 
-/** 幂等。内部完成 mt6835 设备初始化（含 1 kHz 采样任务）。 */
+/**
+ * @brief 内部完成 mt6835 设备初始化（含 1 kHz 采样任务）。幂等。
+ *
+ * @return ESP_OK；cfg 为 NULL 返回 ESP_ERR_INVALID_ARG；
+ *         其余透传 mt6835_init 返回值。
+ */
 esp_err_t poleang_mt6835_init(const poleang_mt6835_config_t *cfg);
 
 #ifdef __cplusplus

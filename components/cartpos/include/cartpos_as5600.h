@@ -22,7 +22,12 @@ typedef struct {
     bool                    invert_dir;   /* 方向镜像（安装标定） */
 } cartpos_as5600_config_t;
 
-/** 幂等。内部完成 as5600 设备初始化（含 1 kHz 采样任务）。 */
+/**
+ * @brief 内部完成 as5600 设备初始化（含 1 kHz 采样任务）。幂等。
+ *
+ * @return ESP_OK；cfg 为 NULL 返回 ESP_ERR_INVALID_ARG；
+ *         其余透传 as5600_init 返回值。
+ */
 esp_err_t cartpos_as5600_init(const cartpos_as5600_config_t *cfg);
 
 /** 方向镜像的 Kconfig 默认值（折叠 AS5600_INVERT_DIR；组装点使用）。 */

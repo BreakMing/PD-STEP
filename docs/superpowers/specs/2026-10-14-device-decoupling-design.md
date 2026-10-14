@@ -53,7 +53,7 @@
 
 Q16.16 指 16 位整数位加 16 位小数位的定点数表示（沿用 step_engine 现有 API 的记法）。
 
-三个接口的共同约定：所有函数线程安全，可在任务上下文任意调用；读函数在器件未初始化时返回 0 / false（沿袭现器件壳的防御行为，本设计不改变该语义）；连续读取失败期间返回最后一次成功样本的值，不额外冻结或清零。
+三个接口的共同约定：所有函数线程安全，可在任务上下文任意调用。器件未初始化时的返回语义沿袭迁移前设备组件行为、本设计不改变：数值读函数返回 0（状态静态零初始化）；`motor_at_rest` 与 `*_is_ok` 返回 true——速度与连续失败计数均处于零状态，判停与判正常都成立，且组装次序（见「组装契约」）保证消费者任务晚于域 init 启动，该初值不会外露为故障。连续读取失败期间，数值读函数返回最后一次成功样本的值，不额外冻结或清零。
 
 ### cartpos（小车位置，编码器实测位置）
 
@@ -81,10 +81,10 @@ Q16.16 指 16 位整数位加 16 位小数位的定点数表示（沿用 step_en
 | `esp_err_t motor_enable(bool en)` | 驱动器使能引脚（EN）使能/关断，en=true 时等待 ≥1 ms 唤醒；仅实现未初始化时返回非 ESP_OK |
 | `void motor_set_vel_mm_s(long v)` | 设定带符号目标速度并喂命令看门狗；实现内换算 mm/s → Q16.16 steps/s |
 | `void motor_halt(void)` | 目标清 0 斜坡停；不喂狗 |
-| `void motor_stop(void)` | 急停：停脉冲、清递推状态与目标、冻结 C |
+| `void motor_stop(void)` | 急停：停脉冲、清递推状态与目标、冻结指令位置 |
 | `bool motor_at_rest(void)` | true ⇔ 当前速度精确为零（Q16.16 域判零，不经 mm/s 整数舍入） |
 | `int64_t motor_cmd_position_um(void)` | 指令位置，steps → µm 四舍五入 |
-| `void motor_set_position_um(long um)` | C 重定基（µm → steps）；前置条件：电机停止（无脉冲发出） |
+| `void motor_set_position_um(long um)` | 指令位置重定基（µm → steps）；前置条件：电机停止（无脉冲发出） |
 | `void motor_set_accel_mm_s2(long a)` / `motor_set_decel_mm_s2(long d)` / `motor_set_wdt_ms(long t)` / `motor_set_dir_invert(bool inv)` | 参数作用点，语义与现 step_engine 对应函数一致；0 值防御按各自现行为 |
 
 `motor_at_rest` 不以整数 mm/s 暴露当前速度：FAULT 停机次序依赖精确判零，Q16.16 域的微小残余换算为整数 mm/s 会舍入到 0、导致提前关 EN。

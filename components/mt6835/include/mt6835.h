@@ -30,7 +30,12 @@ typedef struct {
     int               spics_io_num;
 } mt6835_config_t;
 
-/** 幂等。接线经 config 注入并启动 1 kHz 采样任务。 */
+/**
+ * @brief 接线经 config 注入并启动 1 kHz 采样任务。幂等。
+ *
+ * @return ESP_OK；cfg 为 NULL 或 host 为负返回 ESP_ERR_INVALID_ARG；
+ *         其余错误码与迁移前一致（SPI 设备挂载 / 任务创建错误）。
+ */
 esp_err_t mt6835_init(const mt6835_config_t *cfg);
 
 /**

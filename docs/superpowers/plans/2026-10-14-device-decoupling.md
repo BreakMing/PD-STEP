@@ -1251,3 +1251,6 @@ git commit -m "解耦收尾：README 工程结构补三域组件，计划验证�
 | Task 4 | 2026-10-14 | 同上 | 双工程 build → Project build complete | 附录 A 6 待上板 |
 | Task 5 | 2026-10-14 | 同上 | 双工程 build → Project build complete；cartfsm_core+params 宿主 87/87（exit=0） | 附录 A 4/5 待上板 |
 | Task 6 | 2026-10-14 | 同上 | host 七测全绿：87/64/2/19/15/48/15（exit=0 × 7）；双工程 build → Project build complete × 2 | 附录 A 全部待上板 |
+| 终审修复 | 2026-10-14 | 同上 | I-1（cc47a27）：grep 零引用 + 双工程构建 + host 七测全绿；M-1/M-2（本轮）：双工程 build → Project build complete（MAIN_EXIT=0 / TEST_EXIT=0），host 七测 87/64/2/19/15/48/15（exit=0 × 7）——改动均为注释与文档，无行为变化 | — |
+
+终审（fresh-context 整分支评审）：无 Critical；Important I-1（bsp_tmc_en_set 迁移后零调用者死代码）修复于 cc47a27。Minor 两条缓办后同日修复：M-1 mt6835.h 补 init 的 @return 错误码契约，同类缺口一并补齐（cartpos_as5600.h / poleang_mt6835.h / motor_tmc2209.h 三个实现 init 头）；M-2 规格「读函数在器件未初始化时返回 0 / false」与实现不符——s_ok 初值为 true（未观测到读取失败即视为正常），数值读函数返回 0 的半句正确，按实际语义修正措辞，同时清除规格 motor 表残留的单字母缩写（冻结 C / C 重定基 → 冻结指令位置 / 指令位置重定基，与 [motor.h](../../../components/motor/include/motor.h) 实现一致），并在[写作规则](../../../.agents/rules/writing.md)固化术语完整名称要求。
