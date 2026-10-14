@@ -1241,7 +1241,7 @@ git commit -m "magnetic_encoder_mt6835 实现落地：mt6835 瘦身为驱动核�
 **Interfaces:**
 - Produces: `cartaxis_mmps_to_steps` / `cartaxis_accel_to_steps` / `cartaxis_steps_to_um` / `cartaxis_um_to_steps`（Task 4 消费）
 
-- [ ] **Step 1: 写失败的宿主测试**
+- [x] **Step 1: 写失败的宿主测试**
 
 `host_tests/cartaxis_conv_test.c`（断言宏形态照抄 [motor_conv_test.c](../../../host_tests/motor_conv_test.c)）：
 
@@ -1303,7 +1303,7 @@ int main(void)
 }
 ```
 
-- [ ] **Step 2: 跑测试确认失败**
+- [x] **Step 2: 跑测试确认失败**
 
 ```bash
 wsl -e bash -c "cd /mnt/c/Users/84580/workspace/cld/PD-STEP && gcc -std=c11 -Wall -Wextra -Icomponents/cartaxis/include host_tests/cartaxis_conv_test.c components/cartaxis/cartaxis_conv.c -lm -o /tmp/tc && /tmp/tc; echo exit=\$?"
@@ -1311,7 +1311,7 @@ wsl -e bash -c "cd /mnt/c/Users/84580/workspace/cld/PD-STEP && gcc -std=c11 -Wal
 
 预期：编译失败 `cartaxis_conv.h: No such file or directory`（红）。
 
-- [ ] **Step 3: 实现纯函数**
+- [x] **Step 3: 实现纯函数**
 
 `components/cartaxis/include/cartaxis_conv.h`：
 
@@ -1384,11 +1384,11 @@ idf_component_register(SRCS "cartaxis_conv.c"
                     INCLUDE_DIRS "include")
 ```
 
-- [ ] **Step 4: 跑测试确认通过**
+- [x] **Step 4: 跑测试确认通过**
 
 同 Step 2 命令。预期：`PASS: 17 用例, 0 失败`，exit=0。
 
-- [ ] **Step 5: 构建验证 + Commit**
+- [x] **Step 5: 构建验证 + Commit**
 
 主工程构建（同 Task 1 Step 5 命令，预期 MAIN=0；cartaxis 未被引用，编入即验证）。提交：
 
