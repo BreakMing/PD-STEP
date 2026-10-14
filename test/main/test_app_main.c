@@ -17,7 +17,8 @@
 #include "bsp.h"
 #include "settings.h"
 #include "motor_tmc2209.h"
-#include "cartpos_as5600.h"
+#include "magnetic_encoder_as5600.h"
+#include "cartpos.h"
 #include "poleang_mt6835.h"
 #include "telemetry.h"
 #include "cartproto.h"
@@ -29,13 +30,15 @@ void app_main(void)
     bsp_early_init();
     ESP_ERROR_CHECK(settings_init());
     ESP_ERROR_CHECK(bsp_init());
-    cartpos_as5600_config_t cpos = {
+    magnetic_encoder_handle_t enc_cart;
+    magnetic_encoder_as5600_config_t ecfg = {
         .bus          = bsp_get_i2c_bus(),
         .dev_addr     = CONFIG_BSP_AS5600_I2C_ADDR,
         .scl_speed_hz = CONFIG_BSP_I2C_FREQ_HZ,
-        .invert_dir   = cartpos_as5600_invert_dir_default(),
+        .invert_dir   = magnetic_encoder_as5600_invert_dir_default(),
     };
-    ESP_ERROR_CHECK(cartpos_as5600_init(&cpos));
+    ESP_ERROR_CHECK(magnetic_encoder_as5600_init(&ecfg, &enc_cart));
+    cartpos_init(enc_cart);
     poleang_mt6835_config_t pol = {
         .host          = bsp_get_spi_host(),
         .clock_speed_hz = CONFIG_BSP_MT6835_SPI_HZ,

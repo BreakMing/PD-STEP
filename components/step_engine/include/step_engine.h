@@ -94,7 +94,7 @@ int32_t step_engine_position_steps(void);
 /**
  * @brief 重定基指令位置（带符号累计 steps，物理域）。
  *
- * 供回零完成时与 AS5600 原点（as5600_set_origin）同帧重定基：
+ * 供回零完成时与编码器原点（cartpos_set_origin_mm）同帧重定基：
  * E/C 域对齐后 |E−C| 丢步判定才有意义。必须在引擎停止
  * （step_engine_stop 之后、无脉冲）时调用。
  */

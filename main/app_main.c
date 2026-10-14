@@ -2,9 +2,9 @@
  * cartpole 固件入口
  *
  * 启动次序：bsp_early_init（EN 拉高 = 电机不使能，任何外设动作之前）
- * → settings_init → bsp_init → cartpos_as5600_init →
- * poleang_mt6835_init → motor_tmc2209_init → cartproto_start →
- * cartfsm_start → telemetry_start。测试代码不编入
+ * → settings_init → bsp_init → magnetic_encoder_as5600_init +
+ * cartpos_init → poleang_mt6835_init → motor_tmc2209_init →
+ * cartproto_start → cartfsm_start → telemetry_start。测试代码不编入
  * 正式固件（见 test/ 独立测试工程）。
  */
 
@@ -13,7 +13,8 @@
 #include "bsp.h"
 #include "settings.h"
 #include "motor_tmc2209.h"
-#include "cartpos_as5600.h"
+#include "magnetic_encoder_as5600.h"
+#include "cartpos.h"
 #include "poleang_mt6835.h"
 #include "telemetry.h"
 #include "cartproto.h"
@@ -27,13 +28,15 @@ void app_main(void)
      * 可见可恢复优于带病存活 */
     ESP_ERROR_CHECK(bsp_init());
     {
-        cartpos_as5600_config_t cpos = {
+        magnetic_encoder_handle_t enc_cart;
+        magnetic_encoder_as5600_config_t ecfg = {
             .bus          = bsp_get_i2c_bus(),
             .dev_addr     = CONFIG_BSP_AS5600_I2C_ADDR,
             .scl_speed_hz = CONFIG_BSP_I2C_FREQ_HZ,
-            .invert_dir   = cartpos_as5600_invert_dir_default(),
+            .invert_dir   = magnetic_encoder_as5600_invert_dir_default(),
         };
-        ESP_ERROR_CHECK(cartpos_as5600_init(&cpos));
+        ESP_ERROR_CHECK(magnetic_encoder_as5600_init(&ecfg, &enc_cart));
+        cartpos_init(enc_cart);
         poleang_mt6835_config_t pol = {
             .host          = bsp_get_spi_host(),
             .clock_speed_hz = CONFIG_BSP_MT6835_SPI_HZ,

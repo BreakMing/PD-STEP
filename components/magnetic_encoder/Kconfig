@@ -1,0 +1,11 @@
+menu "magnetic_encoder - 磁编码器类别"
+
+config MAGNETIC_ENCODER_AS5600
+    bool "编入 AS5600 实现（I2C，12-bit，小车编码器）"
+    default y
+
+config MAGNETIC_ENCODER_MT6835
+    bool "编入 MT6835 实现（SPI，21-bit，摆角编码器）"
+    default y
+
+endmenu

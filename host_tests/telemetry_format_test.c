@@ -2,12 +2,13 @@
  * telemetry_format_state 宿主测试 — 组帧契约
  *
  * 退出码 = 失败断言数（0 = 全过）。
+ * counts→µm 换算断言已随 as5600_counts_to_um 删除（换算归 cartpos
+ * 解释层，数值域比对移至上板验收）。
  */
 
 #include <stdio.h>
 #include <string.h>
 #include "telemetry.h"
-#include "as5600.h"
 
 static int s_fail = 0;
 static int s_run = 0;
@@ -54,22 +55,11 @@ static void test_buffer_too_small(void)
     CHECK(telemetry_format_state(NULL, 64, 1, 1, 1, 1) < 0, "NULL 缓冲应返回负值");
 }
 
-/* as5600 counts → µm 换算（内联于 as5600.h） */
-static void test_counts_to_um(void)
-{
-    CHECK(as5600_counts_to_um(64) == 625, "64 count → 625 µm");
-    CHECK(as5600_counts_to_um(-64) == -625, "−64 count → −625 µm");
-    CHECK(as5600_counts_to_um(4096) == 40000, "一圈 4096 count → 40000 µm");
-    CHECK(as5600_counts_to_um(0) == 0, "零");
-    CHECK(as5600_counts_to_um(61440) == 600000, "全程 600 mm");
-}
-
 int main(void)
 {
     test_basic_format();
     test_zero_and_negative();
     test_buffer_too_small();
-    test_counts_to_um();
 
     printf("telemetry_format_test: %d/%d 断言通过\n", s_run - s_fail, s_run);
     return s_fail;

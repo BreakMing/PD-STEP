@@ -1,5 +1,6 @@
 /*
- * as5600_hw — AS5600 I2C 读层（驱动核心层，组件私有）
+ * as5600_hw — AS5600 I2C 读层（驱动核心层；公共头，magnetic_encoder
+ * 类别实现消费）
  *
  * !! READ-ONLY DEVICE — RED LINE !!
  *   ZPOS / MPOS / CONF / MANG 是一次性可编程（OTP）：写错即永久
