@@ -1,13 +1,13 @@
 /*
- * cartaxis $0 单一写者状态机宿主测试 — 评审 Critical-1 的回归锚
+ * cartaxis 细分单一写者状态机宿主测试 — 评审 Critical-1 的回归锚
  *
- * 覆盖规格 cartaxis 决策表三条路径 + $1/$2 即时生效：
+ * 覆盖规格 cartaxis 决策表三条路径 + 每转整步数/每转行程即时生效：
  *  A 上电：applied 档建立，cmd = steps × applied 派生 spm 换算
  *  B 静止即时应用：µm 保持、步数按新 spm 重定基（settings 先提交
  *    后通知——回调里 settings 视图已新，旧档步数不得被新系数污染）
  *  C 运动中挂起 → 斜坡完成由入口应用：挂起期间读数保持旧档换算
  *  D 写失败：芯片档与换算一并保持旧值（读数自洽），重设才恢复
- *  E $2 变更：仅换算系数即时变化，不推细分
+ *  E 每转行程变更：仅换算系数即时变化，不推细分
  *
  * 编译：gcc -std=c11 -Wall -Wextra \
  *   -Ihost_tests/stub -Icomponents/cartaxis/include \
@@ -131,7 +131,7 @@ static int s_run = 0;
 
 int main(void)
 {
-    /* ---- A 上电：$0=8、$1=200、$2=40 → applied=8、spm=40 ---- */
+    /* ---- A 上电：细分=8、每转整步数=200、每转行程=40 → applied=8、spm=40 ---- */
     s_vals[SET_MICROSTEP] = 8;
     s_vals[SET_FULL_STEP] = 200;
     s_vals[SET_MM_PER_REV] = 40.0f;
@@ -142,13 +142,13 @@ int main(void)
     CHECK_EQ(g_chip_ms, -1);                       /* init 不推细分（tmc2209 config 已推） */
     CHECK_EQ(cartaxis_cmd_position_um(), 40000);   /* 1600 × 1000 / 40 */
 
-    /* ---- B 静止即时应用：$0 8→16（spm 40→80），µm 保持 ---- */
+    /* ---- B 静止即时应用：细分 8→16（spm 40→80），µm 保持 ---- */
     stub_settings_set(SET_MICROSTEP, 16);
     CHECK_EQ(g_chip_ms, 16);                       /* 新档已写入芯片 */
     CHECK_EQ(g_pos_steps, 3200);                   /* 40000 µm × 80 / 1000 */
     CHECK_EQ(cartaxis_cmd_position_um(), 40000);   /* µm 不变 */
 
-    /* ---- C 运动中挂起 → 斜坡完成由入口应用：$0 16→32（spm 80→160） ---- */
+    /* ---- C 运动中挂起 → 斜坡完成由入口应用：细分 16→32（spm 80→160） ---- */
     g_at_rest = false;
     stub_settings_set(SET_MICROSTEP, 32);
     CHECK_EQ(g_halt_calls, 1);                     /* 回调已下发斜坡停 */
@@ -168,14 +168,14 @@ int main(void)
     CHECK_EQ(g_pos_steps, 6400);                   /* 位置不重写 */
     CHECK_EQ(cartaxis_cmd_position_um(), 40000);   /* 旧档换算读数自洽 */
 
-    /* ---- D2 写失败后重设 $0 恢复（附录 C 恢复语义锚定） ---- */
+    /* ---- D2 写失败后重设细分恢复（附录 C 恢复语义锚定） ---- */
     g_write_fail = 0;
     stub_settings_set(SET_MICROSTEP, 8);
     CHECK_EQ(g_chip_ms, 8);                        /* 重设即走正常应用路径 */
     CHECK_EQ(g_pos_steps, 1600);                   /* 40000 µm × 40 / 1000 */
     CHECK_EQ(cartaxis_cmd_position_um(), 40000);   /* µm 仍不变 */
 
-    /* ---- E $2 变更：仅系数即时变化（spm 40→80），不推细分 ---- */
+    /* ---- E 每转行程变更：仅系数即时变化（spm 40→80），不推细分 ---- */
     stub_settings_set(SET_MM_PER_REV, 20.0f);
     CHECK_EQ(g_chip_ms, 8);                        /* 不推细分 */
     CHECK_EQ(cartaxis_cmd_position_um(), 20000);   /* 1600 × 1000 / 80：行程定义减半 */

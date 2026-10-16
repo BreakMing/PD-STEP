@@ -1,9 +1,9 @@
 /*
  * cartaxis — 小车直线轴解释组件（mm 域命令面 ↔ motor steps 域）
  *
- * 换算即读即算 settings 派生 steps_per_mm（$0×$1÷$2）；X_INV 经
- * 指令与读数统一取反（cartfsm 的调用面签名与旧 motor.h 一致）；
- * $0 细分档由本组件单一写者持有（决策表见规格「cartaxis」节）。
+ * 换算即读即算 settings 派生 steps_per_mm（细分×每转整步数÷每转行程）；
+ * X_INV 经指令与读数统一取反（cartfsm 的调用面签名与旧 motor.h 一致）；
+ * 细分档由本组件单一写者持有（决策表见规格「cartaxis」节）。
  * 语义：docs/superpowers/specs/2026-10-14-device-category-abstraction.md。
  */
 #pragma once
@@ -17,7 +17,7 @@
 extern "C" {
 #endif
 
-/** 绑定电机实例并订阅 $0/$1/$2（$0 变更按静止/运动两路处理）。 */
+/** 绑定电机实例并订阅细分/每转整步数/每转行程（细分变更按静止/运动两路处理）。 */
 void cartaxis_init(motor_handle_t m);
 
 /** 以下签名与语义同旧 motor.h 业务面（消费方 cartfsm / flowtest 只改名）。 */

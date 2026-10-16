@@ -4,9 +4,9 @@
 
 上一轮域解耦（[设计](2026-10-14-device-decoupling-design.md)）按应用域切出了 cartpos / poleang / motor 三个域组件，业务调用面已经干净。但三个域组件都把「器件本身」与「本台倒立摆对器件的解释」合在一起：
 
-- cartpos 内嵌皮带机械比例：µm 线性单位预设了皮带传动（[as5600.h](../../components/as5600/include/as5600.h) 的 counts→µm 固定 40 mm ÷ 4096），`$2` 订阅、原点偏移也在器件侧。
+- cartpos 内嵌皮带机械比例：µm 线性单位预设了皮带传动（[as5600.h](../../components/as5600/include/as5600.h) 的 counts→µm 固定 40 mm ÷ 4096），每转行程（SET_MM_PER_REV）订阅、原点偏移也在器件侧。
 - poleang 内嵌摆的直立定义：「直立 = 0」的零位与符号标定（POLE_ZERO_URAD / POLE_INV）在域实现内逐次读业务参数表。
-- motor 内嵌机械换算与协议语义：mm↔steps 换算消费 `$0×$1÷$2`，`motor_set_wdt_ms` 是 [protocol.md](../../docs/protocol.md) 的 VEL 命令看门狗。
+- motor 内嵌机械换算与协议语义：mm↔steps 换算消费细分×每转整步数÷每转行程（settings 参数 SET_MICROSTEP / SET_FULL_STEP / SET_MM_PER_REV），`motor_set_wdt_ms` 是 [protocol.md](../../docs/protocol.md) 的 VEL 命令看门狗。
 - as5600 与 mt6835 的采样任务、失败计数、速度窗结构互为抄录（[mt6835.c](../../components/mt6835/mt6835.c) 头注释自述「结构照抄 as5600」）。
 
 本设计的目标：**器件按类别抽象（magnetic_encoder、motor），类别契约只含器件本征语义与原生单位（counts、steps），不依赖本项目任何业务概念；「拿器件做什么」全部上收到业务侧解释层**。机械比例、符号、零位、原点、mm 换算、命令看门狗参数只在解释层出现。
@@ -54,8 +54,8 @@
 |---|---|---|
 | `components/magnetic_encoder/` | 类别组件（新增） | magnetic_encoder 契约 + `magnetic_encoder_as5600.c` / `magnetic_encoder_mt6835.c` 实现（1 kHz 采样任务、失败计数、is_ok、16 ms 速度窗） |
 | `components/motor/` | 类别组件（重定位） | motor 契约（steps 域）+ `motor_tmc2209.c` 实现（tmc2209 + step_engine 组合）；删除 mm 换算 |
-| `components/cartaxis/` | 解释组件（新增） | mm↔steps 换算、steps_per_mm 派生、`$0` 单一写者、X_INV 取反 |
-| `components/cartpos/` | 解释组件（重定位） | encoder counts → x_um / vx：`$2` 比例、原点偏移；签名不变 |
+| `components/cartaxis/` | 解释组件（新增） | mm↔steps 换算、steps_per_mm 派生、细分单一写者、X_INV 取反 |
+| `components/cartpos/` | 解释组件（重定位） | encoder counts → x_um / vx：每转行程比例、原点偏移；签名不变 |
 | `components/poleang/` | 解释组件（重定位） | encoder 角量 → θ / vth：零位、符号（读 cartparams）；签名不变 |
 | `components/as5600/` | 器件驱动组件（瘦身） | 只留 as5600_hw（I2C 读层）+ as5600_tracker（多圈纯逻辑）；设备策略与任务移入 magnetic_encoder_as5600.c |
 | `components/mt6835/` | 器件驱动组件（瘦身） | 只留 mt6835_hw（SPI 帧层）+ mt6835_urad（±π 环绕纯函数） |
@@ -116,12 +116,12 @@
 
 | 函数 | 语义（与现行为的关系） |
 |---|---|
-| `int64_t cartpos_position_um(void)` | x_um = round(counts × `$2` × 1000 ÷ counts_per_rev) − 原点偏移 µm。换算统一四舍五入；旧实现的 40 mm 整数精确路径为截断除法，两者相差 ≤1 µm（数值域兼容，见迁移不变量 4） |
-| `float cartpos_velocity_mm_s(void)` | counts/s × `$2` ÷ counts_per_rev（浮点）。与旧浮点路径相差 ≤1 mm/s |
+| `int64_t cartpos_position_um(void)` | x_um = round(counts × 每转行程 × 1000 ÷ counts_per_rev) − 原点偏移 µm。换算统一四舍五入；旧实现的 40 mm 整数精确路径为截断除法，两者相差 ≤1 µm（数值域兼容，见迁移不变量 4） |
+| `float cartpos_velocity_mm_s(void)` | counts/s × 每转行程 ÷ counts_per_rev（浮点）。与旧浮点路径相差 ≤1 mm/s |
 | `bool cartpos_is_ok(void)` | 转发 magnetic_encoder_is_ok（10 次失败语义不变） |
 | `void cartpos_set_origin_mm(float new_pos_mm)` | 原点偏移改存 µm 整数（旧为 mm 浮点，读时取整）；声明语义不变 |
 
-新增生命周期：`cartpos_init(magnetic_encoder_handle_t enc)`。比例随 `$2` 订阅刷新（订阅从 as5600 移入本层）。`$2` 语义由此收敛为单一权威：位置与速度同源同值，旧实现「位置走固定 40 mm 比例、速度跟 `$2`」的分裂消除。
+新增生命周期：`cartpos_init(magnetic_encoder_handle_t enc)`。比例随每转行程（SET_MM_PER_REV）订阅刷新（订阅从 as5600 移入本层）。每转行程语义由此收敛为单一权威：位置与速度同源同值，旧实现「位置走固定 40 mm 比例、速度跟每转行程」的分裂消除。
 
 ### poleang（摆角测量，重定位）
 
@@ -151,11 +151,11 @@ cartaxis_set_wdt_ms(long ms)
 
 职责与语义：
 
-- **换算**：mm↔steps 用 settings 派生的 steps_per_mm（`$0`×`$1`÷`$2`），即读即算；四条换算为宿主可测纯函数（原 motor_conv 迁入，mm/s→steps/s 改为 lround，不再经 Q16.16 暴露）。
+- **换算**：mm↔steps 用 settings 派生的 steps_per_mm（细分×每转整步数÷每转行程），即读即算；四条换算为宿主可测纯函数（原 motor_conv 迁入，mm/s→steps/s 改为 lround，不再经 Q16.16 暴露）。
 - **X_INV**：为真时对指令与读数统一取反（替代旧 `motor_set_dir_invert`）。`step_engine_set_dir_invert` 随迁移删除。
-- **`$0` 单一写者**：本组件是细分档位唯一的生效路径——订阅 `$0/$1/$2`，`$0` 变更时按下表处理；tmc2209 组件不再订阅任何 settings 项。旧实现「订阅回调忽略寄存器写返回值、换算与实际细分可脱钩」的缺陷（双消费者无协调）由此消除。换算系数按**已写入芯片的细分档**（组件内缓存）与当前 `$1/$2` 派生：settings 的值提交先于通知到达，`$0` 变更回调里按 settings 派生会把旧档步数按新系数换算；按已生效档派生则挂起等待与写失败期间读数都保持旧档换算，应用完成后 µm 无跳变。
+- **细分单一写者**：本组件是细分档位唯一的生效路径——订阅细分/每转整步数/每转行程（SET_MICROSTEP / SET_FULL_STEP / SET_MM_PER_REV），细分变更时按下表处理；tmc2209 组件不再订阅任何 settings 项。旧实现「订阅回调忽略寄存器写返回值、换算与实际细分可脱钩」的缺陷（双消费者无协调）由此消除。换算系数按**已写入芯片的细分档**（组件内缓存）与当前每转整步数/每转行程派生：settings 的值提交先于通知到达，细分变更回调里按 settings 派生会把旧档步数按新系数换算；按已生效档派生则挂起等待与写失败期间读数都保持旧档换算，应用完成后 µm 无跳变。
 
-`$0` 变更处理（决策表；`$1/$2` 变更仅影响换算系数，即时生效，无状态动作）：
+细分（SET_MICROSTEP）变更处理（决策表；每转整步数/每转行程变更仅影响换算系数，即时生效，无状态动作）：
 
 | 变更时电机状态 | 动作 |
 |---|---|
@@ -167,14 +167,14 @@ cartaxis_set_wdt_ms(long ms)
 - `magnetic_encoder_as5600.c`：吸收现 as5600.c 的采样任务、失败计数、速度窗、多圈 tracker 组合；init 收接线 config（I2C 总线、地址、时钟、方向镜像布尔）并创建实例返回句柄。方向镜像是磁铁安装属性，留在实现 config（组装点从 Kconfig 折算传入），不出现在契约。
 - `magnetic_encoder_mt6835.c`：同理（SPI 主机、时钟、CS）；STATUS 变化告警与失败分诊日志随迁。
 - `motor_tmc2209.c`：现实现去 mm 化——换算与 spm 移除，速度/加速度/位置改为 steps 域直通 step_engine；`motor_set_microstep` 转发 tmc2209 细分写、`motor_set_current` 转发电流写（含 VSENSE 分档）。EN 经 config 的 en_gpio 直驱（现状不变）。
-- `tmc2209` 组件：删除 settings 订阅与回调；寄存器策略保留。`$3/$4`（电流）改由组装点订阅中转：app_main 订阅 settings，收到 `$3/$4` 变更调用 `motor_set_current`。
+- `tmc2209` 组件：删除 settings 订阅与回调；寄存器策略保留。运行/保持电流（SET_RUN_MA / SET_HOLD_MA）改由组装点订阅中转：app_main 订阅 settings，收到运行/保持电流变更调用 `motor_set_current`。
 - `step_engine`：删除 `step_engine_set_dir_invert`（无调用者）。
 - Kconfig：magnetic_encoder 组件内为两个**独立 bool**（`MAGNETIC_ENCODER_AS5600` / `MAGNETIC_ENCODER_MT6835`，默认 y——两实例并存，不是 choice）；motor 组件保留 choice（`MOTOR_IMPL_TMC2209`）。
 - CMake 约束（上一轮实测的求值陷阱）：类别组件的 REQUIRES / PRIV_REQUIRES 一律**无条件字面量声明**，仅 SRCS 随 Kconfig 宏条件编入。
 
 ## 组装契约
 
-初始化次序：`bsp_early_init → settings_init → bsp_init → magnetic_encoder_as5600_init(&cfg, &enc_cart) → magnetic_encoder_mt6835_init(&cfg, &enc_pole) → motor_tmc2209_init(&cfg, &mot) → cartpos_init(enc_cart) → poleang_init(enc_pole) → cartaxis_init(mot) → 组装点订阅 $3/$4 中转 → cartproto_start → cartfsm_start → telemetry_start`。
+初始化次序：`bsp_early_init → settings_init → bsp_init → magnetic_encoder_as5600_init(&cfg, &enc_cart) → magnetic_encoder_mt6835_init(&cfg, &enc_pole) → motor_tmc2209_init(&cfg, &mot) → cartpos_init(enc_cart) → poleang_init(enc_pole) → cartaxis_init(mot) → 组装点订阅运行/保持电流中转 → cartproto_start → cartfsm_start → telemetry_start`。
 
 app_main 是唯一创建实例、分发句柄的位置：三个实现 config 仍由 app_main 读取 Kconfig 宏与 bsp 句柄组装；解释层只拿句柄。测试工程入口同样组装。
 
@@ -185,9 +185,9 @@ app_main 是唯一创建实例、分发句柄的位置：三个实现 config 仍
 1. cartfsm 的 REQUIRES = cartpos、poleang、cartaxis、cartparams、cartproto；不得出现 motor、magnetic_encoder、器件驱动组件或 bsp。
 2. telemetry 的 REQUIRES = cartpos、poleang、cartproto。
 3. 解释层（cartpos / poleang / cartaxis）REQUIRES magnetic_encoder 与/或 motor 契约组件 + settings / cartparams；不依赖器件实现与 bsp。
-4. 类别契约头（magnetic_encoder.h / motor.h）零组件依赖。类别实现 REQUIRES 器件驱动组件与 ESP-IDF 驱动库；**不得 REQUIRES settings、cartparams、bsp**（业务数据反向依赖清零，旧 as5600 的 `$2` 订阅与 tmc2209 的 `$0/$3/$4` 订阅全部移除）。
+4. 类别契约头（magnetic_encoder.h / motor.h）零组件依赖。类别实现 REQUIRES 器件驱动组件与 ESP-IDF 驱动库；**不得 REQUIRES settings、cartparams、bsp**（业务数据反向依赖清零，旧 as5600 的每转行程订阅与 tmc2209 的细分/运行电流/保持电流订阅全部移除）。
 5. 器件驱动组件不 REQUIRES bsp / settings / cartparams；只被类别实现与测试工程引用。
-6. cartproto 现状（REQUIRES bsp）不动；app_main 引用全部实现头并承担 `$3/$4` 中转。
+6. cartproto 现状（REQUIRES bsp）不动；app_main 引用全部实现头并承担运行/保持电流中转。
 
 ## 测试与验证
 
@@ -204,7 +204,7 @@ app_main 是唯一创建实例、分发句柄的位置：三个实现 config 仍
 3. **锁序**：cartfsm 共享状态读写持 s_lock，cartaxis 调用在锁外。权威定义见 [cartfsm.c](../../components/cartfsm/cartfsm.c)。
 4. **协议数值域兼容**：行格式、字段顺序、MODE reason 值（"AS5600"、"MT6835"、"STEP_LOSS"）逐字节不变；四个数值字段因换算路径统一（四舍五入、counts/s 整数化）允许 ≤1 个旧量化级的差异（x_um ≤1 µm、vx ≤1 mm/s、vth ≤1 mrad/s、指令位置同 x_um）。权威定义见 [protocol.md](../../docs/protocol.md)。
 5. **测试注入语义**：编码器失联注入与位置偏置注入的用例行为不变。权威定义见 [test_cartfsm_flow.c](../../components/cartfsm/test/test_cartfsm_flow.c)。
-6. **解释层单一权威**：机械比例（`$2`）、方向（X_INV、方向镜像安装配置）、零位（POLE_ZERO_URAD / POLE_INV）、细分档（`$0`）只在解释层与组装点消费；类别层与器件层无业务参数依赖（依赖规则 4 的构建期检查即其验收）。
+6. **解释层单一权威**：机械比例（每转行程）、方向（X_INV、方向镜像安装配置）、零位（POLE_ZERO_URAD / POLE_INV）、细分档（微步）只在解释层与组装点消费；类别层与器件层无业务参数依赖（依赖规则 4 的构建期检查即其验收）。
 
 ## 范围界定（本设计不改变归属的内容）
 
@@ -212,5 +212,5 @@ app_main 是唯一创建实例、分发句柄的位置：三个实现 config 仍
 - cartproto 对 bsp 的 UART1 接线维持现状。
 - 两编码器采样的相干性（同拍快照、时间戳）仅作契约预留，本期不实现。
 - 速度估计算法维持现状（16 窗均值、按标称周期折算）；espp 以实际时戳差测速并在读失败时保持时间戳的做法，记录为未来改进候选（故障恢复瞬间的窗口低估可由此消除），不在本次迁移改变估计器语义。
-- `$0` 运动中变更从「未定义」收紧为「先斜坡停再应用」——这是对原有未定义边界的显式行为定义，非语义变更。
+- 细分在运动中变更从「未定义」收紧为「先斜坡停再应用」——这是对原有未定义边界的显式行为定义，非语义变更。
 - step_engine 内部 Q16.16 定点递推保留（精确判零与斜坡平滑依赖它），契约不暴露该记法。

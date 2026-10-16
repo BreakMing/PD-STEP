@@ -4,7 +4,7 @@
  * 启动次序：bsp_early_init（EN 拉高 = 电机不使能，任何外设动作之前）
  * → settings_init → bsp_init → magnetic_encoder_as5600_init +
  * cartpos_init → magnetic_encoder_mt6835_init + poleang_init →
- * motor_tmc2209_init + cartaxis_init → 组装点订阅 $3/$4 中转 →
+ * motor_tmc2209_init + cartaxis_init → 组装点订阅运行/保持电流中转 →
  * cartproto_start → cartfsm_start → telemetry_start。测试代码不编入
  * 正式固件（见 test/ 独立测试工程）。
  */
@@ -24,7 +24,7 @@
 #include "cartproto.h"
 #include "cartfsm.h"
 
-static motor_handle_t s_mot;   /* $3/$4 中转用（app_main 单次启动） */
+static motor_handle_t s_mot;   /* 运行/保持电流中转用（app_main 单次启动） */
 
 static void on_driver_settings(int idx, float new_value)
 {
@@ -82,11 +82,11 @@ void app_main(void)
         };
         ESP_ERROR_CHECK(motor_tmc2209_init(&mcfg, &mot));
         cartaxis_init(mot);
-        /* $3/$4 中转：纯驱动器参数由组装点推送（返回值接住并告警，
+        /* 运行/保持电流中转：纯驱动器参数由组装点推送（返回值接住并告警，
          * 消灭旧订阅回调吞返回值的脱钩窗口） */
         s_mot = mot;
         if (!settings_subscribe(on_driver_settings)) {
-            ESP_LOGW("app_main", "settings 订阅失败（槽满）——$3/$4 变更不会生效");
+            ESP_LOGW("app_main", "settings 订阅失败（槽满）——运行/保持电流变更不会生效");
         }
         ESP_ERROR_CHECK(cartproto_start());
         ESP_ERROR_CHECK(cartfsm_start());

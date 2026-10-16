@@ -128,8 +128,8 @@ TEST_CASE("B16 静止速度 |v| ≤512 counts/s（16 ms 窗）", "[as5600]")
     TEST_ASSERT_TRUE_MESSAGE(v <= 512 && v >= -512, "静止速度超 512 counts/s");
 }
 
-/* 位置/标度一致性（cartpos 解释层）：x_um = counts × $2 / 4096（未设原点时） */
-TEST_CASE("B17 x_um == counts × $2 ÷ 4096（cartpos 层）", "[as5600]")
+/* 位置/标度一致性（cartpos 解释层）：x_um = counts × 每转行程 / 4096（未设原点时） */
+TEST_CASE("B17 x_um == counts × 每转行程 ÷ 4096（cartpos 层）", "[as5600]")
 {
     magnetic_encoder_handle_t h = enc();
     cartpos_set_origin_mm(0.0f);   /* 清偏移，令 x = 原始位置 */

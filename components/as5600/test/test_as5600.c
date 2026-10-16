@@ -95,8 +95,8 @@ TEST_CASE("A6 0↔4095 抖动 ×8 → 累计漂移 ≤1 count", "[as5600]")
                              "边界抖动累计漂移超限");
 }
 
-/* 3 整圈 = +12288 counts = 120.0 mm @40 mm/rev（默认 $2；mm 解释
- * 归 cartpos，此处仅作计数换算示意）——上板验收判据的纯逻辑等价 */
+/* 3 整圈 = +12288 counts = 120.0 mm @40 mm/rev（settings 每转行程默认值；
+ * mm 解释归 cartpos，此处仅作计数换算示意）——上板验收判据的纯逻辑等价 */
 TEST_CASE("A7 正转 3 圈 → +12288 counts = 120 mm", "[as5600]")
 {
     as5600_tracker_t t;

@@ -1,7 +1,7 @@
 /*
  * Settings — NVS 参数存储实现
  *
- * 参数表（$0–$4，机械/驱动层）带校验、NVS 持久化、变更通知
+ * 参数表（5 项，机械/驱动层）带校验、NVS 持久化、变更通知
  * 与派生访问器。方向反转由 CONFIG X_INV 承担，不在本表。
  *
  * 线程安全：FreeRTOS 互斥（s_mutex）保护 s_values[] 与全部 NVS
@@ -33,7 +33,7 @@ static const param_meta_t s_meta[SETTINGS_COUNT] = {
     [SET_FULL_STEP]  = { "full_steps_per_rev", 200.0f, true  },  /* ∈{200, 400} */
     [SET_MM_PER_REV] = { "mm_per_rev",        40.0f,  false },  /* (0, 500] */
     [SET_RUN_MA]     = { "run_current_mA",    800.0f, true  },  /* (0, 2000] */
-    [SET_HOLD_MA]    = { "hold_current_mA",   400.0f, true  },  /* [0, $3] */
+    [SET_HOLD_MA]    = { "hold_current_mA",   400.0f, true  },  /* [0, 运行电流] */
 };
 
 /* ---- 运行状态 ---- */
@@ -82,11 +82,11 @@ static bool validate_locked(int idx, float value)
     case SET_MM_PER_REV:  /* (0, 500] */
         if (value <= 0.0f || value > 500.0f) return false;
         break;
-    case SET_RUN_MA:  /* (0, 2000], 整数；交叉检查 $4 ≤ 新 $3 */
+    case SET_RUN_MA:  /* (0, 2000], 整数；交叉检查 保持电流 ≤ 新运行电流 */
         if (iv <= 0 || iv > 2000) return false;
         if (iv < (int)s_values[SET_HOLD_MA]) return false;
         break;
-    case SET_HOLD_MA:  /* [0, $3], 整数 */
+    case SET_HOLD_MA:  /* [0, 运行电流], 整数 */
         if (iv < 0 || iv > (int)s_values[SET_RUN_MA]) return false;
         break;
     default:
@@ -168,7 +168,7 @@ static settings_status_t nvs_erase_settings_all(void)
 }
 
 /* 从 NVS 载入全部值。两阶段：先填满每个槽（缺键 → 默认值），
- * 再统一校验——交叉检查（$3/$4）总是看到完整集合。单遍前向
+ * 再统一校验——交叉检查（运行/保持电流）总是看到完整集合。单遍前向
  * 校验会在冷启动时用未载入的零值错误丢弃合法存储值。
  * 调用方须持 s_mutex。 */
 static bool load_all_locked(void)

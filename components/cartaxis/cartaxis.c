@@ -1,18 +1,19 @@
 /*
  * cartaxis — 小车直线轴解释实现
  *
- * $0 单一写者：订阅 $0/$1/$2——$1/$2 只影响换算系数（即读即算，
- * 即时生效）；$0 变更时静止则回调内立即「推细分→按新单位重定基
- * （µm 值不变）」，运动中先斜坡停并挂起，此后任意入口在静止时应用
- * （cartfsm 监督任务 1 kHz 调用读数，滞后 ≤ 数拍；DISABLED 必静止，
- * 回调内即完成）。细分写失败放弃本次并告警，链路恢复后重设 $0 恢复。
+ * 细分（settings 参数 SET_MICROSTEP）单一写者：订阅细分/每转整步数/
+ * 每转行程——后两者只影响换算系数（即读即算，即时生效）；细分变更
+ * 时静止则回调内立即「推细分→按新单位重定基（µm 值不变）」，运动中
+ * 先斜坡停并挂起，此后任意入口在静止时应用（cartfsm 监督任务 1 kHz
+ * 调用读数，滞后 ≤ 数拍；DISABLED 必静止，回调内即完成）。细分写
+ * 失败放弃本次并告警，链路恢复后重设细分恢复。
  *
  * 换算单一权威：steps_per_mm 用已写入芯片的细分档（s_applied_
- * microstep）与当前 $1/$2 派生。settings 的值提交先于通知到达
- * （settings.c：s_values[idx] 赋值后才 notify），$0 变更回调里
- * settings_steps_per_mm() 已是新档——直接使用会把旧档步数按新系数
- * 换算，µm 不保持；按 applied 档派生则挂起等待与写失败期间读数
- * 都保持旧档换算，应用完成后 µm 无跳变。
+ * microstep）与当前每转整步数/每转行程派生。settings 的值提交先于
+ * 通知到达（settings.c：s_values[idx] 赋值后才 notify），细分变更
+ * 回调里 settings_steps_per_mm() 已是新档——直接使用会把旧档步数
+ * 按新系数换算，µm 不保持；按 applied 档派生则挂起等待与写失败
+ * 期间读数都保持旧档换算，应用完成后 µm 无跳变。
  */
 #include "cartaxis.h"
 #include "cartaxis_conv.h"
@@ -56,7 +57,7 @@ static void apply_microstep_now(void)
 {
     portENTER_CRITICAL(&s_apply_lock);
     if (s_apply_busy) {
-        /* 并发到达的第二条 $0 变更挂起待补推（幂等：下次入口重记 µm
+        /* 并发到达的第二条细分变更挂起待补推（幂等：下次入口重记 µm
          * → 重推 settings 当前档 → µm 不变），不得静默丢弃 */
         s_pending_microstep = true;
         portEXIT_CRITICAL(&s_apply_lock);
@@ -73,7 +74,7 @@ static void apply_microstep_now(void)
     if (err != ESP_OK) {
         /* 芯片档与换算一并保持旧值（applied 未更新）——读数仍自洽 */
         ESP_LOGE(TAG, "细分写入失败（%d）——保持旧档 %d，换算不变，"
-                      "链路恢复后重设 $0 恢复", err, s_applied_microstep);
+                      "链路恢复后重设细分恢复", err, s_applied_microstep);
         portENTER_CRITICAL(&s_apply_lock);
         s_apply_busy = false;
         portEXIT_CRITICAL(&s_apply_lock);
@@ -98,7 +99,7 @@ static void on_settings_change(int idx, float new_value)
 {
     (void)new_value;
     if (idx != SET_MICROSTEP) {
-        return;   /* $1/$2 影响换算系数，即读即算即时生效 */
+        return;   /* 每转整步数/每转行程影响换算系数，即读即算即时生效 */
     }
     if (motor_at_rest(s_m)) {
         apply_microstep_now();
@@ -116,7 +117,7 @@ void cartaxis_init(motor_handle_t m)
     ESP_LOGI(TAG, "细分档 %d 已生效，steps_per_mm=%.1f（换算按已生效档）",
              s_applied_microstep, spm());
     if (!settings_subscribe(on_settings_change)) {
-        ESP_LOGW(TAG, "settings 订阅失败（槽满）——$0 变更不会生效");
+        ESP_LOGW(TAG, "settings 订阅失败（槽满）——细分变更不会生效");
     }
 }
 

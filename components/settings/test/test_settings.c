@@ -48,7 +48,7 @@ TEST_CASE("默认值抽查（含微步 8）", "[settings]")
 }
 
 /* 2–6. 合法 set→get 往返 */
-TEST_CASE("set/get 往返：$0 微步", "[settings]")
+TEST_CASE("set/get 往返：微步", "[settings]")
 {
     settings_status_t st = settings_set(SET_MICROSTEP, 16.0f);
     TEST_ASSERT_EQUAL(SETTINGS_OK, st);
@@ -56,7 +56,7 @@ TEST_CASE("set/get 往返：$0 微步", "[settings]")
     settings_reset_defaults();
 }
 
-TEST_CASE("set/get 往返：$1 整步数", "[settings]")
+TEST_CASE("set/get 往返：每转整步数", "[settings]")
 {
     settings_status_t st = settings_set(SET_FULL_STEP, 400.0f);
     TEST_ASSERT_EQUAL(SETTINGS_OK, st);
@@ -64,7 +64,7 @@ TEST_CASE("set/get 往返：$1 整步数", "[settings]")
     settings_reset_defaults();
 }
 
-TEST_CASE("set/get 往返：$2 每转行程", "[settings]")
+TEST_CASE("set/get 往返：每转行程", "[settings]")
 {
     settings_status_t st = settings_set(SET_MM_PER_REV, 36.0f);
     TEST_ASSERT_EQUAL(SETTINGS_OK, st);
@@ -72,7 +72,7 @@ TEST_CASE("set/get 往返：$2 每转行程", "[settings]")
     settings_reset_defaults();
 }
 
-TEST_CASE("set/get 往返：$3 运行电流", "[settings]")
+TEST_CASE("set/get 往返：运行电流", "[settings]")
 {
     settings_status_t st = settings_set(SET_RUN_MA, 1500.0f);
     TEST_ASSERT_EQUAL(SETTINGS_OK, st);
@@ -80,17 +80,17 @@ TEST_CASE("set/get 往返：$3 运行电流", "[settings]")
     settings_reset_defaults();
 }
 
-TEST_CASE("set/get 往返：$4 保持电流", "[settings]")
+TEST_CASE("set/get 往返：保持电流", "[settings]")
 {
-    /* $3 处于默认 800，600 合法 */
+    /* 运行电流处于默认 800，600 合法 */
     settings_status_t st = settings_set(SET_HOLD_MA, 600.0f);
     TEST_ASSERT_EQUAL(SETTINGS_OK, st);
     TEST_ASSERT_FLOAT_WITHIN(0.001f, 600.0f, settings_get(SET_HOLD_MA));
     settings_reset_defaults();
 }
 
-/* 7. 非法：$0 */
-TEST_CASE("非法值：$0 微步", "[settings]")
+/* 7. 非法：微步 */
+TEST_CASE("非法值：微步", "[settings]")
 {
     settings_reset_defaults();
     TEST_ASSERT_EQUAL(SETTINGS_INVALID, settings_set(SET_MICROSTEP, 7.0f));   /* 非 2^n */
@@ -99,23 +99,23 @@ TEST_CASE("非法值：$0 微步", "[settings]")
     TEST_ASSERT_EQUAL(SETTINGS_INVALID, settings_set(SET_MICROSTEP, 8.5f));   /* 非整数 */
 }
 
-/* 8. 非法：$1 */
-TEST_CASE("非法值：$1 整步数", "[settings]")
+/* 8. 非法：每转整步数 */
+TEST_CASE("非法值：每转整步数", "[settings]")
 {
     settings_reset_defaults();
     TEST_ASSERT_EQUAL(SETTINGS_INVALID, settings_set(SET_FULL_STEP, 300.0f)); /* 非 200/400 */
 }
 
-/* 9. 非法：$2 */
-TEST_CASE("非法值：$2 每转行程", "[settings]")
+/* 9. 非法：每转行程 */
+TEST_CASE("非法值：每转行程", "[settings]")
 {
     settings_reset_defaults();
     TEST_ASSERT_EQUAL(SETTINGS_INVALID, settings_set(SET_MM_PER_REV, 0.0f));   /* == 0 */
     TEST_ASSERT_EQUAL(SETTINGS_INVALID, settings_set(SET_MM_PER_REV, 501.0f)); /* > 500 */
 }
 
-/* 10. 非法：$3 */
-TEST_CASE("非法值：$3 运行电流", "[settings]")
+/* 10. 非法：运行电流 */
+TEST_CASE("非法值：运行电流", "[settings]")
 {
     settings_reset_defaults();
     TEST_ASSERT_EQUAL(SETTINGS_INVALID, settings_set(SET_RUN_MA, 0.0f));      /* == 0 */
@@ -123,18 +123,18 @@ TEST_CASE("非法值：$3 运行电流", "[settings]")
 }
 
 /* 11. 交叉检查：SET_HOLD_MA > SET_RUN_MA 拒绝 */
-TEST_CASE("交叉检查：$4 > $3 拒绝", "[settings]")
+TEST_CASE("交叉检查：保持电流 > 运行电流 拒绝", "[settings]")
 {
-    settings_reset_defaults();  /* $3 = 800 */
-    TEST_ASSERT_EQUAL(SETTINGS_INVALID, settings_set(SET_HOLD_MA, 1000.0f)); /* > $3=800 */
+    settings_reset_defaults();  /* 运行电流 = 800 */
+    TEST_ASSERT_EQUAL(SETTINGS_INVALID, settings_set(SET_HOLD_MA, 1000.0f)); /* > 运行电流 800 */
 }
 
-/* 11b. 交叉检查：$3 收缩到 $4 之下（反向） */
-TEST_CASE("交叉检查：$3 < $4 拒绝，收到 $4 为界", "[settings]")
+/* 11b. 交叉检查：运行电流收缩到保持电流之下（反向） */
+TEST_CASE("交叉检查：运行电流 < 保持电流 拒绝，收缩到保持电流为界", "[settings]")
 {
-    settings_reset_defaults();  /* $3 = 800, $4 = 400 */
-    TEST_ASSERT_EQUAL(SETTINGS_INVALID, settings_set(SET_RUN_MA, 200.0f)); /* < $4=400 */
-    /* 收缩到 $4 即可 */
+    settings_reset_defaults();  /* 运行电流 = 800，保持电流 = 400 */
+    TEST_ASSERT_EQUAL(SETTINGS_INVALID, settings_set(SET_RUN_MA, 200.0f)); /* < 保持电流 400 */
+    /* 收缩到保持电流即可 */
     TEST_ASSERT_EQUAL(SETTINGS_OK, settings_set(SET_RUN_MA, 400.0f));
     settings_reset_defaults();
 }

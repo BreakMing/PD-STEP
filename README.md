@@ -22,7 +22,7 @@ PC 联调机）通过串口以 **protocol.md 线协议** 驱动：200 Hz 状态�
 | 供电 | CH224K PD | — | USB-PD 12V 供电机 |
 | 烧录/日志 | UART0 | 板载 CH340K | 烧录与 ESP_LOG 控制台 |
 
-机械：2GT 20T 同步带，40 mm/圈；细分 8（settings `$0`，NVS
+机械：2GT 20T 同步带，40 mm/圈；细分 8（settings 微步参数，NVS
 namespace `cart`）→ 1600 steps/圈 = 40 steps/mm = 25 µm/step。
 
 ## 工程结构
@@ -40,12 +40,12 @@ components/
                 16 ms 速度窗；两实例并存，契约经操作表分发）
   motor/        步进电机类别：契约（句柄式、steps 域）+ TMC2209+
                 GPTimer 实现（Kconfig choice）
-  cartpos/      小车位置解释组件：encoder counts → x_um（$2 比例、
+  cartpos/      小车位置解释组件：encoder counts → x_um（每转行程比例、
                 原点偏移归本层）
   poleang/      摆角解释组件：encoder 角量 → 已标定 θ（POLE_ZERO/
                 POLE_INV 归本层，µrad 算术与 mt6835_urad 逐位一致）
   cartaxis/     直线轴解释组件：mm↔steps 换算（纯函数，宿主可测）、
-                steps_per_mm 即读即算、$0 单一写者、X_INV 指令与
+                steps_per_mm 即读即算、细分单一写者、X_INV 指令与
                 读数统一取反
   step_engine/  GPTimer ISR 速度模式：vel_ramp 每步递推（纯函数）+
                 带符号目标 + 命令看门狗 + 换向经零速（器件驱动，经 motor 组合）
@@ -55,11 +55,11 @@ components/
                 magnetic_encoder 组合；帧格式抄录见
                 docs/reviews/T4-brief.md）
   telemetry/    200 Hz STATE 组帧（纯函数 + 常开任务）
-  settings/     NVS 机械参数（$0–$4：细分/整步/每转行程/电流）
+  settings/     NVS 机械参数（微步/每转整步数/每转行程/电流，索引 0–4）
   tmc2209/      驱动配置（电流/细分/EN，初值经 config 注入）（器件
                 驱动，经 motor 组合）
   <每个组件>/test/  组件单元测试（Unity，仅测试工程编入）
-main/app_main.c 启动接线（创建全部实例、分发句柄、$3/$4 中转）
+main/app_main.c 启动接线（创建全部实例、分发句柄、运行/保持电流中转）
 test/           独立测试工程（TEST_COMPONENTS + Unity 菜单）
 host_tests/     宿主可跑的纯逻辑测试（gcc，无 ESP 依赖）
 tools/          cartpole_host.py 联调工具

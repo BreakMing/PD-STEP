@@ -24,7 +24,7 @@ static int s_run = 0;
 
 int main(void)
 {
-    /* steps_per_mm = 40（默认 $0=8、$1=200、$2=40） */
+    /* steps_per_mm = 40（默认细分=8、每转整步数=200、每转行程=40） */
     CHECK_EQ(cartaxis_mmps_to_steps(0,    40.0), 0);
     CHECK_EQ(cartaxis_mmps_to_steps(1000, 40.0), 40000);
     CHECK_EQ(cartaxis_mmps_to_steps(-250, 40.0), -10000);

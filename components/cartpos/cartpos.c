@@ -1,8 +1,8 @@
 /*
  * cartpos — 小车位置解释实现
  *
- * 机械比例（$2 → µm/count）的唯一权威在本层：位置与速度同源
- * 同值。$2 非法（≤0）回退 40 mm/rev 并告警（沿袭原 as5600 行为）。
+ * 机械比例（每转行程 → µm/count）的唯一权威在本层：位置与速度同源
+ * 同值。每转行程非法（≤0）回退 40 mm/rev 并告警（沿袭原 as5600 行为）。
  */
 #include "cartpos.h"
 
@@ -14,7 +14,7 @@
 
 static const char *TAG = "cartpos";
 
-#define CARTPOS_DEFAULT_UPR  40.0f  /* fallback if $2 is unusable */
+#define CARTPOS_DEFAULT_UPR  40.0f  /* fallback if units_per_rev is unusable */
 
 static magnetic_encoder_handle_t s_enc;
 
@@ -26,7 +26,7 @@ static void refresh_scale(void)
 {
     float upr = settings_units_per_rev();
     if (!(upr > 0.0f)) {
-        ESP_LOGW(TAG, "invalid $2 units_per_rev=%.3f — falling back to %.1f mm/rev",
+        ESP_LOGW(TAG, "invalid units_per_rev=%.3f — falling back to %.1f mm/rev",
                  (double)upr, (double)CARTPOS_DEFAULT_UPR);
         upr = CARTPOS_DEFAULT_UPR;
     }
@@ -39,13 +39,13 @@ static void refresh_scale(void)
     portEXIT_CRITICAL(&s_lock);
 }
 
-/* Settings notification — only $2 changes the counts → mm scale. */
+/* Settings notification — only units_per_rev changes the counts → mm scale. */
 static void on_settings_change(int idx, float new_value)
 {
     (void)new_value;
     if (idx == SET_MM_PER_REV) {
         refresh_scale();
-        ESP_LOGI(TAG, "$2 changed — scale refreshed (%.6f µm/count)",
+        ESP_LOGI(TAG, "units_per_rev changed — scale refreshed (%.6f µm/count)",
                  (double)settings_units_per_rev() * 1000.0
                      / (double)magnetic_encoder_counts_per_rev(s_enc));
     }
@@ -56,7 +56,7 @@ void cartpos_init(magnetic_encoder_handle_t enc)
     s_enc = enc;
     refresh_scale();
     if (!settings_subscribe(on_settings_change)) {
-        ESP_LOGW(TAG, "settings 订阅失败（槽满）——$2 变更不会生效");
+        ESP_LOGW(TAG, "settings 订阅失败（槽满）——每转行程变更不会生效");
     }
 }
 
