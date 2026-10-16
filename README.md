@@ -19,7 +19,7 @@ PC 联调机）通过串口以 **protocol.md 线协议** 驱动：200 Hz 状态�
 | 小车编码器 | AS5600（电机尾部直装） | I2C SDA=8 / SCL=9 @400 kHz | 12 bit 多圈 → x_um 遥测与丢步判定 |
 | 摆角编码器 | MT6835（21 bit） | SPI MISO=46、MOSI=40、SCK=39、CS=7 | ±π µrad 摆角与角速度遥测 |
 | 主机通道 | UART1 | TX=41 / RX=42 @460800 8N1 | protocol.md 线协议（经 CH343P USB） |
-| 供电 | CH224K PD | — | USB-PD 12V 供电机 |
+| 供电 | CH224K PD | — | USB-PD 20V 供电机 |
 | 烧录/日志 | UART0 | 板载 CH340K | 烧录与 ESP_LOG 控制台 |
 
 机械：2GT 20T 同步带，40 mm/圈；细分 8（settings 微步参数，NVS
