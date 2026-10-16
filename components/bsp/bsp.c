@@ -32,7 +32,6 @@ static const char *TAG = "bsp";
 #define BSP_PIN_I2C_SCL       CONFIG_BSP_I2C_SCL_GPIO
 #define BSP_I2C_FREQ_HZ       CONFIG_BSP_I2C_FREQ_HZ
 #define BSP_I2C_PORT_NUM      I2C_NUM_0
-#define BSP_AS5600_ADDR       CONFIG_BSP_AS5600_I2C_ADDR
 
 /* MT6835 SPI（MOSI=40 MISO=46 SCK=39，CS 由 mt6835 设备侧持有） */
 #define BSP_SPI_HOST          SPI3_HOST
@@ -106,7 +105,8 @@ static esp_err_t bsp_gpio_init(void)
  *   1. Create bus WITHOUT internal pullup (assume external pullups).
  *   2. Scan 0x08–0x77.
  *   3. If zero devices found: delete bus, recreate WITH internal pullup, rescan.
- *   4. Log which address(es) replied. If 0x36 replies, print AS5600 detected.
+ *   4. Log which address(es) replied. 器件在场性与健康判定归
+ *      magnetic_encoder 的首读与失败计数，本层不按地址识别器件。
  */
 static esp_err_t bsp_i2c_create_bus(bool enable_internal_pullup)
 {
@@ -124,15 +124,12 @@ static esp_err_t bsp_i2c_create_bus(bool enable_internal_pullup)
     return i2c_new_master_bus(&bus_cfg, &s_i2c_bus);
 }
 
-static int bsp_i2c_scan(uint8_t *found_addrs, int max_found)
+static int bsp_i2c_scan(void)
 {
     int count = 0;
     for (int addr = I2C_SCAN_ADDR_FIRST; addr <= I2C_SCAN_ADDR_LAST; addr++) {
         esp_err_t err = i2c_master_probe(s_i2c_bus, (uint16_t)addr, I2C_PROBE_TIMEOUT_MS);
         if (err == ESP_OK) {
-            if (count < max_found) {
-                found_addrs[count] = (uint8_t)addr;
-            }
             count++;
             ESP_LOGI(TAG, "I2C scan: device found at 0x%02x", addr);
         }
@@ -156,8 +153,7 @@ static esp_err_t bsp_i2c_init(void)
     }
     s_i2c_internal_pullup = false;
 
-    uint8_t found[16];
-    int count = bsp_i2c_scan(found, sizeof(found));
+    int count = bsp_i2c_scan();
 
     if (count == 0) {
         ESP_LOGW(TAG, "I2C scan found 0 devices (no pullup). "
@@ -176,7 +172,7 @@ static esp_err_t bsp_i2c_init(void)
         s_i2c_internal_pullup = true;
         ESP_LOGI(TAG, "I2C bus recreated with internal pullups enabled");
 
-        count = bsp_i2c_scan(found, sizeof(found));
+        count = bsp_i2c_scan();
 
         if (count == 0) {
             ESP_LOGE(TAG, "I2C scan still found 0 devices even with internal pullups. "
@@ -188,20 +184,6 @@ static esp_err_t bsp_i2c_init(void)
     } else {
         ESP_LOGI(TAG, "I2C scan: %d device(s) found (no internal pullup)", count);
         ESP_LOGI(TAG, "Conclusion: board has external I2C pullups.");
-    }
-
-    /* Look for the AS5600 specifically */
-    bool as5600_found = false;
-    for (int i = 0; i < count && i < (int)sizeof(found); i++) {
-        if (found[i] == BSP_AS5600_ADDR) {
-            as5600_found = true;
-            break;
-        }
-    }
-    if (as5600_found) {
-        ESP_LOGI(TAG, "AS5600 detected at 0x%02x", BSP_AS5600_ADDR);
-    } else {
-        ESP_LOGW(TAG, "AS5600 NOT detected at 0x%02x", BSP_AS5600_ADDR);
     }
 
     return ESP_OK;
@@ -218,7 +200,7 @@ static esp_err_t bsp_spi_init(void)
         .sclk_io_num = BSP_PIN_SPI_SCLK,
         .quadwp_io_num = -1,
         .quadhd_io_num = -1,
-        .max_transfer_sz = 8,   /* 角度读取事务 6 字节 */
+        .max_transfer_sz = 8,   /* 当前最大单事务 6 字节，8 留余量 */
     };
 
     esp_err_t err = spi_bus_initialize(BSP_SPI_HOST, &bus_cfg, SPI_DMA_CH_AUTO);

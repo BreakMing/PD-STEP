@@ -48,14 +48,15 @@ void bsp_early_init(void);
 esp_err_t bsp_init(void);
 
 /**
- * @brief Get the I2C master bus handle (for use by other components, e.g. AS5600).
+ * @brief Get the I2C master bus handle (for device config assembly
+ *        at the assembly point).
  *
  * @return Bus handle, or NULL if bus not initialized.
  */
 i2c_master_bus_handle_t bsp_get_i2c_bus(void);
 
 /**
- * @brief Get the SPI host used by the MT6835 encoder.
+ * @brief Get the SPI host (for device config assembly at the assembly point).
  *
  * @return Host id (SPI3_HOST), or -1 if bus not initialized.
  */
