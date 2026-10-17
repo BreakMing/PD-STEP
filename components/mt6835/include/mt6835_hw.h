@@ -40,29 +40,36 @@ typedef struct {
     int               spics_io_num;
 } mt6835_hw_config_t;
 
+/* 实例句柄（定义在 mt6835_hw.c）：SPI 设备与失败分诊快照全部进实例，
+ * 同一总线可 init 多个实例互不影响（rev2 双编码器各持一份）。 */
+typedef struct mt6835_hw_dev_t *mt6835_hw_handle_t;
+
 /**
- * @brief 在 config 给出的总线上添加 MT6835 设备（MODE3）。
+ * @brief 在 config 给出的总线上添加 MT6835 设备（MODE3），创建实例。
  *
- * @return ESP_OK；cfg 为 NULL 或 host < 0 返回
- *         ESP_ERR_INVALID_ARG；其余错误码与
- *         spi_bus_add_device 一致。
+ * @param handle_out 出参，返回新实例句柄。
+ * @return ESP_OK；cfg/handle_out 为 NULL 或 host < 0 返回
+ *         ESP_ERR_INVALID_ARG；内存不足返回 ESP_ERR_NO_MEM；
+ *         其余错误码与 spi_bus_add_device 一致（失败时已释放实例）。
  */
-esp_err_t mt6835_hw_init(const mt6835_hw_config_t *cfg);
+esp_err_t mt6835_hw_init(const mt6835_hw_config_t *cfg,
+                         mt6835_hw_handle_t *handle_out);
 
 /**
  * @brief 读一次 21-bit 原始角与 STATUS[2:0]（帧校验含全零/CRC）。
  *
- * @return false = 事务或帧校验失败（*raw21 / *status 不变）；
- *         失败详情随后用 mt6835_hw_last_failure() 取快照。
+ * @return false = 句柄为 NULL、事务或帧校验失败（*raw21 / *status
+ *         不变）；失败详情随后用 mt6835_hw_last_failure() 取快照。
  */
-bool mt6835_hw_read_raw(uint32_t *raw21, uint8_t *status);
+bool mt6835_hw_read_raw(mt6835_hw_handle_t h, uint32_t *raw21, uint8_t *status);
 
 /**
  * @brief 最近一次失败的分类与 6 字节帧原文（无失败时返回上次值）。
  *
- * kind / frame 各自可为 NULL，为 NULL 时跳过该项。
+ * kind / frame 各自可为 NULL，为 NULL 时跳过该项；句柄为 NULL 时不写任何出参。
  */
-void mt6835_hw_last_failure(mt6835_hw_fail_t *kind,
+void mt6835_hw_last_failure(mt6835_hw_handle_t h,
+                            mt6835_hw_fail_t *kind,
                             uint8_t frame[MT6835_HW_FRAME_BYTES]);
 
 #ifdef __cplusplus

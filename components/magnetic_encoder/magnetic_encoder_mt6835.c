@@ -46,6 +46,7 @@ static bool     me_is_ok(magnetic_encoder_handle_t enc);
 /* ---- 发布状态（s_lock 保护；操作表为首成员，句柄即其地址） ---- */
 typedef struct {
     struct magnetic_encoder_s ops;
+    mt6835_hw_handle_t hw;           /* 帧层实例（驱动核心层） */
     uint32_t raw21;                  /* 最新原始角 */
     int64_t  pos_counts;             /* 多圈连续位置 */
     int64_t  hist[ME_MT6835_HIST_LEN];   /* 速度窗样本与位置同为 64 位域 */
@@ -131,7 +132,7 @@ static void me_task(void *arg)
         uint32_t raw = 0;
         uint8_t status = 0;
 
-        if (mt6835_hw_read_raw(&raw, &status)) {
+        if (mt6835_hw_read_raw(s_state.hw, &raw, &status)) {
             if (fail_streak >= ME_MT6835_FAIL_LIMIT) {
                 ESP_LOGI(TAG, "SPI 在连续 %d 次失败后恢复", fail_streak);
             }
@@ -151,7 +152,7 @@ static void me_task(void *arg)
                 s_ok = false;
                 mt6835_hw_fail_t kind;
                 uint8_t frame[MT6835_HW_FRAME_BYTES];
-                mt6835_hw_last_failure(&kind, frame);
+                mt6835_hw_last_failure(s_state.hw, &kind, frame);
                 ESP_LOGE(TAG, "SPI 读连续失败 %d 次——编码器标记 NOT OK（%s）",
                          fail_streak, fail_str(kind));
                 ESP_LOGE(TAG, "末帧 rx = %02x %02x %02x %02x %02x %02x"
@@ -245,7 +246,8 @@ esp_err_t magnetic_encoder_mt6835_init(const magnetic_encoder_mt6835_config_t *c
         .clock_speed_hz = cfg->clock_speed_hz,
         .spics_io_num  = cfg->spics_io_num,
     };
-    ESP_RETURN_ON_ERROR(mt6835_hw_init(&hw), TAG, "mt6835_hw_init 失败");
+    mt6835_hw_handle_t hwdev = NULL;
+    ESP_RETURN_ON_ERROR(mt6835_hw_init(&hw, &hwdev), TAG, "mt6835_hw_init 失败");
 
     /* 状态清零并保留操作表 */
     s_state = (me_state_t){
@@ -256,17 +258,18 @@ esp_err_t magnetic_encoder_mt6835_init(const magnetic_encoder_mt6835_config_t *c
             .is_ok                 = me_is_ok,
         },
     };
+    s_state.hw = hwdev;
 
     /* 首读：种子多圈位置并验证总线可用 */
     uint32_t raw = 0;
     uint8_t status = 0;
-    if (mt6835_hw_read_raw(&raw, &status)) {
+    if (mt6835_hw_read_raw(s_state.hw, &raw, &status)) {
         publish(raw, status);
         ESP_LOGI(TAG, "MT6835 在线——首读 raw21=%u（种子，pos=0）", raw);
     } else {
         mt6835_hw_fail_t kind;
         uint8_t frame[MT6835_HW_FRAME_BYTES];
-        mt6835_hw_last_failure(&kind, frame);
+        mt6835_hw_last_failure(s_state.hw, &kind, frame);
         ESP_LOGW(TAG, "首读失败（%s）——采样任务将继续重试",
                  fail_str(kind));
         ESP_LOGW(TAG, "末帧 rx = %02x %02x %02x %02x %02x %02x",

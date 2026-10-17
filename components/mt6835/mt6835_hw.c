@@ -19,26 +19,35 @@
 
 #include "mt6835_hw.h"
 
+#include <stdlib.h>
+
 #include "mt6835_urad.h"   /* mt6835_crc8 */
 
 /* ---- 帧常量（T4-brief.md 抄录） ---- */
 #define MT6835_OP_ANGLE     0x0Au       /* 0b1010 */
 #define MT6835_REG_ANGLE1   0x03u
 
-static spi_device_handle_t s_dev = NULL;
-
-/* 失败分诊：SPI 错误 / 全零帧 / CRC 不符；进入失败态时由设备组件 dump 一次 */
-static mt6835_hw_fail_t s_last_fail = MT6835_HW_FAIL_SPI_ERR;
-static uint8_t s_last_frame[MT6835_HW_FRAME_BYTES];
+/* 实例：SPI 设备 + 失败分诊快照（进入失败态时由设备组件 dump 一次） */
+struct mt6835_hw_dev_t {
+    spi_device_handle_t dev;
+    mt6835_hw_fail_t    last_fail;
+    uint8_t             last_frame[MT6835_HW_FRAME_BYTES];
+};
 
 /* ================================================================
  * Lifecycle
  * ================================================================ */
 
-esp_err_t mt6835_hw_init(const mt6835_hw_config_t *cfg)
+esp_err_t mt6835_hw_init(const mt6835_hw_config_t *cfg,
+                         mt6835_hw_handle_t *handle_out)
 {
-    if (cfg == NULL || cfg->host < 0) {
+    if (cfg == NULL || handle_out == NULL || cfg->host < 0) {
         return ESP_ERR_INVALID_ARG;
+    }
+
+    mt6835_hw_handle_t h = calloc(1, sizeof(*h));
+    if (h == NULL) {
+        return ESP_ERR_NO_MEM;
     }
 
     spi_device_interface_config_t dev_cfg = {
@@ -47,7 +56,15 @@ esp_err_t mt6835_hw_init(const mt6835_hw_config_t *cfg)
         .spics_io_num = cfg->spics_io_num,
         .queue_size = 1,
     };
-    return spi_bus_add_device(cfg->host, &dev_cfg, &s_dev);
+    esp_err_t err = spi_bus_add_device(cfg->host, &dev_cfg, &h->dev);
+    if (err != ESP_OK) {
+        free(h);
+        return err;
+    }
+
+    h->last_fail = MT6835_HW_FAIL_SPI_ERR;
+    *handle_out = h;
+    return ESP_OK;
 }
 
 /* ================================================================
@@ -55,8 +72,12 @@ esp_err_t mt6835_hw_init(const mt6835_hw_config_t *cfg)
  * ================================================================ */
 
 /* 读一次 21-bit 原始角。返回 false = 事务/帧校验失败（raw 不变）。 */
-bool mt6835_hw_read_raw(uint32_t *raw_out, uint8_t *status_out)
+bool mt6835_hw_read_raw(mt6835_hw_handle_t h, uint32_t *raw_out, uint8_t *status_out)
 {
+    if (h == NULL) {
+        return false;
+    }
+
     uint8_t tx[MT6835_HW_FRAME_BYTES] = {
         (uint8_t)(MT6835_OP_ANGLE << 4),
         MT6835_REG_ANGLE1,
@@ -72,9 +93,9 @@ bool mt6835_hw_read_raw(uint32_t *raw_out, uint8_t *status_out)
         .rx_buffer = rx,
     };
 
-    esp_err_t err = spi_device_polling_transmit(s_dev, &t);
+    esp_err_t err = spi_device_polling_transmit(h->dev, &t);
     if (err != ESP_OK) {
-        s_last_fail = MT6835_HW_FAIL_SPI_ERR;
+        h->last_fail = MT6835_HW_FAIL_SPI_ERR;
         goto fail;
     }
 
@@ -85,11 +106,11 @@ bool mt6835_hw_read_raw(uint32_t *raw_out, uint8_t *status_out)
     /* 帧校验：拔线时 MISO 悬空常读全零——CRC 与全零帧一并拒绝，
      * 失败计入 fail_streak（10 ms 内 is_ok 变 false → FAULT/MT6835） */
     if (raw == 0 && status == 0 && rx[5] == 0) {
-        s_last_fail = MT6835_HW_FAIL_ALL_ZERO;
+        h->last_fail = MT6835_HW_FAIL_ALL_ZERO;
         goto fail;
     }
     if (mt6835_crc8(raw, status) != rx[5]) {
-        s_last_fail = MT6835_HW_FAIL_CRC;
+        h->last_fail = MT6835_HW_FAIL_CRC;
         goto fail;
     }
 
@@ -100,7 +121,7 @@ bool mt6835_hw_read_raw(uint32_t *raw_out, uint8_t *status_out)
 fail:
     /* 帧原文留存，进入失败态时一次性 dump（接线/算法分诊用） */
     for (int i = 0; i < MT6835_HW_FRAME_BYTES; i++) {
-        s_last_frame[i] = rx[i];
+        h->last_frame[i] = rx[i];
     }
     return false;
 }
@@ -109,15 +130,19 @@ fail:
  * 失败分诊快照
  * ================================================================ */
 
-void mt6835_hw_last_failure(mt6835_hw_fail_t *kind,
+void mt6835_hw_last_failure(mt6835_hw_handle_t h,
+                            mt6835_hw_fail_t *kind,
                             uint8_t frame[MT6835_HW_FRAME_BYTES])
 {
+    if (h == NULL) {
+        return;
+    }
     if (kind != NULL) {
-        *kind = s_last_fail;
+        *kind = h->last_fail;
     }
     if (frame != NULL) {
         for (int i = 0; i < MT6835_HW_FRAME_BYTES; i++) {
-            frame[i] = s_last_frame[i];
+            frame[i] = h->last_frame[i];
         }
     }
 }
