@@ -8,8 +8,8 @@ PC 联调机）通过串口以 **protocol.md 线协议** 驱动：200 Hz 状态�
 
 > **硬件已改版（2026-10-17，见 [docs/hardware.md](docs/hardware.md)）**：
 > 小车编码器 AS5600→板载 MT6835、摆角改外接 MT6835、协议通道 UART1→UART0、
-> 烧录日志切原生 USB。编码器双 MT6835 台位已完成固件适配（双 SPI、骨架多实例）；
-> 协议通道迁移（T7）与新增外设（T8）见迁移计划。
+> 烧录日志切原生 USB。固件适配已完成（双 SPI 编码器骨架多实例、通道迁移、
+> vbus/LED/按键/CH224Q 调档）；上板回归按 hardware.md 检查清单执行（待办）。
 
 **线协议唯一权威：本仓库之外的项目主仓库
 `deploy/v2/protocol.md`**（命令词法、模式转换表、参数注册表、
@@ -24,7 +24,8 @@ PC 联调机）通过串口以 **protocol.md 线协议** 驱动：200 Hz 状态�
 | 小车编码器 | MT6835（板载，21 bit） | SPI SCK=12、MOSI=11、MISO=13、CS=10 | 多圈 → x_um 遥测与丢步判定（2026-10-17 改版接替 AS5600） |
 | 摆角编码器 | MT6835（外接，21 bit） | SPI SCK=47、MOSI=48、MISO=38、CS=14 | ±π µrad 摆角与角速度遥测 |
 | 主机通道 | UART0 | TX=43 / RX=44 @460800 8N1 | protocol.md 线协议（飞线直连；CH343P 已移除） |
-| 供电 | CH224Q PD | CF1=120kΩ 定档 | USB-PD 20V 供电机；io4 分压回读总线电压 |
+| 供电 | CH224Q PD | CF1=120kΩ 定档、I2C 8/9 可调档 | USB-PD 20V 供电机；io4 分压回读总线电压 |
+| 按键/LED | 3 键 + 1 LED | but=7/2/1、LED=15 | 按键驱动层读取；LED 1Hz 心跳（行为语义待定义） |
 | 烧录/日志 | 原生 USB | D−=19 / D+=20 | USB-Serial/JTAG |
 
 机械：2GT 20T 同步带，40 mm/圈；细分 8（settings 微步参数，NVS
@@ -34,7 +35,7 @@ namespace `cart`）→ 1600 steps/圈 = 40 steps/mm = 25 µm/step。
 
 ```
 components/
-  bsp/          引脚与外设初始化（UART1/GPIO/I2C/SPI）
+  bsp/          引脚与外设初始化（GPIO/I2C/双 SPI/vbus ADC/LED/按键）
   cartparams/   参数注册表（九项运行参数，纯数据层，无硬件依赖）
   cartproto/    线协议载体：行组装、命令解析（纯函数）、MODE/OK/ERR 应答
   cartfsm/      三态模式机：纯核心（转换表/标定合法性/软限位窗口/丢步）
@@ -55,6 +56,8 @@ components/
                 读数统一取反
   step_engine/  GPTimer ISR 速度模式：vel_ramp 每步递推（纯函数）+
                 带符号目标 + 命令看门狗 + 换向经零速（器件驱动，经 motor 组合）
+  ch224q/       CH224Q PD 诱骗 I2C 调档（驱动核心：设档 0x0A/握手
+                状态 0x09 位解析/档电流 0x50；CF1 电阻档为上电默认）
   as5600/       AS5600 I2C 读层（驱动核心，实例句柄式；rev2 不接线，
                 组件保留备旧板/复用）
   mt6835/       MT6835 SPI 帧层 + ±π 环绕换算纯函数（驱动核心，经
