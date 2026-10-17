@@ -1,20 +1,18 @@
 /*
  * magnetic_encoder 硬件自测（官方 test/ 子目录约定，仅测试工程编入）
  *
- * [as5600] 段承接原 test_as5600.c B13–B18 与 manual A9：
- *  - B13/B14/B15 走类别实现面（init / last_raw / is_ok）；
- *  - B16 静止速度改为 counts/s 口径（5 mm/s ≡ 512 counts/s @40 mm/4096）；
+ * [cart] 段为小车位板载 MT6835（rev2 接替 AS5600 职责）：
+ *  - B13 双实例在位、B14 读数合法域、B15 静止噪声（counts 口径）、
+ *    B16 静止速度（5 mm/s ≡ 262144 counts/s @40 mm/2^21）；
  *  - B17/B18 转测 cartpos 解释层（比例一致性、原点重置）。
- * [mt6835] 段承接原 test_mt6835.c 硬件用例（静止稳定性、theta 合法域
+ * [mt6835] 段为摆角位外接 MT6835（静止稳定性、theta 合法域
  * 与 poleang 解释层对拍、A10 手动段）。
- * init 每次调用各出独立实例（不再幂等）——本文件经 static 句柄
- * 每台位只建一次。
+ * 实例由 test_app_main 组装（init 不幂等，每台位一次）。
  */
 
 #include <math.h>
 
 #include "magnetic_encoder.h"
-#include "magnetic_encoder_as5600.h"
 #include "magnetic_encoder_mt6835.h"
 #include "mt6835_urad.h"
 #include "cartpos.h"
@@ -46,50 +44,53 @@ static magnetic_encoder_handle_t mt6835_enc(void)
     return test_me_pole_enc();
 }
 
-TEST_CASE("B13 I2C 总线在位 + magnetic_encoder_as5600_init OK", "[as5600]")
+TEST_CASE("B13 小车位 SPI 在位 + 双实例 init OK", "[cart]")
 {
-    TEST_ASSERT_NOT_NULL(bsp_get_i2c_bus());
     TEST_ASSERT_NOT_NULL(enc());
+    TEST_ASSERT_NOT_NULL(mt6835_enc());
+    /* 双实例同时在线（rev2 主线：同实现两实例各归其主） */
+    TEST_ASSERT_TRUE(magnetic_encoder_is_ok(enc()));
+    TEST_ASSERT_TRUE(magnetic_encoder_is_ok(mt6835_enc()));
 }
 
-/* 只读（红线见 as5600_hw.c） */
-TEST_CASE("B14 20 次实时读全部 12 bit 内且链路健康", "[as5600]")
+/* 只读（帧校验含全零/CRC 拒收，见 mt6835_hw.c） */
+TEST_CASE("B14 20 次实时读全部 21 bit 内且链路健康", "[cart]")
 {
     magnetic_encoder_handle_t h = enc();
     for (int i = 0; i < 20; i++) {
-        uint16_t raw = magnetic_encoder_as5600_last_raw(h);
-        TEST_ASSERT_LESS_OR_EQUAL_UINT16(4095, raw);
+        uint32_t raw = magnetic_encoder_mt6835_last_raw(h);
+        TEST_ASSERT_LESS_OR_EQUAL_UINT32(MT6835_COUNTS_PER_REV - 1, raw);
         vTaskDelay(pdMS_TO_TICKS(2));
     }
     TEST_ASSERT_TRUE_MESSAGE(magnetic_encoder_is_ok(h),
-                             "is_ok 假——I2C 读失败");
+                             "is_ok 假——SPI 读失败");
     ESP_LOGI(TAG, "  last raw=%u, counts=%lld",
-             magnetic_encoder_as5600_last_raw(h),
+             magnetic_encoder_mt6835_last_raw(h),
              (long long)magnetic_encoder_position_counts(h));
 }
 
-/* 静止噪声：20 样本峰峰值 ≤2 counts（验收判据见
- * docs/reviews/T8-acceptance.md），保持轴静止。峰峰值按相对首样本
- * 的「展开差」度量（与 tracker 同一 ±2048 规则）。 */
-TEST_CASE("B15 静止噪声峰峰值 ≤2 counts", "[as5600]")
+/* 静止噪声：20 样本峰峰值 ≤2 count。峰峰值按相对首样本的
+ * 「展开差」度量（±cpr/2 规则，与 tracker 同式——磁铁停在
+ * 0/2^21−1 边界时 raw 极值差虚高，展开差仍 ≤2）。 */
+TEST_CASE("B15 静止噪声峰峰值 ≤2 count", "[cart]")
 {
     magnetic_encoder_handle_t h = enc();
-    int32_t  ref     = (int32_t)magnetic_encoder_as5600_last_raw(h);
-    uint16_t raw_min = 0xFFFF;
-    uint16_t raw_max = 0;
+    int32_t  ref     = (int32_t)magnetic_encoder_mt6835_last_raw(h);
+    uint32_t raw_min = 0xFFFFFFFFu;
+    uint32_t raw_max = 0;
     int32_t  d_min   = 0;
     int32_t  d_max   = 0;
 
     for (int i = 0; i < 20; i++) {
-        uint16_t raw = magnetic_encoder_as5600_last_raw(h);
+        uint32_t raw = magnetic_encoder_mt6835_last_raw(h);
         if (raw < raw_min) raw_min = raw;
         if (raw > raw_max) raw_max = raw;
 
         int32_t d = (int32_t)raw - ref;
-        if (d > 2048) {
-            d -= 4096;
-        } else if (d < -2047) {
-            d += 4096;
+        if (d > (int32_t)(MT6835_COUNTS_PER_REV / 2)) {
+            d -= (int32_t)MT6835_COUNTS_PER_REV;
+        } else if (d < -(int32_t)(MT6835_COUNTS_PER_REV / 2 - 1)) {
+            d += (int32_t)MT6835_COUNTS_PER_REV;
         }
         if (d < d_min) d_min = d;
         if (d > d_max) d_max = d;
@@ -101,42 +102,43 @@ TEST_CASE("B15 静止噪声峰峰值 ≤2 counts", "[as5600]")
     ESP_LOGI(TAG, "  噪声：raw %u..%u，展开 p-p=%ld counts",
              raw_min, raw_max, (long)pp);
 
-    if ((uint16_t)(raw_max - raw_min) > 2 && pp <= 2) {
-        ESP_LOGW(TAG, "  注：raw 极值跨 0/4095 边界——轴停在回绕点上，"
+    if ((raw_max - raw_min) > 2 && pp <= 2) {
+        ESP_LOGW(TAG, "  注：raw 极值跨 0/2^21−1 边界——轴停在回绕点上，"
                       "展开噪声仍 ≤2");
     }
-    TEST_ASSERT_TRUE_MESSAGE(pp <= 2, "静止噪声超 2 counts（是否碰了轴？）");
+    TEST_ASSERT_TRUE_MESSAGE(pp <= 2, "静止噪声超 2 count（是否碰了轴？）");
 }
 
-/* 静止速度：协议口径 σ≤5 mm/s @40 mm/4096 ≡ 512 counts/s */
-TEST_CASE("B16 静止速度 |v| ≤512 counts/s（16 ms 窗）", "[as5600]")
+/* 静止速度：协议口径 σ≤5 mm/s @40 mm/2^21 ≡ 262144 counts/s */
+TEST_CASE("B16 静止速度 |v| ≤262144 counts/s（16 ms 窗）", "[cart]")
 {
     magnetic_encoder_handle_t h = enc();
     vTaskDelay(pdMS_TO_TICKS(50));   /* 等速度窗填充 */
 
     int32_t v = magnetic_encoder_velocity_counts_per_s(h);
     ESP_LOGI(TAG, "  静止速度 = %d counts/s", v);
-    TEST_ASSERT_TRUE_MESSAGE(v <= 512 && v >= -512, "静止速度超 512 counts/s");
+    TEST_ASSERT_TRUE_MESSAGE(v <= 262144 && v >= -262144,
+                             "静止速度超 262144 counts/s");
 }
 
-/* 位置/标度一致性（cartpos 解释层）：x_um = counts × 每转行程 / 4096（未设原点时） */
-TEST_CASE("B17 x_um == counts × 每转行程 ÷ 4096（cartpos 层）", "[as5600]")
+/* 位置/标度一致性（cartpos 解释层）：x_um = counts × 每转行程 / 2^21（未设原点时） */
+TEST_CASE("B17 x_um == counts × 每转行程 ÷ 2^21（cartpos 层）", "[cart]")
 {
     magnetic_encoder_handle_t h = enc();
     cartpos_set_origin_mm(0.0f);   /* 清偏移，令 x = 原始位置 */
 
-    long counts = (long)magnetic_encoder_position_counts(h);
+    long long counts = magnetic_encoder_position_counts(h);
     float upr   = settings_units_per_rev();
-    float expect = (float)counts * upr / 4096.0f;   /* AS5600 每转计数 */
+    float expect = (float)((double)counts * upr / 2097152.0);
     float actual = (float)(cartpos_position_um() / 1000.0);
 
-    ESP_LOGI(TAG, "  counts=%ld → 期望 %.3f mm，实测 %.3f mm",
+    ESP_LOGI(TAG, "  counts=%lld → 期望 %.3f mm，实测 %.3f mm",
              counts, (double)expect, (double)actual);
     TEST_ASSERT_FLOAT_WITHIN(0.01f, expect, actual);
 }
 
 /* 原点重置（cartpos 层）：上报位置跟随 set_origin */
-TEST_CASE("B18 原点重置（设 100 / 回 0，cartpos 层）", "[as5600]")
+TEST_CASE("B18 原点重置（设 100 / 回 0，cartpos 层）", "[cart]")
 {
     cartpos_set_origin_mm(100.0f);
     float at100 = (float)(cartpos_position_um() / 1000.0);
@@ -150,7 +152,7 @@ TEST_CASE("B18 原点重置（设 100 / 回 0，cartpos 层）", "[as5600]")
 }
 
 /* ---- 人工引导段（= 上板清单 A9）---- */
-TEST_CASE("人工：手转 3 圈观察 x_um 变化", "[as5600][manual]")
+TEST_CASE("人工：手转 3 圈观察 x_um 变化", "[cart][manual]")
 {
     const int   secs = 15;
     const float upr  = settings_units_per_rev();

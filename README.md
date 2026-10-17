@@ -8,8 +8,8 @@ PC 联调机）通过串口以 **protocol.md 线协议** 驱动：200 Hz 状态�
 
 > **硬件已改版（2026-10-17，见 [docs/hardware.md](docs/hardware.md)）**：
 > 小车编码器 AS5600→板载 MT6835、摆角改外接 MT6835、协议通道 UART1→UART0、
-> 烧录日志切原生 USB。下文「硬件」表为新板事实；「工程结构」节描述的仍是
-> 适配前的当前代码（as5600 组件保留待复用，UART1 待迁移），固件适配完成后更新。
+> 烧录日志切原生 USB。编码器双 MT6835 台位已完成固件适配（双 SPI、骨架多实例）；
+> 协议通道迁移（T7）与新增外设（T8）见迁移计划。
 
 **线协议唯一权威：本仓库之外的项目主仓库
 `deploy/v2/protocol.md`**（命令词法、模式转换表、参数注册表、
@@ -41,8 +41,9 @@ components/
                 + 1 kHz 监督任务（标定状态/编码器失联/
                 丢步/软限位/FAULT 次序）
   magnetic_encoder/ 磁编码器类别：契约（句柄式、原生单位 counts）
-                + AS5600/MT6835 实现（1 kHz 采样任务/失败计数/
-                16 ms 速度窗；两实例并存，契约经操作表分发）
+                + 参数化多圈纯逻辑 + 采样骨架（1 kHz 任务/失败计数/
+                16 ms 速度窗，实例全状态进实例结构）+ AS5600/MT6835
+                薄读层实现（rev2 组装用双 MT6835 实例，契约经操作表分发）
   motor/        步进电机类别：契约（句柄式、steps 域）+ TMC2209+
                 GPTimer 实现（Kconfig choice）
   cartpos/      小车位置解释组件：encoder counts → x_um（每转行程比例、
@@ -54,8 +55,8 @@ components/
                 读数统一取反
   step_engine/  GPTimer ISR 速度模式：vel_ramp 每步递推（纯函数）+
                 带符号目标 + 命令看门狗 + 换向经零速（器件驱动，经 motor 组合）
-  as5600/       AS5600 I2C 读层 + 多圈 tracker 纯逻辑（驱动核心，经
-                magnetic_encoder 组合）
+  as5600/       AS5600 I2C 读层（驱动核心，实例句柄式；rev2 不接线，
+                组件保留备旧板/复用）
   mt6835/       MT6835 SPI 帧层 + ±π 环绕换算纯函数（驱动核心，经
                 magnetic_encoder 组合；帧格式抄录见
                 docs/reviews/T4-brief.md）
@@ -72,7 +73,7 @@ docs/reviews/   抄录与上板验收记录
 ```
 
 任务/CPU 布局：CPU0 = cartproto 通讯（prio 5）+ STEP ISR；
-CPU1 = me_as5600/me_mt6835 采样（prio 3）、cartfsm 监督（prio 4）、
+CPU1 = me_cart/me_pole 采样（prio 3）、cartfsm 监督（prio 4）、
 telemetry 组帧（prio 2）。全部订阅任务看门狗。
 
 ## 构建

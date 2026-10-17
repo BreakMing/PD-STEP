@@ -2,8 +2,8 @@
  * cartpole 固件入口
  *
  * 启动次序：bsp_early_init（EN 拉高 = 电机不使能，任何外设动作之前）
- * → settings_init → bsp_init → magnetic_encoder_as5600_init +
- * cartpos_init → magnetic_encoder_mt6835_init + poleang_init →
+ * → settings_init → bsp_init → 小车位编码器（板载 MT6835，SPI2）+
+ * cartpos_init → 摆角位编码器（外接 MT6835，SPI3）+ poleang_init →
  * motor_tmc2209_init + cartaxis_init → 组装点订阅运行/保持电流中转 →
  * cartproto_start → cartfsm_start → telemetry_start。测试代码不编入
  * 正式固件（见 test/ 独立测试工程）。
@@ -16,9 +16,8 @@
 #include "motor_tmc2209.h"
 #include "motor.h"
 #include "cartaxis.h"
-#include "magnetic_encoder_as5600.h"
-#include "cartpos.h"
 #include "magnetic_encoder_mt6835.h"
+#include "cartpos.h"
 #include "poleang.h"
 #include "telemetry.h"
 #include "cartproto.h"
@@ -46,20 +45,23 @@ void app_main(void)
      * 可见可恢复优于带病存活 */
     ESP_ERROR_CHECK(bsp_init());
     {
+        /* 双 MT6835 台位（rev2）：小车位板载（SPI2）、摆角位外接（SPI3），
+         * 同实现两实例各归其主 */
         magnetic_encoder_handle_t enc_cart;
-        magnetic_encoder_as5600_config_t ecfg = {
-            .bus          = bsp_get_i2c_bus(),
-            .dev_addr     = CONFIG_BSP_AS5600_I2C_ADDR,
-            .scl_speed_hz = CONFIG_BSP_I2C_FREQ_HZ,
-            .invert_dir   = magnetic_encoder_as5600_invert_dir_default(),
+        magnetic_encoder_mt6835_config_t ccfg = {
+            .host          = bsp_get_cart_enc_spi_host(),
+            .clock_speed_hz = CONFIG_BSP_CART_ENC_SPI_HZ,
+            .spics_io_num  = CONFIG_BSP_CART_ENC_CS_GPIO,
+            .task_name     = "me_cart",
         };
-        ESP_ERROR_CHECK(magnetic_encoder_as5600_init(&ecfg, &enc_cart));
+        ESP_ERROR_CHECK(magnetic_encoder_mt6835_init(&ccfg, &enc_cart));
         cartpos_init(enc_cart);
         magnetic_encoder_handle_t enc_pole;
         magnetic_encoder_mt6835_config_t pcfg = {
             .host          = bsp_get_pole_enc_spi_host(),
             .clock_speed_hz = CONFIG_BSP_POLE_ENC_SPI_HZ,
             .spics_io_num  = CONFIG_BSP_POLE_ENC_CS_GPIO,
+            .task_name     = "me_pole",
         };
         ESP_ERROR_CHECK(magnetic_encoder_mt6835_init(&pcfg, &enc_pole));
         poleang_init(enc_pole);
