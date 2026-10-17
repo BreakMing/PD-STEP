@@ -33,11 +33,16 @@ static const char *TAG = "bsp";
 #define BSP_I2C_FREQ_HZ       CONFIG_BSP_I2C_FREQ_HZ
 #define BSP_I2C_PORT_NUM      I2C_NUM_0
 
-/* MT6835 SPI（MOSI=40 MISO=46 SCK=39，CS 由 mt6835 设备侧持有） */
-#define BSP_SPI_HOST          SPI3_HOST
-#define BSP_PIN_SPI_MOSI      CONFIG_BSP_SPI_MOSI_GPIO
-#define BSP_PIN_SPI_MISO      CONFIG_BSP_SPI_MISO_GPIO
-#define BSP_PIN_SPI_SCLK      CONFIG_BSP_SPI_SCLK_GPIO
+/* 双 SPI 主机（rev2）：小车位=板载 MT6835（SPI2），摆角位=外接
+ * MT6835（SPI3）；CS 由各 mt6835 设备侧持有 */
+#define BSP_CART_ENC_HOST     SPI2_HOST
+#define BSP_POLE_ENC_HOST     SPI3_HOST
+#define BSP_CART_PIN_SCLK     CONFIG_BSP_CART_ENC_SCK_GPIO
+#define BSP_CART_PIN_MOSI     CONFIG_BSP_CART_ENC_MOSI_GPIO
+#define BSP_CART_PIN_MISO     CONFIG_BSP_CART_ENC_MISO_GPIO
+#define BSP_POLE_PIN_SCLK     CONFIG_BSP_POLE_ENC_SCK_GPIO
+#define BSP_POLE_PIN_MOSI     CONFIG_BSP_POLE_ENC_MOSI_GPIO
+#define BSP_POLE_PIN_MISO     CONFIG_BSP_POLE_ENC_MISO_GPIO
 
 /* I2C scan range (7-bit addresses) */
 #define I2C_SCAN_ADDR_FIRST   0x08
@@ -47,7 +52,8 @@ static const char *TAG = "bsp";
 /* ---- Internal state ---- */
 static i2c_master_bus_handle_t s_i2c_bus = NULL;
 static bool s_i2c_internal_pullup = false;
-static bool s_spi_initialized = false;
+static bool s_cart_enc_spi_ready = false;
+static bool s_pole_enc_spi_ready = false;
 
 /* ================================================================
  * bsp_early_init()
@@ -190,29 +196,49 @@ static esp_err_t bsp_i2c_init(void)
 }
 
 /* ================================================================
- * SPI bus init (MT6835)
+ * SPI bus init（双主机：小车位 + 摆角位）
  * ================================================================ */
-static esp_err_t bsp_spi_init(void)
+static esp_err_t bsp_spi_add_host(spi_host_device_t host,
+                                  int mosi, int miso, int sclk,
+                                  const char *slot)
 {
     spi_bus_config_t bus_cfg = {
-        .mosi_io_num = BSP_PIN_SPI_MOSI,
-        .miso_io_num = BSP_PIN_SPI_MISO,
-        .sclk_io_num = BSP_PIN_SPI_SCLK,
+        .mosi_io_num = mosi,
+        .miso_io_num = miso,
+        .sclk_io_num = sclk,
         .quadwp_io_num = -1,
         .quadhd_io_num = -1,
         .max_transfer_sz = 8,   /* 当前最大单事务 6 字节，8 留余量 */
     };
 
-    esp_err_t err = spi_bus_initialize(BSP_SPI_HOST, &bus_cfg, SPI_DMA_CH_AUTO);
+    esp_err_t err = spi_bus_initialize(host, &bus_cfg, SPI_DMA_CH_AUTO);
     if (err != ESP_OK) {
-        ESP_LOGE(TAG, "SPI 总线初始化失败（host=%d）：%s",
-                 BSP_SPI_HOST, esp_err_to_name(err));
+        ESP_LOGE(TAG, "SPI 总线初始化失败（%s，host=%d）：%s",
+                 slot, host, esp_err_to_name(err));
         return err;
     }
 
-    s_spi_initialized = true;
-    ESP_LOGI(TAG, "SPI: host=%d MOSI=%d MISO=%d SCLK=%d",
-             BSP_SPI_HOST, BSP_PIN_SPI_MOSI, BSP_PIN_SPI_MISO, BSP_PIN_SPI_SCLK);
+    ESP_LOGI(TAG, "SPI %s: host=%d MOSI=%d MISO=%d SCLK=%d",
+             slot, host, mosi, miso, sclk);
+    return ESP_OK;
+}
+
+static esp_err_t bsp_spi_init(void)
+{
+    ESP_RETURN_ON_ERROR(
+        bsp_spi_add_host(BSP_CART_ENC_HOST,
+                         BSP_CART_PIN_MOSI, BSP_CART_PIN_MISO, BSP_CART_PIN_SCLK,
+                         "小车位编码器"),
+        TAG, "cart enc SPI host init failed");
+    s_cart_enc_spi_ready = true;
+
+    ESP_RETURN_ON_ERROR(
+        bsp_spi_add_host(BSP_POLE_ENC_HOST,
+                         BSP_POLE_PIN_MOSI, BSP_POLE_PIN_MISO, BSP_POLE_PIN_SCLK,
+                         "摆角位编码器"),
+        TAG, "pole enc SPI host init failed");
+    s_pole_enc_spi_ready = true;
+
     return ESP_OK;
 }
 
@@ -235,7 +261,7 @@ esp_err_t bsp_init(void)
         return err;
     }
 
-    /* SPI bus (MT6835) */
+    /* SPI 双主机（小车位板载 + 摆角位外接 MT6835） */
     err = bsp_spi_init();
     if (err != ESP_OK) {
         return err;
@@ -253,7 +279,12 @@ i2c_master_bus_handle_t bsp_get_i2c_bus(void)
     return s_i2c_bus;
 }
 
-spi_host_device_t bsp_get_spi_host(void)
+spi_host_device_t bsp_get_cart_enc_spi_host(void)
 {
-    return s_spi_initialized ? BSP_SPI_HOST : (spi_host_device_t)-1;
+    return s_cart_enc_spi_ready ? BSP_CART_ENC_HOST : (spi_host_device_t)-1;
+}
+
+spi_host_device_t bsp_get_pole_enc_spi_host(void)
+{
+    return s_pole_enc_spi_ready ? BSP_POLE_ENC_HOST : (spi_host_device_t)-1;
 }

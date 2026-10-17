@@ -91,30 +91,60 @@ menu "BSP - Board Support Package"
             AS5600 default I2C address, per hardware.md §4 (0x36).
 
     # ------------------------------------------------------------------
-    # SPI bus (MT6835 pole encoder)
+    # SPI：小车编码器位（板载 MT6835，SPI2_HOST）
     # ------------------------------------------------------------------
-    config BSP_SPI_MOSI_GPIO
-        int "SPI MOSI GPIO (MT6835)"
-        default 40
+    config BSP_CART_ENC_SCK_GPIO
+        int "小车编码器 SPI SCK GPIO（板载 MT6835）"
+        default 12
+        help
+            rev2 板载小车编码器 MT6835，挂 SPI2_HOST。
+            默认值见 docs/hardware.md §3。
 
-    config BSP_SPI_MISO_GPIO
-        int "SPI MISO GPIO (MT6835)"
-        default 46
+    config BSP_CART_ENC_MOSI_GPIO
+        int "小车编码器 SPI MOSI GPIO（板载 MT6835）"
+        default 11
 
-    config BSP_SPI_SCLK_GPIO
-        int "SPI SCLK GPIO (MT6835)"
-        default 39
+    config BSP_CART_ENC_MISO_GPIO
+        int "小车编码器 SPI MISO GPIO（板载 MT6835）"
+        default 13
 
-    config BSP_MT6835_CS_GPIO
-        int "MT6835 SPI CS GPIO"
-        default 7
+    config BSP_CART_ENC_CS_GPIO
+        int "小车编码器 SPI CS GPIO（板载 MT6835）"
+        default 10
 
-    config BSP_MT6835_SPI_HZ
-        int "MT6835 SPI clock (Hz)"
+    config BSP_CART_ENC_SPI_HZ
+        int "小车编码器 SPI clock (Hz)"
         default 1000000
         range 100000 16000000
         help
-            手册上限 16 MHz；保守取 1 MHz（1 kHz 轮询下 48 µs/事务，
-            预算充足）。上板稳定后可提速。
+            MT6835 手册上限 16 MHz；保守取 1 MHz（1 kHz 轮询下
+            48 µs/事务，预算充足）。上板稳定后可提速。
+
+    # ------------------------------------------------------------------
+    # SPI：摆角编码器位（外接 MT6835，SPI3_HOST）
+    # ------------------------------------------------------------------
+    config BSP_POLE_ENC_SCK_GPIO
+        int "摆角编码器 SPI SCK GPIO（外接 MT6835）"
+        default 47
+        help
+            rev2 外接摆角编码器 MT6835（主控板供电），挂 SPI3_HOST。
+            默认值见 docs/hardware.md §3。
+
+    config BSP_POLE_ENC_MOSI_GPIO
+        int "摆角编码器 SPI MOSI GPIO（外接 MT6835）"
+        default 48
+
+    config BSP_POLE_ENC_MISO_GPIO
+        int "摆角编码器 SPI MISO GPIO（外接 MT6835）"
+        default 38
+
+    config BSP_POLE_ENC_CS_GPIO
+        int "摆角编码器 SPI CS GPIO（外接 MT6835）"
+        default 14
+
+    config BSP_POLE_ENC_SPI_HZ
+        int "摆角编码器 SPI clock (Hz)"
+        default 1000000
+        range 100000 16000000
 
 endmenu

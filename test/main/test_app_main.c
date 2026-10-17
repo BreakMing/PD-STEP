@@ -71,9 +71,9 @@ void app_main(void)
     ESP_ERROR_CHECK(magnetic_encoder_as5600_init(&ecfg, &s_enc_cart));
     cartpos_init(s_enc_cart);
     magnetic_encoder_mt6835_config_t pcfg = {
-        .host          = bsp_get_spi_host(),
-        .clock_speed_hz = CONFIG_BSP_MT6835_SPI_HZ,
-        .spics_io_num  = CONFIG_BSP_MT6835_CS_GPIO,
+        .host          = bsp_get_pole_enc_spi_host(),
+        .clock_speed_hz = CONFIG_BSP_POLE_ENC_SPI_HZ,
+        .spics_io_num  = CONFIG_BSP_POLE_ENC_CS_GPIO,
     };
     ESP_ERROR_CHECK(magnetic_encoder_mt6835_init(&pcfg, &s_enc_pole));
     poleang_init(s_enc_pole);

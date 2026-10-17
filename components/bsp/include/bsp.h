@@ -4,7 +4,8 @@
  * Two-stage initialization:
  *   bsp_early_init()  — MUST be the first line of app_main.
  *                       Only pulls TMC2209 EN high (disable).
- *   bsp_init()        — Full peripheral init (UART1, GPIO, I2C bus + scan).
+ *   bsp_init()        — Full peripheral init (GPIO, I2C bus + scan,
+ *                       dual SPI hosts for the two encoder slots).
  */
 
 #pragma once
@@ -56,11 +57,18 @@ esp_err_t bsp_init(void);
 i2c_master_bus_handle_t bsp_get_i2c_bus(void);
 
 /**
- * @brief Get the SPI host (for device config assembly at the assembly point).
+ * @brief 小车位编码器 SPI 主机（板载 MT6835，组装点注入 mt6835 config）。
+ *
+ * @return Host id (SPI2_HOST), or -1 if bus not initialized.
+ */
+spi_host_device_t bsp_get_cart_enc_spi_host(void);
+
+/**
+ * @brief 摆角位编码器 SPI 主机（外接 MT6835，组装点注入 mt6835 config）。
  *
  * @return Host id (SPI3_HOST), or -1 if bus not initialized.
  */
-spi_host_device_t bsp_get_spi_host(void);
+spi_host_device_t bsp_get_pole_enc_spi_host(void);
 
 #ifdef __cplusplus
 }
