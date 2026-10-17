@@ -29,6 +29,21 @@
 
 static motor_handle_t s_mot;   /* 运行/保持电流中转用（app_main 单次启动） */
 
+/* 编码器实例（init 不幂等，每台位一次）——测试组件经这对
+ * accessor 共享 app_main 组装的句柄 */
+static magnetic_encoder_handle_t s_enc_cart;
+static magnetic_encoder_handle_t s_enc_pole;
+
+magnetic_encoder_handle_t test_me_cart_enc(void)
+{
+    return s_enc_cart;
+}
+
+magnetic_encoder_handle_t test_me_pole_enc(void)
+{
+    return s_enc_pole;
+}
+
 static void on_driver_settings(int idx, float new_value)
 {
     (void)new_value;
@@ -47,23 +62,21 @@ void app_main(void)
     bsp_early_init();
     ESP_ERROR_CHECK(settings_init());
     ESP_ERROR_CHECK(bsp_init());
-    magnetic_encoder_handle_t enc_cart;
     magnetic_encoder_as5600_config_t ecfg = {
         .bus          = bsp_get_i2c_bus(),
         .dev_addr     = CONFIG_BSP_AS5600_I2C_ADDR,
         .scl_speed_hz = CONFIG_BSP_I2C_FREQ_HZ,
         .invert_dir   = magnetic_encoder_as5600_invert_dir_default(),
     };
-    ESP_ERROR_CHECK(magnetic_encoder_as5600_init(&ecfg, &enc_cart));
-    cartpos_init(enc_cart);
-    magnetic_encoder_handle_t enc_pole;
+    ESP_ERROR_CHECK(magnetic_encoder_as5600_init(&ecfg, &s_enc_cart));
+    cartpos_init(s_enc_cart);
     magnetic_encoder_mt6835_config_t pcfg = {
         .host          = bsp_get_spi_host(),
         .clock_speed_hz = CONFIG_BSP_MT6835_SPI_HZ,
         .spics_io_num  = CONFIG_BSP_MT6835_CS_GPIO,
     };
-    ESP_ERROR_CHECK(magnetic_encoder_mt6835_init(&pcfg, &enc_pole));
-    poleang_init(enc_pole);
+    ESP_ERROR_CHECK(magnetic_encoder_mt6835_init(&pcfg, &s_enc_pole));
+    poleang_init(s_enc_pole);
     motor_handle_t mot;
     motor_tmc2209_config_t mcfg = {
         .tmc = {

@@ -21,14 +21,16 @@ typedef struct {
     spi_host_device_t host;         /* 已初始化的 SPI 主机（组装点从 bsp 获取） */
     int               clock_speed_hz;
     int               spics_io_num;
+    const char       *task_name;    /* 采样任务名与日志标签（双实例台位区分，如 me_cart/me_pole；NULL = "me_mt6835"） */
 } magnetic_encoder_mt6835_config_t;
 
 /**
- * @brief 注入接线参数并启动 1 kHz 采样任务。幂等。每实现单实例。
+ * @brief 注入接线参数并启动 1 kHz 采样任务。每次调用各出独立实例
+ *        （rev2 双 MT6835 台位：板载小车 + 外接摆角）。
  *
  * @return ESP_OK；cfg 或 handle_out 为 NULL、host 为负返回
- *         ESP_ERR_INVALID_ARG；其余错误码与迁移前一致
- *         （SPI 设备挂载 / 任务创建错误）。
+ *         ESP_ERR_INVALID_ARG；内存不足返回 ESP_ERR_NO_MEM；
+ *         其余错误码与迁移前一致（SPI 设备挂载 / 任务创建错误）。
  */
 esp_err_t magnetic_encoder_mt6835_init(const magnetic_encoder_mt6835_config_t *cfg,
                                        magnetic_encoder_handle_t *handle_out);

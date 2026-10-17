@@ -7,7 +7,8 @@
  *  - B17/B18 转测 cartpos 解释层（比例一致性、原点重置）。
  * [mt6835] 段承接原 test_mt6835.c 硬件用例（静止稳定性、theta 合法域
  * 与 poleang 解释层对拍、A10 手动段）。
- * 实例由 test_app_main 创建（幂等 init 返回既有句柄）。
+ * init 每次调用各出独立实例（不再幂等）——本文件经 static 句柄
+ * 每台位只建一次。
  */
 
 #include <math.h>
@@ -30,29 +31,19 @@
 
 static const char *TAG = "me_test";
 
+/* 实例由 test_app_main 组装（init 不幂等，每台位一次）——本文件
+ * 经这对 accessor 共享句柄 */
+extern magnetic_encoder_handle_t test_me_cart_enc(void);
+extern magnetic_encoder_handle_t test_me_pole_enc(void);
+
 static magnetic_encoder_handle_t enc(void)
 {
-    magnetic_encoder_handle_t h = NULL;
-    magnetic_encoder_as5600_config_t cfg = {
-        .bus          = bsp_get_i2c_bus(),
-        .dev_addr     = CONFIG_BSP_AS5600_I2C_ADDR,
-        .scl_speed_hz = CONFIG_BSP_I2C_FREQ_HZ,
-        .invert_dir   = magnetic_encoder_as5600_invert_dir_default(),
-    };
-    TEST_ASSERT_EQUAL(ESP_OK, magnetic_encoder_as5600_init(&cfg, &h));
-    return h;
+    return test_me_cart_enc();
 }
 
 static magnetic_encoder_handle_t mt6835_enc(void)
 {
-    magnetic_encoder_handle_t h = NULL;
-    magnetic_encoder_mt6835_config_t cfg = {
-        .host          = bsp_get_spi_host(),
-        .clock_speed_hz = CONFIG_BSP_MT6835_SPI_HZ,
-        .spics_io_num  = CONFIG_BSP_MT6835_CS_GPIO,
-    };
-    TEST_ASSERT_EQUAL(ESP_OK, magnetic_encoder_mt6835_init(&cfg, &h));
-    return h;
+    return test_me_pole_enc();
 }
 
 TEST_CASE("B13 I2C 总线在位 + magnetic_encoder_as5600_init OK", "[as5600]")

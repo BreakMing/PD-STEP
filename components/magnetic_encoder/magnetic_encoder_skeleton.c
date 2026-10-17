@@ -12,6 +12,7 @@
 
 #include "magnetic_encoder_impl.h"
 
+#include <stdio.h>
 #include <string.h>
 
 #include "freertos/task.h"
@@ -53,12 +54,14 @@ static bool fail_step_locked(magnetic_encoder_inst_t *inst, bool read_ok)
     return event;
 }
 
-static const char *fail_desc_of(const magnetic_encoder_inst_t *inst)
+static void fail_desc_of(const magnetic_encoder_inst_t *inst,
+                         char *buf, size_t len)
 {
     if (inst->impl->fail_desc != NULL) {
-        return inst->impl->fail_desc(inst->impl_ctx);
+        inst->impl->fail_desc(inst->impl_ctx, buf, len);
+        return;
     }
-    return "读取失败";
+    snprintf(buf, len, "读取失败");
 }
 
 /* ================================================================
@@ -93,9 +96,11 @@ static void skeleton_task(void *arg)
             }
         } else {
             if (fail_step_locked(inst, false)) {
+                char desc[96];
+                fail_desc_of(inst, desc, sizeof(desc));
                 ESP_LOGE(inst->name,
                          "连续 %d 次读取失败——编码器标记 NOT OK（%s）",
-                         MAGNETIC_ENCODER_FAIL_LIMIT, fail_desc_of(inst));
+                         MAGNETIC_ENCODER_FAIL_LIMIT, desc);
             }
         }
 
@@ -183,8 +188,9 @@ esp_err_t magnetic_encoder_skeleton_start(magnetic_encoder_inst_t *inst,
         publish_sample(inst, raw, status);
         ESP_LOGI(name, "在线——首读 raw=%u（种子，pos=0）", raw);
     } else {
-        ESP_LOGW(name, "首读失败（%s）——采样任务将继续重试",
-                 fail_desc_of(inst));
+        char desc[96];
+        fail_desc_of(inst, desc, sizeof(desc));
+        ESP_LOGW(name, "首读失败（%s）——采样任务将继续重试", desc);
     }
 
     BaseType_t ok = xTaskCreatePinnedToCore(skeleton_task, name,

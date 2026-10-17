@@ -37,10 +37,11 @@ typedef struct {
     int32_t (*counts_per_rev)(void *ctx);
 
     /**
-     * 失败分诊文案（进入 NOT OK 事件的日志用）。可 NULL——
+     * 失败分诊文案（进入 NOT OK 事件与首读失败的日志用）：向 buf
+     * 填充单行描述（含实现的分诊细节，如失败帧原文）。可 NULL——
      * 骨架用通用文案。
      */
-    const char *(*fail_desc)(void *ctx);
+    void (*fail_desc)(void *ctx, char *buf, size_t len);
 
     /**
      * 成功样本钩子（STATUS 位告警等实现侧职责）。可 NULL。

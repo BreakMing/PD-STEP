@@ -23,15 +23,15 @@ typedef struct {
     uint16_t                dev_addr;     /* 7-bit 从机地址 */
     uint32_t                scl_speed_hz; /* 总线时钟 */
     bool                    invert_dir;   /* 方向镜像（安装标定） */
+    const char             *task_name;    /* 采样任务名与日志标签（NULL = "me_as5600"） */
 } magnetic_encoder_as5600_config_t;
 
 /**
- * @brief 注入接线参数并启动 1 kHz 采样任务。幂等。每实现单实例
- *        （本台位一台），句柄式留多实例演进。
+ * @brief 注入接线参数并启动 1 kHz 采样任务。每次调用各出独立实例。
  *
  * @return ESP_OK；cfg 或 handle_out 为 NULL、bus 为 NULL 返回
- *         ESP_ERR_INVALID_ARG；其余错误码与迁移前一致
- *         （I2C / 任务创建错误）。
+ *         ESP_ERR_INVALID_ARG；内存不足返回 ESP_ERR_NO_MEM；
+ *         其余错误码与迁移前一致（I2C / 任务创建错误）。
  */
 esp_err_t magnetic_encoder_as5600_init(const magnetic_encoder_as5600_config_t *cfg,
                                        magnetic_encoder_handle_t *handle_out);

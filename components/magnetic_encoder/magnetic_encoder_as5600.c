@@ -1,185 +1,63 @@
 /*
- * magnetic_encoder_as5600 — magnetic_encoder 契约的 AS5600 实现
+ * magnetic_encoder_as5600 — magnetic_encoder 契约的 AS5600 薄读层
  *
- * 吸收自原 as5600.c 设备组件：1 kHz 采样任务（CPU1、优先级 3，
- * I2C 阻塞事务不扰 CPU0 的 STEP ISR）、连续失败计数（≥10 次
- * NOT OK）、16 样本速度窗。只读红线与寄存器图见 as5600_hw.c；
- * 多圈累计为参数化纯逻辑（magnetic_encoder_tracker.c，宿主可测）。
- *
- * 发布语义：契约值在 s_lock 内原子发布；速度 = 16 ms 窗位置差
- * × 62.5（量子 62.5 counts/s）。2 字节突发读避免跨内部角度更新
- * 的拼接（见 as5600_hw）。
+ * 采样任务、失败计数、速度窗、多圈累计与原子发布全在类别骨架
+ * （magnetic_encoder_skeleton.c / magnetic_encoder_tracker.c /
+ * magnetic_encoder_core.c）；本实现只提供读帧回调与每转计数，
+ * 每次注入接线参数，实现状态全部进实例（calloc）——多次 init
+ * 各出独立句柄。只读红线与寄存器图见 as5600_hw.c。
  */
 #include "magnetic_encoder_as5600.h"
 #include "as5600.h"
 #include "as5600_hw.h"
-#include "magnetic_encoder_tracker.h"
+#include "magnetic_encoder_impl.h"
 
-#include <math.h>
+#include <stdlib.h>
 
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
-#include "esp_log.h"
 #include "esp_check.h"
-#include "esp_task_wdt.h"
 
-static const char *TAG = "me_as5600";
-
-#define ME_AS5600_SAMPLE_PERIOD_MS  1      /* 1 kHz */
-#define ME_AS5600_FAIL_LIMIT        10
-#define ME_AS5600_TASK_PRIO         3
-#define ME_AS5600_TASK_CORE         1
-#define ME_AS5600_TASK_STACK        3072
-
-/* ---- 速度：16 ms 窗（17 个 1 ms 位置样本） ---- */
-#define ME_AS5600_SPEED_WINDOW     16
-#define ME_AS5600_HIST_LEN         (ME_AS5600_SPEED_WINDOW + 1)
-
-/* ---- 操作表函数（单实例：直接读写本文件静态状态） ---- */
-static int32_t me_counts_per_rev(magnetic_encoder_handle_t enc);
-static int64_t  me_position_counts(magnetic_encoder_handle_t enc);
-static int32_t  me_velocity_counts_per_s(magnetic_encoder_handle_t enc);
-static bool     me_is_ok(magnetic_encoder_handle_t enc);
-
-/* ---- 发布状态（s_lock 保护；操作表为首成员，句柄即其地址） ---- */
+/* ---- 实现实例：骨架实例 + 读层句柄 ---- */
 typedef struct {
-    struct magnetic_encoder_s ops;
-    as5600_hw_handle_t hw;            /* 读层实例（驱动核心层） */
-    int64_t  pos_counts;             /* 多圈累计（accumulator） */
-    int32_t  hist[ME_AS5600_HIST_LEN];
-    int      hist_head;
-    int      hist_fill;
-    int32_t  vel_counts_per_s;
-    uint16_t last_raw;
-} me_state_t;
+    magnetic_encoder_inst_t skel;      /* 骨架实例（首成员，句柄即其地址） */
+    as5600_hw_handle_t      hw;
+} me_as5600_inst_t;
 
-static me_state_t s_state = {
-    .ops = {
-        .counts_per_rev        = me_counts_per_rev,
-        .position_counts       = me_position_counts,
-        .velocity_counts_per_s = me_velocity_counts_per_s,
-        .is_ok                 = me_is_ok,
-    },
-};
+/* ---- 实现回调（ctx = me_as5600_inst_t*） ---- */
 
-static portMUX_TYPE s_lock = portMUX_INITIALIZER_UNLOCKED;
-static magnetic_encoder_tracker_t s_tracker;
-static volatile bool s_ok = true;        /* false = I2C failing */
-static bool s_initialized = false;
-
-/* Store one new sample and refresh the velocity estimate.
- * Called from the sampling task only. */
-static void publish(int64_t pos_counts, uint16_t raw)
+static bool read_frame(void *ctx, uint32_t *raw, uint8_t *status)
 {
-    portENTER_CRITICAL(&s_lock);
-
-    s_state.pos_counts = pos_counts;
-    s_state.last_raw   = raw;
-
-    s_state.hist_head = (s_state.hist_head + 1) % ME_AS5600_HIST_LEN;
-    s_state.hist[s_state.hist_head] = pos_counts;
-    if (s_state.hist_fill < ME_AS5600_HIST_LEN) {
-        s_state.hist_fill++;
+    me_as5600_inst_t *me = ctx;
+    uint16_t r = 0;
+    if (!as5600_hw_read_raw(me->hw, &r)) {
+        return false;
     }
-
-    if (s_state.hist_fill == ME_AS5600_HIST_LEN) {
-        int     oldest = (s_state.hist_head + 1) % ME_AS5600_HIST_LEN;
-        int32_t delta  = pos_counts - s_state.hist[oldest];
-        /* counts over 16 ms → counts/s（量子 62.5） */
-        s_state.vel_counts_per_s =
-            (int32_t)llround((double)delta * (1000.0 / ME_AS5600_SPEED_WINDOW));
-    } else {
-        s_state.vel_counts_per_s = 0;   /* window not filled yet */
-    }
-
-    portEXIT_CRITICAL(&s_lock);
+    *raw = r;
+    *status = 0;              /* AS5600 无 STATUS 位 */
+    return true;
 }
 
-static void me_task(void *arg)
+static int32_t counts_per_rev(void *ctx)
 {
-    (void)arg;
-
-    TickType_t last_wake = xTaskGetTickCount();
-    int        fail_streak = 0;
-
-    bool wdt_ok = (esp_task_wdt_add(NULL) == ESP_OK);
-    if (!wdt_ok) {
-        ESP_LOGW(TAG, "task WDT subscribe failed — sampling task not monitored");
-    }
-
-    while (1) {
-        uint16_t raw = 0;
-
-        if (as5600_hw_read_raw(s_state.hw, &raw)) {
-            if (fail_streak >= ME_AS5600_FAIL_LIMIT) {
-                ESP_LOGI(TAG, "I2C recovered after %d consecutive failures",
-                         fail_streak);
-            }
-            fail_streak = 0;
-            s_ok = true;
-
-            int64_t pos = magnetic_encoder_tracker_update(&s_tracker, raw,
-                                                          AS5600_COUNTS_PER_REV);
-            publish(pos, raw);
-        } else {
-            fail_streak++;
-            if (fail_streak == ME_AS5600_FAIL_LIMIT) {
-                s_ok = false;
-                ESP_LOGE(TAG, "I2C read failed %d times in a row — encoder marked NOT OK",
-                         fail_streak);
-            }
-        }
-
-        if (wdt_ok) {
-            esp_task_wdt_reset();
-        }
-
-        /* Fixed 1 kHz cadence; never busy-wait (watchdog). */
-        vTaskDelayUntil(&last_wake, pdMS_TO_TICKS(ME_AS5600_SAMPLE_PERIOD_MS));
-    }
-}
-
-/* ---- 契约操作表函数 ---- */
-
-static int32_t me_counts_per_rev(magnetic_encoder_handle_t enc)
-{
-    (void)enc;
+    (void)ctx;
     return AS5600_COUNTS_PER_REV;
 }
 
-static int64_t me_position_counts(magnetic_encoder_handle_t enc)
-{
-    (void)enc;
-    portENTER_CRITICAL(&s_lock);
-    int64_t p = s_state.pos_counts;
-    portEXIT_CRITICAL(&s_lock);
-    return p;
-}
-
-static int32_t me_velocity_counts_per_s(magnetic_encoder_handle_t enc)
-{
-    (void)enc;
-    portENTER_CRITICAL(&s_lock);
-    int32_t v = s_state.vel_counts_per_s;
-    portEXIT_CRITICAL(&s_lock);
-    return v;
-}
-
-static bool me_is_ok(magnetic_encoder_handle_t enc)
-{
-    (void)enc;
-    return s_ok;
-}
+static const magnetic_encoder_impl_t s_impl = {
+    .read_frame    = read_frame,
+    .counts_per_rev = counts_per_rev,
+    .fail_desc     = NULL,    /* I2C 失败无帧可 dump——骨架通用文案 */
+    .on_sample     = NULL,
+};
 
 /* ---- 器件自测面 ---- */
 
 uint16_t magnetic_encoder_as5600_last_raw(magnetic_encoder_handle_t enc)
 {
-    (void)enc;
-    portENTER_CRITICAL(&s_lock);
-    uint16_t r = s_state.last_raw;
-    portEXIT_CRITICAL(&s_lock);
-    return r;
+    magnetic_encoder_inst_t *inst = (magnetic_encoder_inst_t *)enc;
+    portENTER_CRITICAL(&inst->lock);
+    uint32_t r = inst->last_raw;
+    portEXIT_CRITICAL(&inst->lock);
+    return (uint16_t)(r & 0x0FFF);
 }
 
 bool magnetic_encoder_as5600_invert_dir_default(void)
@@ -196,12 +74,13 @@ bool magnetic_encoder_as5600_invert_dir_default(void)
 esp_err_t magnetic_encoder_as5600_init(const magnetic_encoder_as5600_config_t *cfg,
                                        magnetic_encoder_handle_t *handle_out)
 {
-    if (s_initialized) {
-        *handle_out = (magnetic_encoder_handle_t)&s_state;
-        return ESP_OK;
-    }
     if (cfg == NULL || handle_out == NULL || cfg->bus == NULL) {
         return ESP_ERR_INVALID_ARG;
+    }
+
+    me_as5600_inst_t *me = calloc(1, sizeof(*me));
+    if (me == NULL) {
+        return ESP_ERR_NO_MEM;
     }
 
     /* 读层（驱动核心）：地址/时钟/方向镜像全由 config 注入 */
@@ -211,45 +90,27 @@ esp_err_t magnetic_encoder_as5600_init(const magnetic_encoder_as5600_config_t *c
         .scl_speed_hz = cfg->scl_speed_hz,
         .invert_dir   = cfg->invert_dir,
     };
-    as5600_hw_handle_t hwdev = NULL;
-    ESP_RETURN_ON_ERROR(as5600_hw_init(&hw, &hwdev),
-                        TAG, "as5600_hw_init failed");
+    esp_err_t err = as5600_hw_init(&hw, &me->hw);
+    if (err != ESP_OK) {
+        free(me);
+        ESP_LOGE("me_as5600", "as5600_hw_init 失败（%d）", err);
+        return err;
+    }
 
-    magnetic_encoder_tracker_reset(&s_tracker);
-
-    ESP_LOGI(TAG, "counting direction: %s",
+    ESP_LOGI("me_as5600", "counting direction: %s",
              cfg->invert_dir
                  ? "INVERTED (magnet mounted opposite; +X move counts up)"
                  : "normal (not inverted)");
 
-    s_state.hw = hwdev;
-
-    /* First read: seeds the tracker (position 0 here) and proves the
-     * bus works before the task starts hammering it. */
-    uint16_t raw = 0;
-    if (as5600_hw_read_raw(s_state.hw, &raw)) {
-        int64_t pos = magnetic_encoder_tracker_update(&s_tracker, raw,
-                                                      AS5600_COUNTS_PER_REV);
-        publish(pos, raw);
-        ESP_LOGI(TAG, "AS5600 online at 0x%02x — first raw angle=%u (seeded, pos=0)",
-                 cfg->dev_addr, raw);
-    } else {
-        ESP_LOGW(TAG, "first RAW ANGLE read at 0x%02x failed — task will retry",
-                 cfg->dev_addr);
+    err = magnetic_encoder_skeleton_start(&me->skel, &s_impl, me,
+                                          cfg->task_name != NULL
+                                              ? cfg->task_name
+                                              : "me_as5600");
+    if (err != ESP_OK) {
+        free(me);
+        return err;
     }
 
-    BaseType_t ok = xTaskCreatePinnedToCore(me_task, "me_as5600",
-                                            ME_AS5600_TASK_STACK, NULL,
-                                            ME_AS5600_TASK_PRIO, NULL,
-                                            ME_AS5600_TASK_CORE);
-    if (ok != pdPASS) {
-        ESP_LOGE(TAG, "failed to create sampling task");
-        return ESP_ERR_NO_MEM;
-    }
-
-    s_initialized = true;
-    ESP_LOGI(TAG, "sampling task up: 1 kHz, prio %d, CPU%d, %d counts/rev",
-             ME_AS5600_TASK_PRIO, ME_AS5600_TASK_CORE, AS5600_COUNTS_PER_REV);
-    *handle_out = (magnetic_encoder_handle_t)&s_state;
+    *handle_out = (magnetic_encoder_handle_t)&me->skel;
     return ESP_OK;
 }
