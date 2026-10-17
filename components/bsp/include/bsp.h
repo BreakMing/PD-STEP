@@ -70,6 +70,23 @@ spi_host_device_t bsp_get_cart_enc_spi_host(void);
  */
 spi_host_device_t bsp_get_pole_enc_spi_host(void);
 
+/**
+ * @brief 读一次总线电压（USB-PD，经 io4 分压）。
+ *
+ * @return 电压（V）；ADC 校准不可用或采样失败返回 -1.0f
+ *         （调用方日志可见，不以 0V 假装成功）。
+ */
+float bsp_vbus_read_volt(void);
+
+/**
+ * @brief 按键消抖读取（按下接地、内部上拉输入；连续 3 次采样
+ *        一致才生效，读取阻塞约 4 ms）。
+ *
+ * @param idx 按键序号 0..2（对应 but1..but3）。
+ * @return true = 按下；idx 越界返回 false。
+ */
+bool bsp_button_read(int idx);
+
 #ifdef __cplusplus
 }
 #endif

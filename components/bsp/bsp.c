@@ -19,6 +19,11 @@
 #include "driver/i2c_master.h"
 #include "driver/spi_master.h"
 #include "esp_check.h"
+#include "esp_adc/adc_oneshot.h"
+#include "esp_adc/adc_cali.h"
+#include "esp_adc/adc_cali_scheme.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 
 static const char *TAG = "bsp";
 
@@ -44,6 +49,16 @@ static const char *TAG = "bsp";
 #define BSP_POLE_PIN_MOSI     CONFIG_BSP_POLE_ENC_MOSI_GPIO
 #define BSP_POLE_PIN_MISO     CONFIG_BSP_POLE_ENC_MISO_GPIO
 
+/* ---- rev2 新增外设：vbus ADC（io4 分压）、LED、按键 ---- */
+#define BSP_PIN_VBUS_ADC      CONFIG_BSP_VBUS_ADC_GPIO
+#define BSP_VBUS_DIV_R_UPPER  CONFIG_BSP_VBUS_DIV_R_UPPER_OHM
+#define BSP_VBUS_DIV_R_LOWER  CONFIG_BSP_VBUS_DIV_R_LOWER_OHM
+#define BSP_PIN_LED           CONFIG_BSP_LED_GPIO
+#define BSP_BTN_COUNT         3
+
+/* LED 心跳：500 ms 翻转 = 1 Hz 闪烁 */
+#define LED_HB_PERIOD_MS      500
+
 /* I2C scan range (7-bit addresses) */
 #define I2C_SCAN_ADDR_FIRST   0x08
 #define I2C_SCAN_ADDR_LAST    0x77
@@ -54,6 +69,15 @@ static i2c_master_bus_handle_t s_i2c_bus = NULL;
 static bool s_i2c_internal_pullup = false;
 static bool s_cart_enc_spi_ready = false;
 static bool s_pole_enc_spi_ready = false;
+
+/* vbus ADC（oneshot + line-fitting 校准；cali 失败则读取返回 -1） */
+static adc_oneshot_unit_handle_t s_adc_unit = NULL;
+static adc_cali_handle_t          s_adc_cali = NULL;
+static adc_channel_t              s_vbus_chan;
+
+static const int s_btn_gpio[BSP_BTN_COUNT] = {
+    CONFIG_BSP_BTN1_GPIO, CONFIG_BSP_BTN2_GPIO, CONFIG_BSP_BTN3_GPIO,
+};
 
 /* ================================================================
  * bsp_early_init()
@@ -243,6 +267,140 @@ static esp_err_t bsp_spi_init(void)
 }
 
 /* ================================================================
+ * vbus ADC（io4 分压回读）
+ * ================================================================ */
+static esp_err_t bsp_vbus_init(void)
+{
+    adc_unit_t unit = ADC_UNIT_1;
+    ESP_RETURN_ON_ERROR(
+        adc_oneshot_io_to_channel(BSP_PIN_VBUS_ADC, &unit, &s_vbus_chan),
+        TAG, "vbus io→channel 失败");
+
+    adc_oneshot_unit_init_cfg_t ucfg = {
+        .unit_id = unit,
+        .ulp_mode = ADC_ULP_MODE_DISABLE,
+    };
+    ESP_RETURN_ON_ERROR(adc_oneshot_new_unit(&ucfg, &s_adc_unit),
+                        TAG, "vbus ADC unit 创建失败");
+
+    adc_oneshot_chan_cfg_t ccfg = {
+        .bitwidth = ADC_BITWIDTH_12,
+        .atten = ADC_ATTEN_DB_12,     /* 20V→2.38V 需 12 dB 量程 */
+    };
+    ESP_RETURN_ON_ERROR(adc_oneshot_config_channel(s_adc_unit, s_vbus_chan, &ccfg),
+                        TAG, "vbus ADC 通道配置失败");
+
+    /* ESP32-S3 校准方案为 curve fitting（line fitting 是经典 ESP32） */
+    adc_cali_curve_fitting_config_t cf = {
+        .unit_id = unit,
+        .chan = s_vbus_chan,
+        .bitwidth = ADC_BITWIDTH_12,
+        .atten = ADC_ATTEN_DB_12,
+    };
+    esp_err_t err = adc_cali_create_scheme_curve_fitting(&cf, &s_adc_cali);
+    if (err != ESP_OK) {
+        /* 校准建立失败不阻断启动：读取返回 -1（可见、不假装 0V） */
+        s_adc_cali = NULL;
+        ESP_LOGW(TAG, "vbus ADC 校准建立失败（%s）——电压读取将返回 -1",
+                 esp_err_to_name(err));
+    }
+
+    ESP_LOGI(TAG, "vbus ADC: io=%d 分压 %d/%d Ω（系数 %.3f）",
+             BSP_PIN_VBUS_ADC, BSP_VBUS_DIV_R_UPPER, BSP_VBUS_DIV_R_LOWER,
+             (double)(BSP_VBUS_DIV_R_UPPER + BSP_VBUS_DIV_R_LOWER)
+                 / (double)BSP_VBUS_DIV_R_LOWER);
+    return ESP_OK;
+}
+
+float bsp_vbus_read_volt(void)
+{
+    if (s_adc_cali == NULL) {
+        return -1.0f;
+    }
+    int cali_mv = 0;
+    if (adc_oneshot_get_calibrated_result(s_adc_unit, s_adc_cali,
+                                          s_vbus_chan, &cali_mv) != ESP_OK) {
+        return -1.0f;
+    }
+    /* 分压还原：vbus = adc 端电压 × (上臂+下臂)/下臂 */
+    return (float)cali_mv / 1000.0f
+         * (float)(BSP_VBUS_DIV_R_UPPER + BSP_VBUS_DIV_R_LOWER)
+         / (float)BSP_VBUS_DIV_R_LOWER;
+}
+
+/* ================================================================
+ * LED 心跳（io15，500 ms 翻转）与按键（消抖读取）
+ * ================================================================ */
+static void led_heartbeat_task(void *arg)
+{
+    (void)arg;
+    bool on = false;
+    while (1) {
+        on = !on;
+        gpio_set_level(BSP_PIN_LED, on ? 1 : 0);
+        vTaskDelay(pdMS_TO_TICKS(LED_HB_PERIOD_MS));
+    }
+}
+
+static esp_err_t bsp_led_init(void)
+{
+    gpio_config_t cfg = {
+        .pin_bit_mask = (1ULL << BSP_PIN_LED),
+        .mode = GPIO_MODE_OUTPUT,
+        .pull_up_en = GPIO_PULLUP_DISABLE,
+        .pull_down_en = GPIO_PULLDOWN_DISABLE,
+        .intr_type = GPIO_INTR_DISABLE,
+    };
+    ESP_RETURN_ON_ERROR(gpio_config(&cfg), TAG, "LED gpio_config 失败");
+    gpio_set_level(BSP_PIN_LED, 0);
+
+    BaseType_t ok = xTaskCreate(led_heartbeat_task, "led_hb",
+                                2048, NULL, 1, NULL);
+    if (ok != pdPASS) {
+        ESP_LOGE(TAG, "LED 心跳任务创建失败");
+        return ESP_ERR_NO_MEM;
+    }
+    return ESP_OK;
+}
+
+static esp_err_t bsp_button_init(void)
+{
+    uint64_t mask = 0;
+    for (int i = 0; i < BSP_BTN_COUNT; i++) {
+        mask |= (1ULL << s_btn_gpio[i]);
+    }
+    gpio_config_t cfg = {
+        .pin_bit_mask = mask,
+        .mode = GPIO_MODE_INPUT,
+        .pull_up_en = GPIO_PULLUP_ENABLE,    /* 按下接地 */
+        .pull_down_en = GPIO_PULLDOWN_DISABLE,
+        .intr_type = GPIO_INTR_DISABLE,
+    };
+    return gpio_config(&cfg);
+}
+
+bool bsp_button_read(int idx)
+{
+    if (idx < 0 || idx >= BSP_BTN_COUNT) {
+        return false;
+    }
+    /* 消抖：连续 3 次采样一致才返回（低电平 = 按下） */
+    int level = 1;
+    for (int i = 0; i < 3; i++) {
+        int cur = gpio_get_level((gpio_num_t)s_btn_gpio[idx]);
+        if (i == 0) {
+            level = cur;
+        } else if (cur != level) {
+            return false;      /* 抖动期：视为未按下 */
+        }
+        if (i < 2) {
+            vTaskDelay(pdMS_TO_TICKS(2));
+        }
+    }
+    return level == 0;
+}
+
+/* ================================================================
  * bsp_init()
  * ================================================================ */
 esp_err_t bsp_init(void)
@@ -263,6 +421,20 @@ esp_err_t bsp_init(void)
 
     /* SPI 双主机（小车位板载 + 摆角位外接 MT6835） */
     err = bsp_spi_init();
+    if (err != ESP_OK) {
+        return err;
+    }
+
+    /* rev2 新增：vbus ADC、LED 心跳、按键 */
+    err = bsp_vbus_init();
+    if (err != ESP_OK) {
+        return err;
+    }
+    err = bsp_led_init();
+    if (err != ESP_OK) {
+        return err;
+    }
+    err = bsp_button_init();
     if (err != ESP_OK) {
         return err;
     }

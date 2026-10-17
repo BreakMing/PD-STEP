@@ -1,0 +1,10 @@
+menu "ch224q - CH224Q PD 诱骗 I2C 调档"
+
+    config CH224Q_I2C_ADDR
+        hex "CH224Q I2C 7-bit 地址"
+        default 0x22
+        help
+            CH224DS1 V2.0 给出 0x22/0x23 两种地址变体，本板为哪个
+            待上板扫描确认（T9）。若 0x22 读失败改 0x23 重试。
+
+endmenu

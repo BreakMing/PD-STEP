@@ -144,4 +144,49 @@ menu "BSP - Board Support Package"
         default 1000000
         range 100000 16000000
 
+    # ------------------------------------------------------------------
+    # vbus 电压检测（io4 分压）
+    # ------------------------------------------------------------------
+    config BSP_VBUS_ADC_GPIO
+        int "总线电压 ADC GPIO"
+        default 4
+        help
+            rev2 新增：USB-PD 总线电压经分压电阻进 ADC。
+            默认值见 docs/hardware.md §3。
+
+    config BSP_VBUS_DIV_R_UPPER_OHM
+        int "vbus 分压上臂电阻（Ω）"
+        default 20000
+
+    config BSP_VBUS_DIV_R_LOWER_OHM
+        int "vbus 分压下臂电阻（Ω）"
+        default 2700
+        help
+            换算系数 = (上臂+下臂)/下臂 ≈ 8.407；20V 总线时
+            ADC 端约 2.38V（12 dB 衰减量程内）。
+
+    # ------------------------------------------------------------------
+    # LED（心跳指示）
+    # ------------------------------------------------------------------
+    config BSP_LED_GPIO
+        int "LED GPIO"
+        default 15
+        help
+            rev2 新增指示灯，固件作 1 Hz 心跳。行为语义后续扩展。
+
+    # ------------------------------------------------------------------
+    # 按键（驱动层读取；行为语义后续定义）
+    # ------------------------------------------------------------------
+    config BSP_BTN1_GPIO
+        int "按键 1 GPIO"
+        default 7
+
+    config BSP_BTN2_GPIO
+        int "按键 2 GPIO"
+        default 2
+
+    config BSP_BTN3_GPIO
+        int "按键 3 GPIO"
+        default 1
+
 endmenu
