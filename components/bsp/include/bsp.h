@@ -36,8 +36,8 @@ void bsp_early_init(void);
  * @brief Full BSP initialization — called after the startup banner.
  *
  * Initializes:
- *   - UART1 不在此初始化：cartproto 是其唯一所有者（引脚/波特率
- *     的 Kconfig 定义仍留在 BSP）。
+ *   - 协议通道 UART0 不在此初始化：cartproto 是其唯一所有者
+ *     （引脚/波特率的 Kconfig 定义仍留在 BSP；console 走原生 USB）。
  *   - GPIO: STEP output LOW, DIR output LOW.
  *   - I2C master bus (using new i2c_master API from ESP-IDF v6).
  *     Scans the bus for devices in the 0x08–0x77 range.

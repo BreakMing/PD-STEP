@@ -5,8 +5,8 @@
  *   bsp_early_init() — pull EN HIGH (disable TMC2209), as first thing.
  *   bsp_init()       — GPIO, I2C bus + scan, SPI.
  *
- * UART1（协议通道）不在此初始化：cartproto 是其唯一所有者
- * （引脚与波特率 Kconfig 仍定义于 BSP）。
+ * 协议通道 UART0 不在此初始化：cartproto 是其唯一所有者
+ * （引脚与波特率 Kconfig 仍定义于 BSP；console 走原生 USB）。
  */
 
 #include "bsp.h"

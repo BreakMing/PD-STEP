@@ -1,7 +1,7 @@
 menu "cartproto - cartpole 线协议通讯栈"
 
     config CARTPROTO_UART_BAUD
-        int "UART1 波特率"
+        int "协议通道（UART0）波特率"
         default 460800
         range 9600 921600
         help

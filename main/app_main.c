@@ -68,7 +68,7 @@ void app_main(void)
         motor_handle_t mot;
         motor_tmc2209_config_t mcfg = {
             .tmc = {
-                .uart_num = UART_NUM_2,   /* 端口分配：UART0=烧录/日志、UART1=协议、UART2=TMC */
+                .uart_num = UART_NUM_2,   /* 端口分配：UART0=协议、UART2=TMC、日志=原生 USB */
                 .tx_pin = CONFIG_BSP_TMC_UART_TX_GPIO,
                 .rx_pin = CONFIG_BSP_TMC_UART_RX_GPIO,
                 .en_gpio = CONFIG_BSP_EN_GPIO,

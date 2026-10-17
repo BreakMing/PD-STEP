@@ -1,8 +1,8 @@
 /*
- * cartproto — cartpole 线协议通讯栈（protocol.md 的 UART1 载体）
+ * cartproto — cartpole 线协议通讯栈（protocol.md 的 UART0 载体）
  *
  * 职责：
- *   - UART1 事件队列驱动的接收：行组装（'\n' 结尾，容忍 '\r'）、
+ *   - 协议通道 UART0 事件队列驱动的接收：行组装（'\n' 结尾，容忍 '\r'）、
  *     超长与超时不完整行静默丢弃（protocol.md：非法行静默丢弃）；
  *   - 每凑成一行回调一次注册的行处理器（行内不含 '\r'/'\n'）；
  *   - 发送原语 cartproto_send_raw：单一 TX 互斥保护，460800 8N1。
@@ -33,7 +33,7 @@ typedef void (*cartproto_line_cb_t)(const char *line);
  * @brief 启动通讯任务。
  *
  * 创建 comm_task（CPU0、优先级 5、4KB 栈），订阅任务看门狗。
- * 初始化 UART1（事件队列驱动，cartproto 是其唯一所有者），波特率取
+ * 初始化协议通道 UART0（事件队列驱动，cartproto 是其唯一所有者），波特率取
  * CONFIG_CARTPROTO_UART_BAUD，引脚取 BSP Kconfig。
  *
  * @return ESP_OK 成功；ESP_ERR_INVALID_STATE 已启动；否则为错误码。

@@ -2,7 +2,7 @@
  * cartproto — 通讯栈实现
  *
  * comm_task（CPU0、优先级 5、4KB 栈）：
- *   - UART1 事件队列驱动接收；
+ *   - 协议通道 UART0 事件队列驱动接收；
  *   - 行组装：128 字节缓冲，'\n' 分行，'\r' 容忍剥离；
  *   - 超长（>127 字符无换行）与不完整行超时（Kconfig，默认 100 ms）
  *     均静默丢弃，不回任何错误行（protocol.md：非法行静默丢弃）；
@@ -29,7 +29,7 @@
 static const char *TAG = "cartproto";
 
 /* ---- 配置常量 ---- */
-#define UART_PORT_NUM           UART_NUM_1
+#define UART_PORT_NUM           UART_NUM_0   /* 协议通道（rev2 从 UART1 迁移，console 已切原生 USB） */
 #define UART_RX_BUF_SIZE        1024   /* RX 环形缓冲大小 */
 #define UART_TX_BUF_SIZE        512    /* TX 环形缓冲大小 */
 #define UART_QUEUE_SIZE         10     /* 事件队列深度 */
@@ -302,7 +302,7 @@ static void comm_task(void *pvParameters)
 }
 
 /* ================================================================
- * UART1 初始化（cartproto 是 UART1 的唯一所有者）
+ * 协议通道 UART0 初始化（cartproto 是其唯一所有者）
  *
  * 一次性完整初始化：驱动（带事件队列）→ 参数 → 引脚。引脚与波特率
  * 来源：BSP Kconfig 引脚 + CONFIG_CARTPROTO_UART_BAUD，esp_gpio_reserve
@@ -312,7 +312,7 @@ static void comm_task(void *pvParameters)
  * 接常 1、TX 输出驱动关闭）并关模块时钟与时钟源，重装驱动不会
  * 自动恢复——不重新 param_config/set_pin 则链路双向全断。
  * ================================================================ */
-static esp_err_t uart1_init(void)
+static esp_err_t proto_uart_init(void)
 {
     uart_config_t uart_cfg = {
         .baud_rate = CONFIG_CARTPROTO_UART_BAUD,
@@ -343,8 +343,8 @@ static esp_err_t uart1_init(void)
 
     err = uart_set_pin(
         UART_PORT_NUM,
-        CONFIG_BSP_UART1_TX_GPIO,
-        CONFIG_BSP_UART1_RX_GPIO,
+        CONFIG_BSP_PROTO_TX_GPIO,
+        CONFIG_BSP_PROTO_RX_GPIO,
         UART_PIN_NO_CHANGE,
         UART_PIN_NO_CHANGE);
     if (err != ESP_OK) {
@@ -352,9 +352,9 @@ static esp_err_t uart1_init(void)
         return err;
     }
 
-    ESP_LOGI(TAG, "UART1 已初始化（事件队列驱动，TX=%d RX=%d @ %d baud）",
-             CONFIG_BSP_UART1_TX_GPIO,
-             CONFIG_BSP_UART1_RX_GPIO,
+    ESP_LOGI(TAG, "协议通道 UART0 已初始化（事件队列驱动，TX=%d RX=%d @ %d baud）",
+             CONFIG_BSP_PROTO_TX_GPIO,
+             CONFIG_BSP_PROTO_RX_GPIO,
              CONFIG_CARTPROTO_UART_BAUD);
 
     return ESP_OK;
@@ -375,7 +375,7 @@ esp_err_t cartproto_start(void)
         return ESP_ERR_NO_MEM;
     }
 
-    esp_err_t err = uart1_init();
+    esp_err_t err = proto_uart_init();
     if (err != ESP_OK) {
         return err;
     }

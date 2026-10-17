@@ -1,24 +1,21 @@
 menu "BSP - Board Support Package"
 
     # ------------------------------------------------------------------
-    # UART1 (protocol channel - host communication)
+    # 协议通道 UART0（主机通信；rev2 从 UART1/41/42 迁移）
     # ------------------------------------------------------------------
-    config BSP_UART1_TX_GPIO
-        int "UART1 TX GPIO (protocol channel)"
-        default 41
+    config BSP_PROTO_TX_GPIO
+        int "协议通道 UART0 TX GPIO"
+        default 43
         help
-            GPIO for UART1 TX (host protocol channel via CH343P).
-            Changed from GPIO10 to GPIO41 (2026-09-12): GPIO10 has an
-            on-board LED (idle-high = always lit); GPIO41/42 chosen from
-            the free pin pool (IO7/IO3/IO46/IO45/IO39-42) avoiding all
-            strapping pins. See docs/hardware.md §3.
+            主机协议通道（cartproto 唯一所有者），飞线直连 3.3V TTL。
+            console 已切原生 USB（io19/20），UART0 引脚整让给协议。
+            默认值见 docs/hardware.md §3。
 
-    config BSP_UART1_RX_GPIO
-        int "UART1 RX GPIO (protocol channel)"
-        default 42
+    config BSP_PROTO_RX_GPIO
+        int "协议通道 UART0 RX GPIO"
+        default 44
         help
-            GPIO for UART1 RX (host protocol channel via CH343P).
-            See BSP_UART1_TX_GPIO help for rationale (was GPIO11).
+            见 BSP_PROTO_TX_GPIO。
 
     # ------------------------------------------------------------------
     # TMC2209 single-wire UART (for T5)
