@@ -29,13 +29,6 @@ extern "C" {
 int32_t mt6835_raw_to_urad(uint32_t raw21, int32_t zero_urad, bool invert);
 
 /**
- * @brief 两次 21-bit 读数的多圈差分（处理 0/2^21 边界跨越）。
- *
- * 返回 a − b 的带符号圈数展开值；|真差| < 半圈时结果正确。
- */
-int32_t mt6835_unwrap_diff(uint32_t a, uint32_t b);
-
-/**
  * @brief 角度帧 CRC8（T4-brief：poly X⁸+X²+X+1 = 0x07、init 0x00、
  *        输入 24 bit = ANGLE[20:0]<<3 | STATUS[2:0]，MSB 先行）。
  *

@@ -23,17 +23,6 @@ int32_t mt6835_raw_to_urad(uint32_t raw21, int32_t zero_urad, bool invert)
     return (int32_t)a;
 }
 
-int32_t mt6835_unwrap_diff(uint32_t a, uint32_t b)
-{
-    int32_t diff = (int32_t)(a - b);   /* 0..2^21−1 域内的无符号差 */
-    if (diff > (int32_t)(MT6835_COUNTS_PER_REV / 2)) {
-        diff -= (int32_t)MT6835_COUNTS_PER_REV;
-    } else if (diff < -(int32_t)(MT6835_COUNTS_PER_REV / 2)) {
-        diff += (int32_t)MT6835_COUNTS_PER_REV;
-    }
-    return diff;
-}
-
 uint8_t mt6835_crc8(uint32_t angle21, uint8_t status)
 {
     uint32_t payload = (angle21 << 3) | (status & 0x07);

@@ -33,14 +33,20 @@ typedef struct {
     bool                    invert_dir;   /* true = 镜像 raw 角（安装方向标定） */
 } as5600_hw_config_t;
 
+/* 实例句柄（定义在 as5600_hw.c）：总线设备与方向镜像配置全部进实例，
+ * 同一总线可 init 多个实例互不影响。 */
+typedef struct as5600_hw_dev_t *as5600_hw_handle_t;
+
 /**
- * @brief 在 config 给出的总线上添加 AS5600 设备。
+ * @brief 在 config 给出的总线上添加 AS5600 设备，创建实例。
  *
- * @return ESP_OK；cfg 为 NULL 或 bus 为 NULL 返回
- *         ESP_ERR_INVALID_ARG；其余错误码与
- *         i2c_master_bus_add_device 一致。
+ * @param handle_out 出参，返回新实例句柄。
+ * @return ESP_OK；cfg/handle_out 为 NULL 或 bus 为 NULL 返回
+ *         ESP_ERR_INVALID_ARG；内存不足返回 ESP_ERR_NO_MEM；
+ *         其余错误码与 i2c_master_bus_add_device 一致（失败时已释放实例）。
  */
-esp_err_t as5600_hw_init(const as5600_hw_config_t *cfg);
+esp_err_t as5600_hw_init(const as5600_hw_config_t *cfg,
+                         as5600_hw_handle_t *handle_out);
 
 /**
  * @brief 读 12-bit 原始角（RAW ANGLE 0x0C/0x0D，单次 2 字节突发）。
@@ -49,9 +55,9 @@ esp_err_t as5600_hw_init(const as5600_hw_config_t *cfg);
  * 因此必须单事务突发读。
  *
  * @return true 成功（*raw ∈ 0..4095，已按 invert_dir 镜像）；
- *         false 事务失败（*raw 不变）。
+ *         false 句柄为 NULL 或事务失败（*raw 不变）。
  */
-bool as5600_hw_read_raw(uint16_t *raw);
+bool as5600_hw_read_raw(as5600_hw_handle_t h, uint16_t *raw);
 
 #ifdef __cplusplus
 }

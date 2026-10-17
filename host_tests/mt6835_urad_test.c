@@ -53,25 +53,14 @@ static void test_invert(void)
     CHECK_EQ(mt6835_raw_to_urad(524288u, -2000000, true), 2712389);
 }
 
-/* 多圈差分 */
-static void test_unwrap_diff(void)
-{
-    CHECK_EQ(mt6835_unwrap_diff(10, 0), 10);
-    CHECK_EQ(mt6835_unwrap_diff(0, 10), -10);
-    /* 跨 0 边界正转：0 ← 2097151 → +1 */
-    CHECK_EQ(mt6835_unwrap_diff(0, 2097151u), 1);
-    /* 跨 0 边界反转：2097151 ← 0 → −1 */
-    CHECK_EQ(mt6835_unwrap_diff(2097151u, 0), -1);
-    /* 半圈差（歧义边界，取负） */
-    CHECK_EQ(mt6835_unwrap_diff(0, 1048576u), -1048576);
-}
+/* 多圈差分（原 mt6835_unwrap_diff）已上提为 magnetic_encoder
+ * 参数化 tracker，见 host_tests/magnetic_encoder_tracker_test.c */
 
 int main(void)
 {
     test_raw_to_urad();
     test_zero_offset();
     test_invert();
-    test_unwrap_diff();
 
     printf("mt6835_urad_test: %d/%d 断言通过\n", s_run - s_fail, s_run);
     return s_fail;

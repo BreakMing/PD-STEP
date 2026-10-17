@@ -13,7 +13,7 @@ list(APPEND SDKCONFIG_DEFAULTS
 
 set(EXTRA_COMPONENT_DIRS "${CMAKE_CURRENT_SOURCE_DIR}/../components")
 
-set(TEST_COMPONENTS "as5600 cartfsm cartproto magnetic_encoder mt6835 settings step_engine telemetry tmc2209"
+set(TEST_COMPONENTS "cartfsm cartproto magnetic_encoder mt6835 settings step_engine telemetry tmc2209"
     CACHE STRING "参与测试的组件（其 test/ 子目录被编入）")
 
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)

@@ -17,10 +17,15 @@
 
 #include "as5600_hw.h"
 
+#include <stdlib.h>
+
 #include "as5600.h"     /* AS5600_COUNTS_PER_REV */
 
-static as5600_hw_config_t s_cfg;
-static i2c_master_dev_handle_t s_dev = NULL;
+/* 实例：总线设备 + 注入配置快照（方向镜像） */
+struct as5600_hw_dev_t {
+    as5600_hw_config_t      cfg;
+    i2c_master_dev_handle_t dev;
+};
 
 /* ---- Register map (READ ONLY — see the red line above) ---- */
 #define AS5600_REG_STATUS       0x0B   /* bit5 MD / bit4 ML / bit3 MH (magnet) */
@@ -35,20 +40,32 @@ static i2c_master_dev_handle_t s_dev = NULL;
  * Lifecycle
  * ================================================================ */
 
-esp_err_t as5600_hw_init(const as5600_hw_config_t *cfg)
+esp_err_t as5600_hw_init(const as5600_hw_config_t *cfg,
+                         as5600_hw_handle_t *handle_out)
 {
-    if (cfg == NULL || cfg->bus == NULL) {
+    if (cfg == NULL || handle_out == NULL || cfg->bus == NULL) {
         return ESP_ERR_INVALID_ARG;
     }
 
-    s_cfg = *cfg;
+    as5600_hw_handle_t h = calloc(1, sizeof(*h));
+    if (h == NULL) {
+        return ESP_ERR_NO_MEM;
+    }
+    h->cfg = *cfg;
 
     i2c_device_config_t dev_cfg = {
         .dev_addr_length = I2C_ADDR_BIT_LEN_7,
         .device_address  = cfg->dev_addr,
         .scl_speed_hz    = cfg->scl_speed_hz,
     };
-    return i2c_master_bus_add_device(cfg->bus, &dev_cfg, &s_dev);
+    esp_err_t err = i2c_master_bus_add_device(cfg->bus, &dev_cfg, &h->dev);
+    if (err != ESP_OK) {
+        free(h);
+        return err;
+    }
+
+    *handle_out = h;
+    return ESP_OK;
 }
 
 /* ================================================================
@@ -57,14 +74,18 @@ esp_err_t as5600_hw_init(const as5600_hw_config_t *cfg)
 
 /* Read the 12-bit raw angle as a single 2-byte burst.
  * Returns false if the transaction failed (value left untouched). */
-bool as5600_hw_read_raw(uint16_t *raw_out)
+bool as5600_hw_read_raw(as5600_hw_handle_t h, uint16_t *raw_out)
 {
+    if (h == NULL) {
+        return false;
+    }
+
     const uint8_t reg = AS5600_REG_RAW_ANGLE;
     uint8_t       buf[2] = { 0, 0 };
 
     /* READ: write the register address, read 2 bytes back, one transaction.
      * No data is ever written to the device. */
-    esp_err_t err = i2c_master_transmit_receive(s_dev, &reg, 1,
+    esp_err_t err = i2c_master_transmit_receive(h->dev, &reg, 1,
                                                 buf, sizeof(buf),
                                                 AS5600_I2C_TIMEOUT_MS);
     if (err != ESP_OK) {
@@ -73,7 +94,7 @@ bool as5600_hw_read_raw(uint16_t *raw_out)
 
     uint16_t raw = (uint16_t)(((buf[0] & 0x0F) << 8) | buf[1]);   /* 0..4095 */
 
-    if (s_cfg.invert_dir) {
+    if (h->cfg.invert_dir) {
         /* Mounting calibration — invert_dir 由组装点按 Kconfig
          * AS5600_INVERT_DIR 注入。Mirroring the angle reverses the
          * counting sense and keeps the value inside 0..4095, so a +X

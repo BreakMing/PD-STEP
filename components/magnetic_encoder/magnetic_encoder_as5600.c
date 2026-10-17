@@ -4,7 +4,7 @@
  * 吸收自原 as5600.c 设备组件：1 kHz 采样任务（CPU1、优先级 3，
  * I2C 阻塞事务不扰 CPU0 的 STEP ISR）、连续失败计数（≥10 次
  * NOT OK）、16 样本速度窗。只读红线与寄存器图见 as5600_hw.c；
- * 多圈 tracker 为纯逻辑（as5600_tracker.c，宿主可测）。
+ * 多圈累计为参数化纯逻辑（magnetic_encoder_tracker.c，宿主可测）。
  *
  * 发布语义：契约值在 s_lock 内原子发布；速度 = 16 ms 窗位置差
  * × 62.5（量子 62.5 counts/s）。2 字节突发读避免跨内部角度更新
@@ -13,6 +13,7 @@
 #include "magnetic_encoder_as5600.h"
 #include "as5600.h"
 #include "as5600_hw.h"
+#include "magnetic_encoder_tracker.h"
 
 #include <math.h>
 
@@ -43,6 +44,7 @@ static bool     me_is_ok(magnetic_encoder_handle_t enc);
 /* ---- 发布状态（s_lock 保护；操作表为首成员，句柄即其地址） ---- */
 typedef struct {
     struct magnetic_encoder_s ops;
+    as5600_hw_handle_t hw;            /* 读层实例（驱动核心层） */
     int64_t  pos_counts;             /* 多圈累计（accumulator） */
     int32_t  hist[ME_AS5600_HIST_LEN];
     int      hist_head;
@@ -61,13 +63,13 @@ static me_state_t s_state = {
 };
 
 static portMUX_TYPE s_lock = portMUX_INITIALIZER_UNLOCKED;
-static as5600_tracker_t s_tracker;
+static magnetic_encoder_tracker_t s_tracker;
 static volatile bool s_ok = true;        /* false = I2C failing */
 static bool s_initialized = false;
 
 /* Store one new sample and refresh the velocity estimate.
  * Called from the sampling task only. */
-static void publish(int32_t pos_counts, uint16_t raw)
+static void publish(int64_t pos_counts, uint16_t raw)
 {
     portENTER_CRITICAL(&s_lock);
 
@@ -108,7 +110,7 @@ static void me_task(void *arg)
     while (1) {
         uint16_t raw = 0;
 
-        if (as5600_hw_read_raw(&raw)) {
+        if (as5600_hw_read_raw(s_state.hw, &raw)) {
             if (fail_streak >= ME_AS5600_FAIL_LIMIT) {
                 ESP_LOGI(TAG, "I2C recovered after %d consecutive failures",
                          fail_streak);
@@ -116,7 +118,8 @@ static void me_task(void *arg)
             fail_streak = 0;
             s_ok = true;
 
-            int32_t pos = as5600_tracker_update(&s_tracker, raw);
+            int64_t pos = magnetic_encoder_tracker_update(&s_tracker, raw,
+                                                          AS5600_COUNTS_PER_REV);
             publish(pos, raw);
         } else {
             fail_streak++;
@@ -208,21 +211,25 @@ esp_err_t magnetic_encoder_as5600_init(const magnetic_encoder_as5600_config_t *c
         .scl_speed_hz = cfg->scl_speed_hz,
         .invert_dir   = cfg->invert_dir,
     };
-    ESP_RETURN_ON_ERROR(as5600_hw_init(&hw),
+    as5600_hw_handle_t hwdev = NULL;
+    ESP_RETURN_ON_ERROR(as5600_hw_init(&hw, &hwdev),
                         TAG, "as5600_hw_init failed");
 
-    as5600_tracker_reset(&s_tracker);
+    magnetic_encoder_tracker_reset(&s_tracker);
 
     ESP_LOGI(TAG, "counting direction: %s",
              cfg->invert_dir
                  ? "INVERTED (magnet mounted opposite; +X move counts up)"
                  : "normal (not inverted)");
 
+    s_state.hw = hwdev;
+
     /* First read: seeds the tracker (position 0 here) and proves the
      * bus works before the task starts hammering it. */
     uint16_t raw = 0;
-    if (as5600_hw_read_raw(&raw)) {
-        int32_t pos = as5600_tracker_update(&s_tracker, raw);
+    if (as5600_hw_read_raw(s_state.hw, &raw)) {
+        int64_t pos = magnetic_encoder_tracker_update(&s_tracker, raw,
+                                                      AS5600_COUNTS_PER_REV);
         publish(pos, raw);
         ESP_LOGI(TAG, "AS5600 online at 0x%02x — first raw angle=%u (seeded, pos=0)",
                  cfg->dev_addr, raw);

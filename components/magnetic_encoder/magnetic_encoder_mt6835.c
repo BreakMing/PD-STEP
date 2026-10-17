@@ -5,7 +5,8 @@
  * SPI 阻塞事务不扰 CPU0 的 STEP ISR）、连续失败计数（≥10 次
  * NOT OK）、16 样本速度窗、STATUS 位变化告警与失败分诊日志。
  * SPI 帧格式与校验（OP_ANGLE/ANGLE1 突发、全零帧与 CRC 拒收、
- * 失败帧原文留存）在 mt6835_hw.c（驱动核心层）。
+ * 失败帧原文留存）在 mt6835_hw.c（驱动核心层）；多圈累计为
+ * 参数化纯逻辑（magnetic_encoder_tracker.c，宿主可测）。
  *
  * 发布语义：契约值在 s_lock 内原子发布；速度 = 16 ms 窗位置差
  * × 62.5（量子 62.5 counts/s，与 AS5600 实现同一式）。µrad 换算
@@ -14,6 +15,7 @@
 #include "magnetic_encoder_mt6835.h"
 #include "mt6835_urad.h"
 #include "mt6835_hw.h"
+#include "magnetic_encoder_tracker.h"
 
 #include <math.h>
 #include <string.h>
@@ -47,7 +49,7 @@ static bool     me_is_ok(magnetic_encoder_handle_t enc);
 typedef struct {
     struct magnetic_encoder_s ops;
     mt6835_hw_handle_t hw;           /* 帧层实例（驱动核心层） */
-    uint32_t raw21;                  /* 最新原始角 */
+    magnetic_encoder_tracker_t tracker;   /* 多圈累计（首样本种子） */
     int64_t  pos_counts;             /* 多圈连续位置 */
     int64_t  hist[ME_MT6835_HIST_LEN];   /* 速度窗样本与位置同为 64 位域 */
     int      hist_head;
@@ -87,10 +89,11 @@ static void publish(uint32_t raw21, uint8_t status)
 {
     portENTER_CRITICAL(&s_lock);
 
-    int32_t diff = mt6835_unwrap_diff(raw21, s_state.raw21);
-    s_state.raw21 = raw21;
+    /* 多圈累计：首样本种子（pos=0），跨 0/2^21−1 边界按 cpr/2 修正 */
+    int64_t pos = magnetic_encoder_tracker_update(&s_state.tracker, raw21,
+                                                  (int32_t)MT6835_COUNTS_PER_REV);
+    s_state.pos_counts = pos;
     s_state.status = status;
-    s_state.pos_counts += diff;
 
     s_state.hist_head = (s_state.hist_head + 1) % ME_MT6835_HIST_LEN;
     s_state.hist[s_state.hist_head] = s_state.pos_counts;
@@ -211,7 +214,7 @@ uint32_t magnetic_encoder_mt6835_last_raw(magnetic_encoder_handle_t enc)
 {
     (void)enc;
     portENTER_CRITICAL(&s_lock);
-    uint32_t r = s_state.raw21;
+    uint32_t r = s_state.tracker.last_raw;
     portEXIT_CRITICAL(&s_lock);
     return r;
 }
