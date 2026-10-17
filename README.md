@@ -1,10 +1,15 @@
 # cartpole 固件 · ESP32-S3 倒立摆小车控制器
 
 cartpole 实验台的运动端固件：ESP32-S3 + TMC2209 步进驱动 +
-AS5600 小车位置编码器 + MT6835 摆角编码器。上端（Hi3516CV610 或
+双 MT6835 编码器（板载测小车位置、外接测摆角）。上端（Hi3516CV610 或
 PC 联调机）通过串口以 **protocol.md 线协议** 驱动：200 Hz 状态流、
 `VEL` 速度模式跟踪、手动两点标定（`MARK LEFT`/`MARK RIGHT`/`ENABLE`）、
 三态模式机与参数注册表。
+
+> **硬件已改版（2026-10-17，见 [docs/hardware.md](docs/hardware.md)）**：
+> 小车编码器 AS5600→板载 MT6835、摆角改外接 MT6835、协议通道 UART1→UART0、
+> 烧录日志切原生 USB。下文「硬件」表为新板事实；「工程结构」节描述的仍是
+> 适配前的当前代码（as5600 组件保留待复用，UART1 待迁移），固件适配完成后更新。
 
 **线协议唯一权威：本仓库之外的项目主仓库
 `deploy/v2/protocol.md`**（命令词法、模式转换表、参数注册表、
@@ -16,11 +21,11 @@ PC 联调机）通过串口以 **protocol.md 线协议** 驱动：200 Hz 状态�
 |---|---|---|---|
 | 主控 | ESP32-S3-WROOM-1-N16R8 | — | 16MB Flash + 8MB PSRAM，240 MHz |
 | 步进驱动 | TMC2209 | EN=21（低有效）、STEP=5、DIR=6、UART TX=17/RX=18 | 42 步进电机驱动，单线 UART 配置 |
-| 小车编码器 | AS5600（电机尾部直装） | I2C SDA=8 / SCL=9 @400 kHz | 12 bit 多圈 → x_um 遥测与丢步判定 |
-| 摆角编码器 | MT6835（21 bit） | SPI MISO=46、MOSI=40、SCK=39、CS=7 | ±π µrad 摆角与角速度遥测 |
-| 主机通道 | UART1 | TX=41 / RX=42 @460800 8N1 | protocol.md 线协议（经 CH343P USB） |
-| 供电 | CH224K PD | — | USB-PD 20V 供电机 |
-| 烧录/日志 | UART0 | 板载 CH340K | 烧录与 ESP_LOG 控制台 |
+| 小车编码器 | MT6835（板载，21 bit） | SPI SCK=12、MOSI=11、MISO=13、CS=10 | 多圈 → x_um 遥测与丢步判定（2026-10-17 改版接替 AS5600） |
+| 摆角编码器 | MT6835（外接，21 bit） | SPI SCK=47、MOSI=48、MISO=38、CS=14 | ±π µrad 摆角与角速度遥测 |
+| 主机通道 | UART0 | TX=43 / RX=44 @460800 8N1 | protocol.md 线协议（飞线直连；CH343P 已移除） |
+| 供电 | CH224Q PD | CF1=120kΩ 定档 | USB-PD 20V 供电机；io4 分压回读总线电压 |
+| 烧录/日志 | 原生 USB | D−=19 / D+=20 | USB-Serial/JTAG |
 
 机械：2GT 20T 同步带，40 mm/圈；细分 8（settings 微步参数，NVS
 namespace `cart`）→ 1600 steps/圈 = 40 steps/mm = 25 µm/step。
