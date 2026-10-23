@@ -1,5 +1,5 @@
 {
-  "name": "camctl",
+  "name": "PD-STEP",
   "image": "hexchip/devcontainer:esp_idf_v6.1-claude_code-codex",
   "customizations": {
     "vscode": {
@@ -32,10 +32,10 @@
     "source=/dev,target=/dev,type=bind",
     "source=/mnt/wslg,target=/mnt/wslg,type=bind",
     "source=devcontainer-shared-data,target=/opt/devcontainer/shared-data,type=volume",
-    "source=camctl-command_history-${devcontainerId},target=/opt/devcontainer/commandhistory,type=volume",
-    "source=camctl-claude_config-${devcontainerId},target=/opt/devcontainer/.claude,type=volume",
-    "source=camctl-codex_config-${devcontainerId},target=/opt/devcontainer/.codex,type=volume",
-    "source=camctl-extensions,target=/opt/devcontainer/vscode-extensions,type=volume"
+    "source=PD-STEP-command_history-${devcontainerId},target=/opt/devcontainer/commandhistory,type=volume",
+    "source=PD-STEP-claude_config-${devcontainerId},target=/opt/devcontainer/.claude,type=volume",
+    "source=PD-STEP-codex_config-${devcontainerId},target=/opt/devcontainer/.codex,type=volume",
+    "source=PD-STEP-extensions,target=/opt/devcontainer/vscode-extensions,type=volume"
   ],
   "containerEnv": {
     "PULSE_SERVER": "${localEnv:PULSE_SERVER}"
@@ -43,6 +43,6 @@
   "runArgs": [
     "--privileged",
     "--group-add", "dialout"
-  ]
+  ],
   "postCreateCommand": "bash .devcontainer/post_create.sh"
 }
