@@ -1,0 +1,1 @@
+current_sequence_test: 命令、阶段边界、重复开始和各阶段中止全部通过

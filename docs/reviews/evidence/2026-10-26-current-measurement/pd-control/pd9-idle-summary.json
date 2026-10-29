@@ -1,0 +1,18 @@
+{
+  "date": "2026-10-26",
+  "command": "CURRENT PD9",
+  "source": "pd9-idle-check.json",
+  "exit_code": 0,
+  "initial_vbus_mV": 20077,
+  "pd_done_line": "CURRENT PD_DONE TARGET_V=9 VBUS_MV=8903 PD=1 EN=1 ELAPSED_MS=3418",
+  "settling_validation_sample_count": 34,
+  "settling_validation_vbus_min_mV": 8878,
+  "settling_validation_vbus_max_mV": 8945,
+  "post_validation_info_count": 5,
+  "post_validation_vbus_min_mV": 8887,
+  "post_validation_vbus_max_mV": 8937,
+  "pd_valid": true,
+  "motor_enable": "EN=1",
+  "motor_movement_command_sent": false,
+  "result": "从 20 V 回到 9 V，PD 握手有效，完成 5 次连续稳定采样；全过程电机禁用。"
+}

@@ -1,8 +1,7 @@
 /*
  * mt6835_hw — SPI 角度帧层（驱动核心层）
  *
- * SPI 角度读取事务（抄录见 docs/reviews/T4-brief.md，来源
- * SimpleFOC Arduino-FOC-drivers MT6835 驱动，与手册 §SSI 一致）：
+ * SPI 角度读取事务（帧格式与时序见 docs/reviews/T4-brief.md）：
  *   MODE3、MSB 先行；48 bit（6 字节）单次事务，CS 拉低期间完成：
  *     TX: [0]=OP_ANGLE(0b1010)<<4, [1]=ANGLE1 地址 0x003, [2..5]=0
  *     RX: [2]=ANGLE[20:13]  [3]=ANGLE[12:5]
@@ -52,7 +51,10 @@ esp_err_t mt6835_hw_init(const mt6835_hw_config_t *cfg,
 
     spi_device_interface_config_t dev_cfg = {
         .clock_speed_hz = cfg->clock_speed_hz,
-        .mode = 3,                          /* CPOL=1 CPHA=2（MODE3） */
+        .mode = 3,                          /* CPOL=1 CPHA=1（MODE3） */
+        /* CSN 至首个 SCK 下降沿至少 100 ns；2 周期在配置上限
+         * 16 MHz 下仍有 125 ns，默认 1 MHz 下为 2 µs。 */
+        .cs_ena_pretrans = 2,
         .spics_io_num = cfg->spics_io_num,
         .queue_size = 1,
     };

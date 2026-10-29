@@ -1,0 +1,18 @@
+{
+  "cartpole-current-test.bin": {
+    "bytes": 294976,
+    "sha256": "131f4992954c359e92e93c89fdc490bc1dfa33b24523f1f52ea4c48b2fa362d8"
+  },
+  "cartpole-current-test.elf": {
+    "bytes": 4828276,
+    "sha256": "afc14cf8d9480f8f8dd4f682be1b7645825a4c66f224ce4af40522510489ecf2"
+  },
+  "bootloader/bootloader.bin": {
+    "bytes": 22608,
+    "sha256": "bbc814a142a50acff8bf8a9891f79a034bc5bc4a7fd9a4cab0ad143f193b3081"
+  },
+  "partition_table/partition-table.bin": {
+    "bytes": 3072,
+    "sha256": "5e71c3c890e04714daa03b21a0d23953a2dadf9fdf15eec02b886f7b6e9f8c81"
+  }
+}

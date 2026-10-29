@@ -1,0 +1,214 @@
+[
+  {
+    "seconds": 1.2e-05,
+    "command": "CURRENT INFO"
+  },
+  {
+    "seconds": 0.020696,
+    "line": "CURRENT INFO PHASE=IDLE EN=1 READY=1 VBUS_MV=8920 RUN_MA=300 HOLD_MA=150 MICROSTEP=8 SPEED_STEPS_S=500 RUN_MS=4000 HOLD_MS=2000"
+  },
+  {
+    "seconds": 0.020772,
+    "line": "CURRENT ENCODER OK=1 STATUS=0 RAW=1744097 COUNTS=5224449"
+  },
+  {
+    "seconds": 0.02078,
+    "line": "CURRENT TMC IOIN=21000241 GCONF=000000c4 CHOPCONF=15030045 IFCNT=10 DRV_STATUS=80040000 CS_ACTUAL=4 MSCNT=624 MSCURACT=01410162"
+  },
+  {
+    "seconds": 0.020786,
+    "line": "CURRENT PD PD=1 QC3=0 QC2=0"
+  },
+  {
+    "seconds": 0.02079,
+    "line": "CURRENT INFO_END"
+  },
+  {
+    "seconds": 5.509255,
+    "command": "CURRENT START"
+  },
+  {
+    "seconds": 5.550228,
+    "line": "CURRENT CONFIG_OK IFCNT_BEFORE=10 IFCNT_AFTER=12 GCONF=000000c4 CHOPCONF=15030045"
+  },
+  {
+    "seconds": 5.550429,
+    "line": "CURRENT RUN EN=0 DURATION_MS=4000 RUN_MA=300"
+  },
+  {
+    "seconds": 6.539466,
+    "command": "CURRENT INFO"
+  },
+  {
+    "seconds": 6.560274,
+    "line": "CURRENT INFO PHASE=RUN EN=0 READY=1 VBUS_MV=8887 RUN_MA=300 HOLD_MA=150 MICROSTEP=8 SPEED_STEPS_S=500 RUN_MS=4000 HOLD_MS=2000"
+  },
+  {
+    "seconds": 6.560322,
+    "line": "CURRENT ENCODER OK=1 STATUS=0 RAW=290801 COUNTS=5868305"
+  },
+  {
+    "seconds": 6.560329,
+    "line": "CURRENT TMC IOIN=21000240 GCONF=000000c4 CHOPCONF=15030045 IFCNT=12 DRV_STATUS=00090000 CS_ACTUAL=9 MSCNT=48 MSCURACT=00f60018"
+  },
+  {
+    "seconds": 6.560334,
+    "line": "CURRENT PD PD=1 QC3=0 QC2=0"
+  },
+  {
+    "seconds": 6.560338,
+    "line": "CURRENT INFO_END"
+  },
+  {
+    "seconds": 7.509947,
+    "command": "CURRENT INFO"
+  },
+  {
+    "seconds": 7.530857,
+    "line": "CURRENT INFO PHASE=RUN EN=0 READY=1 VBUS_MV=8878 RUN_MA=300 HOLD_MA=150 MICROSTEP=8 SPEED_STEPS_S=500 RUN_MS=4000 HOLD_MS=2000"
+  },
+  {
+    "seconds": 7.530929,
+    "line": "CURRENT ENCODER OK=1 STATUS=0 RAW=932570 COUNTS=6510074"
+  },
+  {
+    "seconds": 7.530975,
+    "line": "CURRENT TMC IOIN=21000240 GCONF=000000c4 CHOPCONF=15030045 IFCNT=12 DRV_STATUS=00090000 CS_ACTUAL=9 MSCNT=905 MSCURACT=00930139"
+  },
+  {
+    "seconds": 7.530985,
+    "line": "CURRENT PD PD=1 QC3=0 QC2=0"
+  },
+  {
+    "seconds": 7.530992,
+    "line": "CURRENT INFO_END"
+  },
+  {
+    "seconds": 8.540655,
+    "command": "CURRENT INFO"
+  },
+  {
+    "seconds": 8.561757,
+    "line": "CURRENT INFO PHASE=RUN EN=0 READY=1 VBUS_MV=8895 RUN_MA=300 HOLD_MA=150 MICROSTEP=8 SPEED_STEPS_S=500 RUN_MS=4000 HOLD_MS=2000"
+  },
+  {
+    "seconds": 8.561823,
+    "line": "CURRENT ENCODER OK=1 STATUS=0 RAW=1606362 COUNTS=7183866"
+  },
+  {
+    "seconds": 8.561834,
+    "line": "CURRENT TMC IOIN=21000240 GCONF=000000c4 CHOPCONF=15030045 IFCNT=12 DRV_STATUS=00090000 CS_ACTUAL=9 MSCNT=797 MSCURACT=01fc0108"
+  },
+  {
+    "seconds": 8.56184,
+    "line": "CURRENT PD PD=1 QC3=0 QC2=0"
+  },
+  {
+    "seconds": 8.561846,
+    "line": "CURRENT INFO_END"
+  },
+  {
+    "seconds": 9.510723,
+    "command": "CURRENT INFO"
+  },
+  {
+    "seconds": 9.531538,
+    "line": "CURRENT INFO PHASE=RUN EN=0 READY=1 VBUS_MV=8878 RUN_MA=300 HOLD_MA=150 MICROSTEP=8 SPEED_STEPS_S=500 RUN_MS=4000 HOLD_MS=2000"
+  },
+  {
+    "seconds": 9.531592,
+    "line": "CURRENT ENCODER OK=1 STATUS=0 RAW=140629 COUNTS=7815285"
+  },
+  {
+    "seconds": 9.531599,
+    "line": "CURRENT TMC IOIN=21000240 GCONF=000000c4 CHOPCONF=15030045 IFCNT=12 DRV_STATUS=00090000 CS_ACTUAL=9 MSCNT=638 MSCURACT=01310178"
+  },
+  {
+    "seconds": 9.531604,
+    "line": "CURRENT PD PD=1 QC3=0 QC2=0"
+  },
+  {
+    "seconds": 9.531608,
+    "line": "CURRENT INFO_END"
+  },
+  {
+    "seconds": 9.551757,
+    "line": "CURRENT HOLD EN=0 DURATION_MS=2000 HOLD_MA=150"
+  },
+  {
+    "seconds": 10.540777,
+    "command": "CURRENT INFO"
+  },
+  {
+    "seconds": 10.561597,
+    "line": "CURRENT INFO PHASE=HOLD EN=0 READY=1 VBUS_MV=8895 RUN_MA=300 HOLD_MA=150 MICROSTEP=8 SPEED_STEPS_S=500 RUN_MS=4000 HOLD_MS=2000"
+  },
+  {
+    "seconds": 10.561687,
+    "line": "CURRENT ENCODER OK=1 STATUS=0 RAW=156701 COUNTS=7831357"
+  },
+  {
+    "seconds": 10.561716,
+    "line": "CURRENT TMC IOIN=21000240 GCONF=000000c4 CHOPCONF=15030045 IFCNT=12 DRV_STATUS=80060000 CS_ACTUAL=6 MSCNT=400 MSCURACT=0140009c"
+  },
+  {
+    "seconds": 10.561724,
+    "line": "CURRENT PD PD=1 QC3=0 QC2=0"
+  },
+  {
+    "seconds": 10.561729,
+    "line": "CURRENT INFO_END"
+  },
+  {
+    "seconds": 11.510528,
+    "command": "CURRENT INFO"
+  },
+  {
+    "seconds": 11.531521,
+    "line": "CURRENT INFO PHASE=HOLD EN=0 READY=1 VBUS_MV=8903 RUN_MA=300 HOLD_MA=150 MICROSTEP=8 SPEED_STEPS_S=500 RUN_MS=4000 HOLD_MS=2000"
+  },
+  {
+    "seconds": 11.531625,
+    "line": "CURRENT ENCODER OK=1 STATUS=0 RAW=156660 COUNTS=7831316"
+  },
+  {
+    "seconds": 11.531656,
+    "line": "CURRENT TMC IOIN=21000240 GCONF=000000c4 CHOPCONF=15030045 IFCNT=12 DRV_STATUS=80040000 CS_ACTUAL=4 MSCNT=400 MSCURACT=0140009c"
+  },
+  {
+    "seconds": 11.531664,
+    "line": "CURRENT PD PD=1 QC3=0 QC2=0"
+  },
+  {
+    "seconds": 11.53167,
+    "line": "CURRENT INFO_END"
+  },
+  {
+    "seconds": 11.551827,
+    "line": "CURRENT DONE EN=1 STEPS=1991 ENCODER_DELTA=2606867 ELAPSED_MS=6001"
+  },
+  {
+    "seconds": 11.572214,
+    "command": "CURRENT INFO"
+  },
+  {
+    "seconds": 11.593135,
+    "line": "CURRENT INFO PHASE=IDLE EN=1 READY=1 VBUS_MV=8920 RUN_MA=300 HOLD_MA=150 MICROSTEP=8 SPEED_STEPS_S=500 RUN_MS=4000 HOLD_MS=2000"
+  },
+  {
+    "seconds": 11.593194,
+    "line": "CURRENT ENCODER OK=1 STATUS=0 RAW=156745 COUNTS=7831401"
+  },
+  {
+    "seconds": 11.593211,
+    "line": "CURRENT TMC IOIN=21000241 GCONF=000000c4 CHOPCONF=15030045 IFCNT=12 DRV_STATUS=80040000 CS_ACTUAL=4 MSCNT=400 MSCURACT=0140009c"
+  },
+  {
+    "seconds": 11.593225,
+    "line": "CURRENT PD PD=1 QC3=0 QC2=0"
+  },
+  {
+    "seconds": 11.593233,
+    "line": "CURRENT INFO_END"
+  }
+]

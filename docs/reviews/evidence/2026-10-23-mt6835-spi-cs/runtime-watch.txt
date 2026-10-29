@@ -1,0 +1,72 @@
+UTC: 2026-10-23T09:06:36.350365+00:00
+Firmware: build/cartpole-fw.elf; board encoder only; motor DISABLED; SPI DMA production task.
+> targets esp32s3.cpu1
+
+> read_memory 0x3fceafa8 32 1
+0x3fceb108
+> read_memory 0x3fceb17c 32 1
+0x3fceafbc
+> read_memory 0x3fceafbc 32 1
+0x1
+Confirmed cart_handle=0x3fceafa8, spi_device=0x3fceb108, host=1
+> read_memory 0x3fceafa8 32 4
+0x3fceb108 0x0 0x0 0x0
+> read_memory 0x60024010 32 1
+0x180000c1
+> read_memory 0x60024014 32 1
+0xf8430007
+> read_memory 0x6002400c 32 1
+0x674e7
+SPI2 USER=0x180000c1 USER1=0xf8430007 CLOCK=0x000674e7; cs_setup=1 cycles=2
+> wp 0x3fceafac 4 w
+
+> resume
+
+> esp32s3.cpu1 curstate
+running
+elapsed=5.000s state=running
+> esp32s3.cpu1 curstate
+running
+elapsed=10.001s state=running
+> esp32s3.cpu1 curstate
+running
+elapsed=15.002s state=running
+> esp32s3.cpu1 curstate
+running
+elapsed=20.006s state=running
+> esp32s3.cpu1 curstate
+running
+elapsed=25.006s state=running
+> esp32s3.cpu1 curstate
+running
+elapsed=30.007s state=running
+> esp32s3.cpu1 curstate
+running
+elapsed=35.007s state=running
+> esp32s3.cpu1 curstate
+running
+elapsed=40.008s state=running
+> esp32s3.cpu1 curstate
+running
+elapsed=45.009s state=running
+> esp32s3.cpu1 curstate
+running
+elapsed=50.009s state=running
+> esp32s3.cpu1 curstate
+running
+elapsed=55.012s state=running
+> esp32s3.cpu1 curstate
+running
+elapsed=60.014s state=running
+> halt 2000
+
+> targets esp32s3.cpu1
+
+> read_memory 0x3fceafa8 32 4
+0x3fceb108 0x0 0x0 0x0
+> rwp 0x3fceafac
+
+> resume
+
+{"duration_seconds": 60.016, "failure_watchpoint_triggered": false, "instance_snapshot_unchanged": true, "pass": true}
+EXIT_CODE=0

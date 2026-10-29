@@ -1,0 +1,64 @@
+Open On-Chip Debugger v0.12.0-esp32-20260703 (2026-07-03-13:49)
+Licensed under GNU GPL v2
+For bug reports, read
+	http://openocd.org/doc/doxygen/bugs.html
+Info : esp_usb_jtag: capabilities descriptor set to 0x2000
+Info : esp_usb_jtag: serial (44:1B:F6:8D:10:EC)
+Info : esp_usb_jtag: Device found. Base speed 40000KHz, div range 1 to 255
+Info : clock speed 40000 kHz
+Info : JTAG tap: esp32s3.tap0 tap/device found: 0x120034e5 (mfg: 0x272 (Tensilica), part: 0x2003, ver: 0x1)
+Info : JTAG tap: esp32s3.tap1 tap/device found: 0x120034e5 (mfg: 0x272 (Tensilica), part: 0x2003, ver: 0x1)
+Info : [esp32s3.cpu0] Examination succeed
+Info : [esp32s3.cpu1] Examination succeed
+Info : [esp32s3.cpu0] gdb port disabled
+Info : [esp32s3.cpu1] gdb port disabled
+Info : [esp32s3.cpu0] Target halted, PC=0x4037BE96, debug_reason=00000000
+Info : [esp32s3.cpu0] Reset cause (1) - (Power on reset)
+Info : [esp32s3.cpu1] Target halted, PC=0x4037BE96, debug_reason=00000000
+Info : [esp32s3.cpu1] Reset cause (1) - (Power on reset)
+Info : [esp32s3.cpu1] Chip revision v0.2
+SPI=0x60024000 OP=a ADDR=0x003 PRE=0 LEN=6 RX= ff ff ff ff ff ff
+SPI=0x60024000 OP=3 ADDR=0x003 PRE=0 LEN=3 RX= ff ff f8
+SPI=0x60024000 OP=3 ADDR=0x004 PRE=0 LEN=3 RX= 00 00 c3
+SPI=0x60024000 OP=3 ADDR=0x005 PRE=0 LEN=3 RX= ff ff 98
+SPI=0x60024000 OP=3 ADDR=0x006 PRE=0 LEN=3 RX= ff ff 2e
+SPI=0x60024000 OP=a ADDR=0x003 PRE=1 LEN=6 RX= 00 00 f8 c3 98 2e
+SPI=0x60024000 OP=3 ADDR=0x003 PRE=1 LEN=3 RX= 00 00 f8
+SPI=0x60024000 OP=3 ADDR=0x004 PRE=1 LEN=3 RX= 00 00 c3
+SPI=0x60024000 OP=3 ADDR=0x005 PRE=1 LEN=3 RX= ff ff 98
+SPI=0x60024000 OP=3 ADDR=0x006 PRE=1 LEN=3 RX= 00 00 2e
+SPI=0x60024000 OP=a ADDR=0x003 PRE=2 LEN=6 RX= 00 00 f8 c3 98 2e
+SPI=0x60024000 OP=3 ADDR=0x003 PRE=2 LEN=3 RX= 00 00 f8
+SPI=0x60024000 OP=3 ADDR=0x004 PRE=2 LEN=3 RX= ff ff c3
+SPI=0x60024000 OP=3 ADDR=0x005 PRE=2 LEN=3 RX= ff ff 98
+SPI=0x60024000 OP=3 ADDR=0x006 PRE=2 LEN=3 RX= 00 00 2e
+SPI=0x60025000 OP=a ADDR=0x003 PRE=0 LEN=6 RX= 00 00 00 00 00 00
+SPI=0x60025000 OP=3 ADDR=0x003 PRE=0 LEN=3 RX= 00 00 00
+SPI=0x60025000 OP=3 ADDR=0x004 PRE=0 LEN=3 RX= 00 00 00
+SPI=0x60025000 OP=3 ADDR=0x005 PRE=0 LEN=3 RX= 00 00 00
+SPI=0x60025000 OP=3 ADDR=0x006 PRE=0 LEN=3 RX= 00 00 00
+SPI=0x60025000 OP=a ADDR=0x003 PRE=1 LEN=6 RX= 00 00 00 00 00 00
+SPI=0x60025000 OP=3 ADDR=0x003 PRE=1 LEN=3 RX= 00 00 00
+SPI=0x60025000 OP=3 ADDR=0x004 PRE=1 LEN=3 RX= 00 00 00
+SPI=0x60025000 OP=3 ADDR=0x005 PRE=1 LEN=3 RX= 00 00 00
+SPI=0x60025000 OP=3 ADDR=0x006 PRE=1 LEN=3 RX= 00 00 00
+SPI=0x60025000 OP=a ADDR=0x003 PRE=2 LEN=6 RX= 00 00 00 00 00 00
+SPI=0x60025000 OP=3 ADDR=0x003 PRE=2 LEN=3 RX= 00 00 00
+SPI=0x60025000 OP=3 ADDR=0x004 PRE=2 LEN=3 RX= 00 00 00
+SPI=0x60025000 OP=3 ADDR=0x005 PRE=2 LEN=3 RX= 00 00 00
+SPI=0x60025000 OP=3 ADDR=0x006 PRE=2 LEN=3 RX= 00 00 00
+PROBE_RESULT=0 
+Info : JTAG tap: esp32s3.tap0 tap/device found: 0x120034e5 (mfg: 0x272 (Tensilica), part: 0x2003, ver: 0x1)
+Info : JTAG tap: esp32s3.tap1 tap/device found: 0x120034e5 (mfg: 0x272 (Tensilica), part: 0x2003, ver: 0x1)
+Info : [esp32s3.cpu0] requesting target halt and executing a soft reset
+Info : [esp32s3.cpu0] Debug controller was reset.
+Info : [esp32s3.cpu0] Core was reset.
+Info : [esp32s3.cpu0] Target halted, PC=0x500000EF, debug_reason=00000000
+Info : [esp32s3.cpu0] Reset cause (3) - (Software core reset)
+Info : [esp32s3.cpu0] Core was reset.
+Info : [esp32s3.cpu1] Debug controller was reset.
+Info : [esp32s3.cpu1] Core was reset.
+RESTORE_RESULT=0 
+shutdown command invoked
+
+OPENOCD_EXIT_CODE 0

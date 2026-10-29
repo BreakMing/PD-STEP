@@ -1,0 +1,41 @@
+{
+  "date": "2026-10-26",
+  "source": "用户口述示波器观察结果；未取得截图或原始波形文件。",
+  "verbatim": "通过示波器中的波形能够看到有一个峰峰值为 +-400ma、15hz左右的正弦波，后面是 -300ma的电流，然后是280、260、230、200、160的保持电流。",
+  "running_waveform": {
+    "reported_extrema_mA": [
+      -400,
+      400
+    ],
+    "reported_frequency_Hz_approx": 15,
+    "extrema_interpretation": "按用户的 ±400 mA 理解为上下峰值；对应峰峰值约 800 mA。",
+    "reported_RMS_mA": null
+  },
+  "stopped_before_reduction_mA": -300,
+  "reduction_values_mA_as_reported": [
+    280,
+    260,
+    230,
+    200,
+    160
+  ],
+  "reduction_signs_confirmed": true,
+  "final_zero_current_confirmed": true,
+  "interpretation": {
+    "estimated_running_RMS_if_sinusoidal_mA": 282.84271247461896,
+    "expected_frequency_Hz": 15.625,
+    "nominal_running_RMS_mA": 305.95966493648683,
+    "hold_to_run_scale_ratio": 0.5
+  },
+  "confirmation_verbatim": "是在零线下方，这个可能是我电流探头反向的问题，这个不用管，测试结束后电流在0ma附近",
+  "reduction_signed_mA": [
+    -280,
+    -260,
+    -230,
+    -200,
+    -160
+  ],
+  "final_current_mA_approx": 0,
+  "functional_result": "本轮约 9 V、300/150 mA 设定下，运行电流波形、停转阶梯降流和结束禁用归零的功能检查通过；依据为串口记录及用户口述仪表观察。",
+  "accuracy_result": "未取得稳定运行段的整周期 RMS 和原始波形，电流精度待测。"
+}

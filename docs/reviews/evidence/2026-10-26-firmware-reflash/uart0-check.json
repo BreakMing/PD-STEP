@@ -1,0 +1,34 @@
+{
+  "port": "/dev/serial/by-id/usb-STMicroelectronics_STM32_STLink_01070158524300093638414B-if02",
+  "baud": 460800,
+  "elapsed_seconds": 3.0069920379901305,
+  "state_count": 601,
+  "state_rate_hz": 199.8675062677278,
+  "state_first": [
+    "STATE 0 0 0 0",
+    "STATE 0 0 0 0",
+    "STATE 0 0 0 0"
+  ],
+  "state_last": [
+    "STATE 0 0 0 0",
+    "STATE 0 0 0 0",
+    "STATE 0 0 0 0"
+  ],
+  "other_passive_lines": [],
+  "replies": {
+    "QUERY": [
+      "MODE DISABLED NONE"
+    ],
+    "CONFIG?": [
+      "OK VEL_MAX 1000",
+      "OK ACC_MAX 5000",
+      "OK WDT_MS 100",
+      "OK WDT_DEC 5000",
+      "OK X_MARGIN_UM 10000",
+      "OK POLE_ZERO_URAD 0",
+      "OK POLE_INV 0",
+      "OK X_INV 0",
+      "OK STEP_LOSS_UM 3000"
+    ]
+  }
+}

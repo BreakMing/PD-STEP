@@ -1,0 +1,327 @@
+[
+  {
+    "seconds": 0.306225,
+    "command": "CURRENT INFO"
+  },
+  {
+    "seconds": 0.31232,
+    "line": "CURRENT INFO PHASE=IDLE EN=1 READY=1 VBUS_MV=8920 RUN_MA=300 HOLD_MA=150 MICROSTEP=8 SPEED_STEPS_S=500 RUN_MS=4000 HOLD_MS=2000 PD_STATE=UNCHANGED TARGET_V=0"
+  },
+  {
+    "seconds": 0.313292,
+    "line": "CURRENT ENCODER OK=1 STATUS=0 RAW=157033 COUNTS=-13"
+  },
+  {
+    "seconds": 0.326171,
+    "line": "CURRENT TMC IOIN=21000041 GCONF=000000c4 CHOPCONF=15030045 IFCNT=6 DRV_STATUS=80040000 CS_ACTUAL=4 MSCNT=16 MSCURACT=00f60018"
+  },
+  {
+    "seconds": 0.326405,
+    "line": "CURRENT PD PD=1 QC3=0 QC2=0"
+  },
+  {
+    "seconds": 0.327171,
+    "line": "CURRENT INFO_END"
+  },
+  {
+    "seconds": 0.327245,
+    "command": "CURRENT PD20"
+  },
+  {
+    "seconds": 0.331188,
+    "line": "CURRENT PD_REQUEST TARGET_V=20 EN=1 VBUS_BEFORE_MV=8920"
+  },
+  {
+    "seconds": 0.332271,
+    "line": "CURRENT PD_SAMPLE TARGET_V=20 VBUS_MV=8920 PD=1 READ_OK=1 EN=1"
+  },
+  {
+    "seconds": 0.432145,
+    "line": "CURRENT PD_SAMPLE TARGET_V=20 VBUS_MV=20043 PD=1 READ_OK=1 EN=1"
+  },
+  {
+    "seconds": 0.532103,
+    "line": "CURRENT PD_SAMPLE TARGET_V=20 VBUS_MV=20043 PD=1 READ_OK=1 EN=1"
+  },
+  {
+    "seconds": 0.632172,
+    "line": "CURRENT PD_SAMPLE TARGET_V=20 VBUS_MV=20060 PD=1 READ_OK=1 EN=1"
+  },
+  {
+    "seconds": 0.732146,
+    "line": "CURRENT PD_SAMPLE TARGET_V=20 VBUS_MV=20043 PD=1 READ_OK=1 EN=1"
+  },
+  {
+    "seconds": 0.832141,
+    "line": "CURRENT PD_SAMPLE TARGET_V=20 VBUS_MV=20077 PD=1 READ_OK=1 EN=1"
+  },
+  {
+    "seconds": 0.832209,
+    "command": "CURRENT INFO"
+  },
+  {
+    "seconds": 0.837371,
+    "line": "CURRENT INFO PHASE=PD_WAIT EN=1 READY=1 VBUS_MV=20060 RUN_MA=300 HOLD_MA=150 MICROSTEP=8 SPEED_STEPS_S=500 RUN_MS=4000 HOLD_MS=2000 PD_STATE=WAITING TARGET_V=20"
+  },
+  {
+    "seconds": 0.839123,
+    "line": "CURRENT ENCODER OK=1 STATUS=0 RAW=157033 COUNTS=-13"
+  },
+  {
+    "seconds": 0.85146,
+    "line": "CURRENT TMC IOIN=21000041 GCONF=000000c4 CHOPCONF=15030045 IFCNT=6 DRV_STATUS=80040000 CS_ACTUAL=4 MSCNT=16 MSCURACT=00f60018"
+  },
+  {
+    "seconds": 0.852281,
+    "line": "CURRENT PD PD=1 QC3=0 QC2=0"
+  },
+  {
+    "seconds": 0.852462,
+    "line": "CURRENT INFO_END"
+  },
+  {
+    "seconds": 0.936208,
+    "line": "CURRENT PD_SAMPLE TARGET_V=20 VBUS_MV=20077 PD=1 READ_OK=1 EN=1"
+  },
+  {
+    "seconds": 1.041129,
+    "line": "CURRENT PD_SAMPLE TARGET_V=20 VBUS_MV=20085 PD=1 READ_OK=1 EN=1"
+  },
+  {
+    "seconds": 1.141181,
+    "line": "CURRENT PD_SAMPLE TARGET_V=20 VBUS_MV=20077 PD=1 READ_OK=1 EN=1"
+  },
+  {
+    "seconds": 1.241168,
+    "line": "CURRENT PD_SAMPLE TARGET_V=20 VBUS_MV=20077 PD=1 READ_OK=1 EN=1"
+  },
+  {
+    "seconds": 1.34117,
+    "line": "CURRENT PD_SAMPLE TARGET_V=20 VBUS_MV=20077 PD=1 READ_OK=1 EN=1"
+  },
+  {
+    "seconds": 1.441178,
+    "line": "CURRENT PD_SAMPLE TARGET_V=20 VBUS_MV=20077 PD=1 READ_OK=1 EN=1"
+  },
+  {
+    "seconds": 1.541175,
+    "line": "CURRENT PD_SAMPLE TARGET_V=20 VBUS_MV=20077 PD=1 READ_OK=1 EN=1"
+  },
+  {
+    "seconds": 1.641141,
+    "line": "CURRENT PD_SAMPLE TARGET_V=20 VBUS_MV=20085 PD=1 READ_OK=1 EN=1"
+  },
+  {
+    "seconds": 1.741182,
+    "line": "CURRENT PD_SAMPLE TARGET_V=20 VBUS_MV=20060 PD=1 READ_OK=1 EN=1"
+  },
+  {
+    "seconds": 1.841221,
+    "line": "CURRENT PD_SAMPLE TARGET_V=20 VBUS_MV=20060 PD=1 READ_OK=1 EN=1"
+  },
+  {
+    "seconds": 1.941211,
+    "line": "CURRENT PD_SAMPLE TARGET_V=20 VBUS_MV=20077 PD=1 READ_OK=1 EN=1"
+  },
+  {
+    "seconds": 2.041212,
+    "line": "CURRENT PD_SAMPLE TARGET_V=20 VBUS_MV=20077 PD=1 READ_OK=1 EN=1"
+  },
+  {
+    "seconds": 2.141206,
+    "line": "CURRENT PD_SAMPLE TARGET_V=20 VBUS_MV=20085 PD=1 READ_OK=1 EN=1"
+  },
+  {
+    "seconds": 2.241178,
+    "line": "CURRENT PD_SAMPLE TARGET_V=20 VBUS_MV=20085 PD=1 READ_OK=1 EN=1"
+  },
+  {
+    "seconds": 2.341411,
+    "line": "CURRENT PD_SAMPLE TARGET_V=20 VBUS_MV=20060 PD=1 READ_OK=1 EN=1"
+  },
+  {
+    "seconds": 2.441204,
+    "line": "CURRENT PD_SAMPLE TARGET_V=20 VBUS_MV=20085 PD=1 READ_OK=1 EN=1"
+  },
+  {
+    "seconds": 2.541194,
+    "line": "CURRENT PD_SAMPLE TARGET_V=20 VBUS_MV=20127 PD=1 READ_OK=1 EN=1"
+  },
+  {
+    "seconds": 2.641261,
+    "line": "CURRENT PD_SAMPLE TARGET_V=20 VBUS_MV=20085 PD=1 READ_OK=1 EN=1"
+  },
+  {
+    "seconds": 2.741256,
+    "line": "CURRENT PD_SAMPLE TARGET_V=20 VBUS_MV=20077 PD=1 READ_OK=1 EN=1"
+  },
+  {
+    "seconds": 2.841219,
+    "line": "CURRENT PD_SAMPLE TARGET_V=20 VBUS_MV=20085 PD=1 READ_OK=1 EN=1"
+  },
+  {
+    "seconds": 2.941216,
+    "line": "CURRENT PD_SAMPLE TARGET_V=20 VBUS_MV=20127 PD=1 READ_OK=1 EN=1"
+  },
+  {
+    "seconds": 3.041237,
+    "line": "CURRENT PD_SAMPLE TARGET_V=20 VBUS_MV=20060 PD=1 READ_OK=1 EN=1"
+  },
+  {
+    "seconds": 3.141236,
+    "line": "CURRENT PD_SAMPLE TARGET_V=20 VBUS_MV=20085 PD=1 READ_OK=1 EN=1"
+  },
+  {
+    "seconds": 3.241216,
+    "line": "CURRENT PD_SAMPLE TARGET_V=20 VBUS_MV=20077 PD=1 READ_OK=1 EN=1"
+  },
+  {
+    "seconds": 3.34122,
+    "line": "CURRENT PD_SAMPLE TARGET_V=20 VBUS_MV=20085 PD=1 READ_OK=1 EN=1"
+  },
+  {
+    "seconds": 3.441223,
+    "line": "CURRENT PD_SAMPLE TARGET_V=20 VBUS_MV=20077 PD=1 READ_OK=1 EN=1"
+  },
+  {
+    "seconds": 3.541237,
+    "line": "CURRENT PD_SAMPLE TARGET_V=20 VBUS_MV=20077 PD=1 READ_OK=1 EN=1"
+  },
+  {
+    "seconds": 3.641272,
+    "line": "CURRENT PD_SAMPLE TARGET_V=20 VBUS_MV=20077 PD=1 READ_OK=1 EN=1"
+  },
+  {
+    "seconds": 3.741255,
+    "line": "CURRENT PD_SAMPLE TARGET_V=20 VBUS_MV=20060 PD=1 READ_OK=1 EN=1"
+  },
+  {
+    "seconds": 3.742446,
+    "line": "CURRENT PD_DONE TARGET_V=20 VBUS_MV=20060 PD=1 EN=1 ELAPSED_MS=3409"
+  },
+  {
+    "seconds": 3.942696,
+    "command": "CURRENT INFO"
+  },
+  {
+    "seconds": 3.948479,
+    "line": "CURRENT INFO PHASE=IDLE EN=1 READY=1 VBUS_MV=20077 RUN_MA=300 HOLD_MA=150 MICROSTEP=8 SPEED_STEPS_S=500 RUN_MS=4000 HOLD_MS=2000 PD_STATE=VERIFIED TARGET_V=20"
+  },
+  {
+    "seconds": 3.950166,
+    "line": "CURRENT ENCODER OK=1 STATUS=0 RAW=157027 COUNTS=-19"
+  },
+  {
+    "seconds": 3.962435,
+    "line": "CURRENT TMC IOIN=21000041 GCONF=000000c4 CHOPCONF=15030045 IFCNT=6 DRV_STATUS=80040000 CS_ACTUAL=4 MSCNT=16 MSCURACT=00f60018"
+  },
+  {
+    "seconds": 3.96325,
+    "line": "CURRENT PD PD=1 QC3=0 QC2=0"
+  },
+  {
+    "seconds": 3.963347,
+    "line": "CURRENT INFO_END"
+  },
+  {
+    "seconds": 4.163525,
+    "command": "CURRENT INFO"
+  },
+  {
+    "seconds": 4.169355,
+    "line": "CURRENT INFO PHASE=IDLE EN=1 READY=1 VBUS_MV=20077 RUN_MA=300 HOLD_MA=150 MICROSTEP=8 SPEED_STEPS_S=500 RUN_MS=4000 HOLD_MS=2000 PD_STATE=VERIFIED TARGET_V=20"
+  },
+  {
+    "seconds": 4.170355,
+    "line": "CURRENT ENCODER OK=1 STATUS=0 RAW=157027 COUNTS=-19"
+  },
+  {
+    "seconds": 4.183248,
+    "line": "CURRENT TMC IOIN=21000041 GCONF=000000c4 CHOPCONF=15030045 IFCNT=6 DRV_STATUS=80040000 CS_ACTUAL=4 MSCNT=16 MSCURACT=00f60018"
+  },
+  {
+    "seconds": 4.183441,
+    "line": "CURRENT PD PD=1 QC3=0 QC2=0"
+  },
+  {
+    "seconds": 4.184226,
+    "line": "CURRENT INFO_END"
+  },
+  {
+    "seconds": 4.384432,
+    "command": "CURRENT INFO"
+  },
+  {
+    "seconds": 4.39036,
+    "line": "CURRENT INFO PHASE=IDLE EN=1 READY=1 VBUS_MV=20085 RUN_MA=300 HOLD_MA=150 MICROSTEP=8 SPEED_STEPS_S=500 RUN_MS=4000 HOLD_MS=2000 PD_STATE=VERIFIED TARGET_V=20"
+  },
+  {
+    "seconds": 4.391355,
+    "line": "CURRENT ENCODER OK=1 STATUS=0 RAW=157027 COUNTS=-19"
+  },
+  {
+    "seconds": 4.404458,
+    "line": "CURRENT TMC IOIN=21000041 GCONF=000000c4 CHOPCONF=15030045 IFCNT=6 DRV_STATUS=80040000 CS_ACTUAL=4 MSCNT=16 MSCURACT=00f60018"
+  },
+  {
+    "seconds": 4.404726,
+    "line": "CURRENT PD PD=1 QC3=0 QC2=0"
+  },
+  {
+    "seconds": 4.404863,
+    "line": "CURRENT INFO_END"
+  },
+  {
+    "seconds": 4.605151,
+    "command": "CURRENT INFO"
+  },
+  {
+    "seconds": 4.611242,
+    "line": "CURRENT INFO PHASE=IDLE EN=1 READY=1 VBUS_MV=20077 RUN_MA=300 HOLD_MA=150 MICROSTEP=8 SPEED_STEPS_S=500 RUN_MS=4000 HOLD_MS=2000 PD_STATE=VERIFIED TARGET_V=20"
+  },
+  {
+    "seconds": 4.612219,
+    "line": "CURRENT ENCODER OK=1 STATUS=0 RAW=157027 COUNTS=-19"
+  },
+  {
+    "seconds": 4.624455,
+    "line": "CURRENT TMC IOIN=21000041 GCONF=000000c4 CHOPCONF=15030045 IFCNT=6 DRV_STATUS=80040000 CS_ACTUAL=4 MSCNT=16 MSCURACT=00f60018"
+  },
+  {
+    "seconds": 4.625344,
+    "line": "CURRENT PD PD=1 QC3=0 QC2=0"
+  },
+  {
+    "seconds": 4.625462,
+    "line": "CURRENT INFO_END"
+  },
+  {
+    "seconds": 4.825752,
+    "command": "CURRENT INFO"
+  },
+  {
+    "seconds": 4.831417,
+    "line": "CURRENT INFO PHASE=IDLE EN=1 READY=1 VBUS_MV=20060 RUN_MA=300 HOLD_MA=150 MICROSTEP=8 SPEED_STEPS_S=500 RUN_MS=4000 HOLD_MS=2000 PD_STATE=VERIFIED TARGET_V=20"
+  },
+  {
+    "seconds": 4.833222,
+    "line": "CURRENT ENCODER OK=1 STATUS=0 RAW=157027 COUNTS=-19"
+  },
+  {
+    "seconds": 4.845397,
+    "line": "CURRENT TMC IOIN=21000041 GCONF=000000c4 CHOPCONF=15030045 IFCNT=6 DRV_STATUS=80040000 CS_ACTUAL=4 MSCNT=16 MSCURACT=00f60018"
+  },
+  {
+    "seconds": 4.846295,
+    "line": "CURRENT PD PD=1 QC3=0 QC2=0"
+  },
+  {
+    "seconds": 4.846386,
+    "line": "CURRENT INFO_END"
+  },
+  {
+    "seconds": 4.846423,
+    "result": "PASS",
+    "scope": "仅空闲调档与回读；外部仪表 VBUS、3.3 V 与电机运行尚待验证"
+  }
+]

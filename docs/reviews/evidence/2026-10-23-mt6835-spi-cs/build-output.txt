@@ -1,0 +1,23 @@
+执行会话：69167
+命令：source /opt/esp/idf/export.sh；idf.py -B build -p /dev/serial/by-id/<Espressif 设备标识> build flash
+构建与烧录命令退出码：0
+
+Command: ninja all
+[1/9] Performing build step for 'bootloader'
+[1/1] cd /workspaces/PD-STEP/build/bootloader && /opt/esp/python_env/idf6.1_py3.12_env/bin/python /opt/esp/idf/components/partition_table/check_sizes.py --offset 0x8000 bootloader 0x0 /workspaces/PD-STEP/build/bootloader/bootloader.bin
+Bootloader binary size 0x5850 bytes. 0x27b0 bytes (31%) free.
+[2/9] No install step for 'bootloader'
+[3/9] Completed 'bootloader'
+[4/9] Building C object esp-idf/mt6835/CMakeFiles/__idf_mt6835.dir/mt6835_hw.c.obj
+[5/9] Linking C static library esp-idf/mt6835/libmt6835.a
+[6/9] Generating esp-idf/esp_system/ld/sections.ld
+Skipping linker script generation, section names unchanged
+[7/9] Linking CXX executable cartpole-fw.elf
+[8/9] Generating binary image from built executable
+esptool v5.3.1
+Creating ESP32-S3 image...
+Merged 3 ELF sections.
+Successfully created ESP32-S3 image.
+Generated /workspaces/PD-STEP/build/cartpole-fw.bin
+[9/9] cd /workspaces/PD-STEP/build && /opt/esp/python_env/idf6.1_py3.12_env/bin/python /opt/esp/idf/components/partition_table/check_sizes.py --offset 0x8000 partition --type app /workspaces/PD-STEP/build/partition_table/partition-table.bin /workspaces/PD-STEP/build/cartpole-fw.bin
+cartpole-fw.bin binary size 0x51db0 bytes. Smallest app partition is 0x200000 bytes. 0x1ae250 bytes (84%) free.

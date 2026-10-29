@@ -1,0 +1,10 @@
+{
+  "date": "2026-10-26",
+  "source": "用户在 PD20 调档并保持电机禁用后口述仪表读数。",
+  "verbatim": "vbus=20V，3.3V为3.32V",
+  "VBUS_V": 20.0,
+  "logic_supply_V": 3.32,
+  "scope_ready_confirmation": "示波器已就绪，可以开始",
+  "instrument_voltage_model": null,
+  "note": "用户未提供电压测量仪表型号、原始照片或电压波形；此条记录与固件 ADC 回读分别保存。"
+}

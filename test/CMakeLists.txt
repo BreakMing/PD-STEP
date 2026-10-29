@@ -13,9 +13,19 @@ list(APPEND SDKCONFIG_DEFAULTS
 
 set(EXTRA_COMPONENT_DIRS "${CMAKE_CURRENT_SOURCE_DIR}/../components")
 
-set(TEST_COMPONENTS "cartfsm ch224q cartproto magnetic_encoder mt6835 settings step_engine telemetry tmc2209"
-    CACHE STRING "参与测试的组件（其 test/ 子目录被编入）")
+option(CURRENT_MEASUREMENT "构建 UART0 空载电流测量固件" OFF)
+if(CURRENT_MEASUREMENT)
+    # 此模式只编入测量入口；不加载 Unity 用例及正式模式机。
+    set(TEST_COMPONENTS "")
+else()
+    set(TEST_COMPONENTS "cartfsm ch224q cartproto magnetic_encoder mt6835 settings step_engine telemetry tmc2209"
+        CACHE STRING "参与测试的组件（其 test/ 子目录被编入）")
+endif()
 
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 idf_build_set_property(MINIMAL_BUILD ON)
-project(cartpole-test)
+if(CURRENT_MEASUREMENT)
+    project(cartpole-current-test)
+else()
+    project(cartpole-test)
+endif()

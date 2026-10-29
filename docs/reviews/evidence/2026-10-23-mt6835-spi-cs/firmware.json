@@ -1,0 +1,20 @@
+{
+  "date": "2026-10-23",
+  "idf_version": "v6.1",
+  "build_flash_exec_session": 69167,
+  "build_flash_exit_code": 0,
+  "artifacts": {
+    "cartpole-fw.bin": {
+      "bytes": 335280,
+      "sha256": "2eb3606a3240ea51211391dcd9ef6bac4de817511f0a3cc0906b32528e37d903"
+    },
+    "cartpole-fw.elf": {
+      "bytes": 5676600,
+      "sha256": "3f491959355a2c7f00004ea980cee5c87b224931140edce497fc2b54421368d1"
+    }
+  },
+  "modified_driver": {
+    "path": "components/mt6835/mt6835_hw.c",
+    "sha256": "f2746ee360ac5aad20cee47f9d55e5168171c2068ad5a0628ab3436548e200d8"
+  }
+}

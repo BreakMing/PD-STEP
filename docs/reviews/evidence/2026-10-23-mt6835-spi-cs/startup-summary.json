@@ -1,0 +1,19 @@
+{
+  "exec_session": 50187,
+  "monitor_exit_code": 0,
+  "boot_count": 5,
+  "successful_cart_first_reads": 5,
+  "cart_first_raw_values": [
+    2037907,
+    2037902,
+    2037898,
+    2037901,
+    2037901
+  ],
+  "cart_error_lines": [],
+  "elf_sha256_prefix_matches": 5,
+  "motor_disabled_boot_count": 5,
+  "external_sensor_connected": false,
+  "test_scope": "board_encoder_only",
+  "method": "One monitor startup reset followed by four Ctrl+T Ctrl+R USB resets; not power cycles."
+}

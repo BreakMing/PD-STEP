@@ -1,0 +1,94 @@
+[
+  {
+    "seconds": 0.005563,
+    "command": "CURRENT INFO"
+  },
+  {
+    "seconds": 0.010845,
+    "line": "CURRENT INFO PHASE=IDLE EN=1 READY=1 VBUS_MV=4977 RUN_MA=300 HOLD_MA=150 MICROSTEP=8 SPEED_STEPS_S=500 RUN_MS=4000 HOLD_MS=2000 PD_STATE=UNCHANGED TARGET_V=0"
+  },
+  {
+    "seconds": 0.012563,
+    "line": "CURRENT ENCODER OK=1 STATUS=0 RAW=157008 COUNTS=0"
+  },
+  {
+    "seconds": 0.024715,
+    "line": "CURRENT TMC IOIN=21000041 GCONF=000000c4 CHOPCONF=15030045 IFCNT=18 DRV_STATUS=800400c0 CS_ACTUAL=4 MSCNT=16 MSCURACT=00f60018"
+  },
+  {
+    "seconds": 0.025582,
+    "line": "CURRENT PD PD=0 QC3=0 QC2=0"
+  },
+  {
+    "seconds": 0.025672,
+    "line": "CURRENT INFO_END"
+  },
+  {
+    "seconds": 0.025712,
+    "command": "CURRENT PD20"
+  },
+  {
+    "seconds": 0.028668,
+    "line": "CURRENT ERROR PD_HANDSHAKE EN=1"
+  },
+  {
+    "seconds": 0.028705,
+    "command": "CURRENT PD9"
+  },
+  {
+    "seconds": 0.031726,
+    "line": "CURRENT ERROR PD_HANDSHAKE EN=1"
+  },
+  {
+    "seconds": 0.031772,
+    "command": "CURRENT PD28"
+  },
+  {
+    "seconds": 0.033665,
+    "line": "CURRENT ERROR COMMAND EN=1"
+  },
+  {
+    "seconds": 0.033701,
+    "command": "CURRENT START"
+  },
+  {
+    "seconds": 0.036508,
+    "line": "CURRENT ERROR VBUS EN=1"
+  },
+  {
+    "seconds": 0.036545,
+    "command": "CURRENT STOP"
+  },
+  {
+    "seconds": 0.039562,
+    "line": "CURRENT STOPPED EN=1 PD_STATE=UNCHANGED TARGET_V=0"
+  },
+  {
+    "seconds": 0.039599,
+    "command": "CURRENT INFO"
+  },
+  {
+    "seconds": 0.04474,
+    "line": "CURRENT INFO PHASE=IDLE EN=1 READY=1 VBUS_MV=4960 RUN_MA=300 HOLD_MA=150 MICROSTEP=8 SPEED_STEPS_S=500 RUN_MS=4000 HOLD_MS=2000 PD_STATE=UNCHANGED TARGET_V=0"
+  },
+  {
+    "seconds": 0.045728,
+    "line": "CURRENT ENCODER OK=1 STATUS=0 RAW=157008 COUNTS=0"
+  },
+  {
+    "seconds": 0.05867,
+    "line": "CURRENT TMC IOIN=21000041 GCONF=000000c4 CHOPCONF=15030045 IFCNT=18 DRV_STATUS=800400c0 CS_ACTUAL=4 MSCNT=16 MSCURACT=00f60018"
+  },
+  {
+    "seconds": 0.060592,
+    "line": "CURRENT PD PD=0 QC3=0 QC2=0"
+  },
+  {
+    "seconds": 0.060696,
+    "line": "CURRENT INFO_END"
+  },
+  {
+    "seconds": 0.060727,
+    "result": "PASS"
+  }
+]

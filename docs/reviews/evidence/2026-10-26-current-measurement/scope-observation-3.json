@@ -1,0 +1,14 @@
+{
+  "date": "2026-10-26",
+  "source": "第 3 轮后用户口述；未取得截图、原始波形或直接测得的 RMS。",
+  "verbatim": "测量到了峰峰值为+-424mA的电流",
+  "interpretation": "将 ±424 mA 解释为正负峰值，峰峰值约 848 mA；若用户指示波器 Vpp=424 mA，则此换算不适用。",
+  "reported_extrema_mA": [
+    -424,
+    424
+  ],
+  "estimated_peak_to_peak_mA": 848,
+  "estimated_RMS_if_sinusoidal_mA": 299.8132752230961,
+  "directly_measured_RMS_mA": null,
+  "accuracy_result": "峰值与设定相符；精度仍待稳定段整周期 RMS 及波形证据。"
+}

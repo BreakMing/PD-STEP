@@ -1,0 +1,63 @@
+{
+  "date": "2026-10-26",
+  "source": "用户在示波器时间轴设为 1 秒/格后对第 2 轮 20 V 测试的口述；未取得截图或原始波形文件。",
+  "running_current": {
+    "reported_extrema_mA": [
+      -424,
+      424
+    ],
+    "reported_waveform": "正弦波",
+    "estimated_RMS_from_reported_peak_mA": 299.81,
+    "nominal_run_current_mA": 300,
+    "nominal_expected_RMS_mA": 305.96,
+    "estimated_difference_from_nominal_percent": -2.01,
+    "directly_measured_RMS_mA": null,
+    "assessment": "运行峰值按正弦波换算所得RMS估计约300mA，与标称约306mA接近；该值不是仪表直接测量的RMS，尚无原始波形可复核。"
+  },
+  "hold_decay_observations": [
+    {
+      "current_mA_approx": 400,
+      "duration_ms_approx": 650,
+      "phase": "正弦运行结束后的静止保持电流；用户澄清此值不是RMS。"
+    },
+    {
+      "current_mA_approx": 350,
+      "duration_ms_approx": 130
+    },
+    {
+      "current_mA_approx": 320,
+      "duration_ms_approx": 130
+    },
+    {
+      "current_mA_approx": 280,
+      "duration_ms_approx": 130
+    },
+    {
+      "current_mA_approx": 240,
+      "duration_ms_approx": 130
+    },
+    {
+      "current_mA_approx": 200,
+      "duration_ms_approx": 830
+    }
+  ],
+  "disabled_current_mA_approx": 0,
+  "functional_result": "用户报告结束后电流回到约 0 mA；串口记录显示 EN=1。",
+  "accuracy_result": "运行电流峰值换算估算与标称值接近；未直接测得整周期RMS。保持阶段单相静止电流不作为运行RMS或保持精度的判据。",
+  "hold_observed_total_duration_ms_approx": 2000,
+  "hold_observed_total_matches_firmware_hold_window": true,
+  "initial_reading_verbatim": "峰峰值为+-424mA的电流",
+  "clarification_verbatim": "400ma是正弦波结束后，电流在400ma出稳定了650ms左右。",
+  "subsequent_hold_readings_verbatim": "后续几段是 350ma、320ma、280ma、240ma这几段都是持续了130ms，然后是200ma，持续了830ms，结束后回到0ma。",
+  "interpretation": {
+    "running_waveform": "用户将 ±424 mA 描述为运行正弦波的峰值读数。按正负峰值解释，峰峰值约848mA。",
+    "rms_estimate_mA": 299.81,
+    "expected_rms_mA": 305.96,
+    "estimate_difference_percent": -2.01,
+    "rms_direct_measurement_mA": null,
+    "accuracy_status": "峰值换算估算与设定标称值接近；尚无直接RMS读数或原始波形，因此精度未完成仪表验收。",
+    "hold_duration_sum_ms_approx": 2000,
+    "hold_duration_matches_firmware_window": true
+  },
+  "hold_current_interpretation": "约400mA是正弦运行结束后的静止电流，持续约650ms，不是RMS。之后分级下降。"
+}

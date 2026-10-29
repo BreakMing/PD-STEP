@@ -1,0 +1,10 @@
+[
+  {
+    "seconds": 0.00908,
+    "command": "CURRENT INFO"
+  },
+  {
+    "seconds": 0.01134,
+    "line": "CURRENT ERROR COMMAND EN=1"
+  }
+]

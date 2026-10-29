@@ -1,0 +1,15 @@
+{
+  "date": "2026-10-26",
+  "exit_code": 0,
+  "source": "pd-interrupt-recovery.json",
+  "initial_state": "PD=1, TARGET_V=9, VBUS约8903mV, EN=1",
+  "interrupt_command": "CURRENT PD20，收到PD_REQUEST后立即发送CURRENT STOP",
+  "stop_result": "CURRENT STOPPED EN=1 PD_STATE=UNCERTAIN TARGET_V=20",
+  "start_result": "CURRENT ERROR PD_UNVERIFIED EN=1",
+  "recovery_command": "CURRENT PD9",
+  "recovery_done": "CURRENT PD_DONE TARGET_V=9 VBUS_MV=8895 PD=1 EN=1 ELAPSED_MS=3407",
+  "final_verified_idle_info_count": 6,
+  "motor_enable": "全程EN=1",
+  "run_command_accepted": false,
+  "result": "STOP后档位标记为未确认，START被拒绝；重新请求并稳定确认9V后恢复可启动状态。"
+}

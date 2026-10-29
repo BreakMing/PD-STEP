@@ -1,0 +1,536 @@
+Script started on 2026-10-23 17:05:10+08:00 [COMMAND="/opt/esp/python_env/idf6.1_py3.12_env/bin/python /opt/esp/idf/tools/idf_monitor.py -p /dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_44:1B:F6:8D:10:EC-if00 -b 115200 --target esp32s3 --toolchain-prefix /opt/esp/tools/xtensa-esp-elf/esp-15.2.0_20251204/xtensa-esp-elf/bin/xtensa-esp32s3-elf- build/cartpole-fw.elf" TERM="xterm-256color" TTY="/dev/pts/12" COLUMNS="80" LINES="24"]
+--- esp-idf-monitor 1.9.0 on /dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_44:1B:F6:8D:10:EC-if00 115200
+--- Quit: Ctrl+] | Menu: Ctrl+T | Help: Ctrl+T followed by Ctrl+H
+ESP-ROM:esp32s3-20210327
+Build:Mar 27 2021
+rst:0x15 (USB_UART_CHIP_RESET),boot:0xb (SPI_FAST_FLASH_BOOT)
+Saved PC:0x40374283
+--- 0x40374283: _DebugExceptionVector at /opt/esp/idf/components/xtensa/xtensa_vectors.S:466
+SPIWP:0xee
+mode:DIO, clock div:1
+load:0x3fce2820,len:0x16bc
+load:0x403c8700,len:0xf44
+load:0x403cb700,len:0x31f4
+entry 0x403c8928
+I (24) boot: ESP-IDF v6.1 2nd stage bootloader
+I (24) boot: compile time Oct 23 2026 12:26:42
+I (25) boot: Multicore bootloader
+I (25) boot: chip revision: v0.2
+I (25) boot: efuse block revision: v1.4
+I (25) qio_mode: Enabling default flash chip QIO
+I (25) boot.esp32s3: Boot SPI Speed : 80MHz
+I (26) boot.esp32s3: SPI Mode       : QIO
+I (26) boot.esp32s3: SPI Flash Size : 16MB
+I (26) boot: Enabling RNG early entropy source...
+I (26) boot: Partition Table:
+I (26) boot: ## Label            Usage          Type ST Offset   Length
+I (27) boot:  0 nvs              WiFi data        01 02 00009000 00006000
+I (27) boot:  1 phy_init         RF data          01 01 0000f000 00001000
+I (27) boot:  2 factory          factory app      00 00 00010000 00200000
+I (28) boot: End of partition table
+I (28) esp_image: segment 0: paddr=00010020 vaddr=3c030020 size=135fch ( 79356) map
+I (41) esp_image: segment 1: paddr=00023624 vaddr=3fc96000 size=03c8ch ( 15500) load
+I (44) esp_image: segment 2: paddr=000272b8 vaddr=40374000 size=08d60h ( 36192) load
+I (52) esp_image: segment 3: paddr=00030020 vaddr=42000020 size=28b00h (166656) map
+I (78) esp_image: segment 4: paddr=00058b28 vaddr=4037cd60 size=09230h ( 37424) load
+I (86) esp_image: segment 5: paddr=00061d60 vaddr=50000000 size=00024h (    36) load
+I (94) boot: Loaded app from partition at offset 0x10000
+I (94) boot: Disabling RNG early entropy source...
+I (95) octal_psram: vendor id    : 0x0d (AP)
+I (95) octal_psram: dev id       : 0x02 (generation 3)
+I (95) octal_psram: density      : 0x03 (64 Mbit)
+I (95) octal_psram: good-die     : 0x01 (Pass)
+I (96) octal_psram: Latency      : 0x01 (Fixed)
+I (96) octal_psram: VCC          : 0x01 (3V)
+I (96) octal_psram: SRF          : 0x01 (Fast Refresh)
+I (97) octal_psram: BurstType    : 0x01 (Hybrid Wrap)
+I (97) octal_psram: BurstLen     : 0x01 (32 Byte)
+I (97) octal_psram: Readlatency  : 0x02 (10 cycles@Fixed)
+I (97) octal_psram: DriveStrength: 0x00 (1/1)
+I (98) MSPI Timing: Enter psram timing tuning
+I (99) esp_psram: Found 8MB PSRAM device
+I (99) esp_psram: Speed: 80MHz
+I (99) cpu_start: Multicore app
+I (532) esp_psram: SPI SRAM memory test OK
+I (540) cpu_start: Pro cpu start user code
+I (540) cpu_start: cpu freq: 240000000 Hz
+I (540) app_init: Application information:
+I (541) app_init: Project name:     cartpole-fw
+I (541) app_init: App version:      795b8db
+I (541) app_init: Compile time:     Oct 23 2026 14:40:22
+I (541) app_init: ELF file SHA256:  3f4919593...
+I (541) app_init: ESP-IDF:          v6.1
+I (541) efuse_init: Min chip rev:     v0.0
+I (542) efuse_init: Max chip rev:     v0.99 
+I (542) efuse_init: Chip rev:         v0.2
+I (542) heap_init: Initializing. RAM available for dynamic allocation:
+I (542) heap_init: At 3FC9A9F0 len 0004ED20 (315 KiB): RAM
+I (542) heap_init: At 3FCE9710 len 00005724 (21 KiB): RAM
+I (543) heap_init: At 3FCF0000 len 00008000 (32 KiB): DRAM
+I (543) heap_init: At 600FE000 len 00001FE8 (7 KiB): RTCRAM
+I (543) esp_psram: Adding pool of 8192K of PSRAM memory to heap allocator
+I (544) spi_flash: detected chip: generic
+I (544) spi_flash: flash io: qio
+I (545) sleep_gpio: Configure to isolate all GPIO pins in sleep state
+I (545) sleep_gpio: Enable automatic switching of GPIO sleep configuration
+I (546) main_task: Started on CPU0
+I (546) esp_psram: Reserving pool of 32K of internal memory for DMA/internal allocations
+I (547) main_task: Calling app_main()
+I (552) settings: settings 已初始化（5 参数，NVS namespace 'cart'）
+I (552) bsp: GPIO: STEP=5 (OUT LOW), DIR=6 (OUT LOW), EN=21 (OUT HIGH=disabled)
+I (552) bsp: I2C: SDA=8 SCL=9 @ 400000 Hz (no internal pullup)
+I (557) bsp: I2C scan: device found at 0x22
+I (557) bsp: I2C scan: device found at 0x23
+I (569) bsp: I2C scan: 2 device(s) found (no internal pullup)
+I (569) bsp: Conclusion: board has external I2C pullups.
+I (570) bsp: SPI 小车位编码器: host=1 MOSI=11 MISO=13 SCLK=12
+I (570) bsp: SPI 摆角位编码器: host=2 MOSI=48 MISO=38 SCLK=47
+I (571) bsp: vbus ADC: io=4 分压 20000/2700 Ω（系数 8.407）
+I (572) bsp: BSP initialization complete
+I (573) me_cart: 在线——首读 raw=2037907（种子，pos=0）
+I (573) me_cart: 采样任务已启动：1 kHz，优先级 3，CPU1，2097152 counts/rev
+W (574) me_pole: 首读失败（全零帧（MISO 悬空/器件未应答）；末帧 rx = 00 00 00 00 00 00（tx = a0 03 00 00 0）——采样任务将继续重试
+I (574) me_pole: 采样任务已启动：1 kHz，优先级 3，CPU1，2097152 counts/rev
+I (575) tmc2209: UART2: TX=17 RX=18 @ 115200 baud 8N1
+E (583) me_pole: 连续 10 次读取失败——编码器标记 NOT OK（全零帧（MISO 悬空/器件未应答）；末帧 rx = 00 00 00 00 00 00（tx = a0 03 00 00 0）
+I (585) tmc2209: initialized: microstep=8, run=800mA, hold=400mA, VSENSE=1
+I (586) step_engine: step engine 已初始化（STEP=GPIO5，DIR=GPIO6，定时器 1MHz）
+I (586) cartaxis: 细分档 8 已生效，steps_per_mm=40.0（换算按已生效档）
+I (587) app_main: 总线电压 4.99 V
+I (588) app_main: CH224Q @0x22：PD=0 QC3=0 QC2=0 BC12=0
+I (588) app_main: CH224Q 当前档最大电流 0 mA
+I (588) uart: queue free spaces: 10
+I (589) cartproto: 协议通道 UART0 已初始化（事件队列驱动，TX=43 RX=44 @ 460800 baud）
+I (589) cartproto: comm_task 已启动（CPU0，优先级 5，栈 4096）
+I (590) cartproto: cartproto 已启动（行超时 100 ms）
+I (590) cartfsm: 模式机已启动：1 kHz，优先级 4，CPU1，上电 DISABLED
+I (590) app_main: cartpole 固件已启动
+I (591) main_task: Returned from app_main()
+I (590) telemetry: STATE 流任务已启动：200 Hz，优先级 2，CPU1
+ESP-ROM:esp32s3-20210327
+Build:Mar 27 2021
+rst:0x15 (USB_UART_CHIP_RESET),boot:0xb (SPI_FAST_FLASH_BOOT)
+Saved PC:0x4037be96
+--- 0x4037be96: esp_cpu_wait_for_intr at /opt/esp/idf/components/esp_hw_support/cpu.c:64
+SPIWP:0xee
+mode:DIO, clock div:1
+load:0x3fce2820,len:0x16bc
+load:0x403c8700,len:0xf44
+load:0x403cb700,len:0x31f4
+entry 0x403c8928
+I (24) boot: ESP-IDF v6.1 2nd stage bootloader
+I (24) boot: compile time Oct 23 2026 12:26:42
+I (25) boot: Multicore bootloader
+I (25) boot: chip revision: v0.2
+I (25) boot: efuse block revision: v1.4
+I (25) qio_mode: Enabling default flash chip QIO
+I (25) boot.esp32s3: Boot SPI Speed : 80MHz
+I (26) boot.esp32s3: SPI Mode       : QIO
+I (26) boot.esp32s3: SPI Flash Size : 16MB
+I (26) boot: Enabling RNG early entropy source...
+I (26) boot: Partition Table:
+I (26) boot: ## Label            Usage          Type ST Offset   Length
+I (27) boot:  0 nvs              WiFi data        01 02 00009000 00006000
+I (27) boot:  1 phy_init         RF data          01 01 0000f000 00001000
+I (27) boot:  2 factory          factory app      00 00 00010000 00200000
+I (28) boot: End of partition table
+I (28) esp_image: segment 0: paddr=00010020 vaddr=3c030020 size=135fch ( 79356) map
+I (41) esp_image: segment 1: paddr=00023624 vaddr=3fc96000 size=03c8ch ( 15500) load
+I (44) esp_image: segment 2: paddr=000272b8 vaddr=40374000 size=08d60h ( 36192) load
+I (52) esp_image: segment 3: paddr=00030020 vaddr=42000020 size=28b00h (166656) map
+I (78) esp_image: segment 4: paddr=00058b28 vaddr=4037cd60 size=09230h ( 37424) load
+I (86) esp_image: segment 5: paddr=00061d60 vaddr=50000000 size=00024h (    36) load
+I (94) boot: Loaded app from partition at offset 0x10000
+I (94) boot: Disabling RNG early entropy source...
+I (95) octal_psram: vendor id    : 0x0d (AP)
+I (95) octal_psram: dev id       : 0x02 (generation 3)
+I (95) octal_psram: density      : 0x03 (64 Mbit)
+I (96) octal_psram: good-die     : 0x01 (Pass)
+I (96) octal_psram: Latency      : 0x01 (Fixed)
+I (96) octal_psram: VCC          : 0x01 (3V)
+I (96) octal_psram: SRF          : 0x01 (Fast Refresh)
+I (97) octal_psram: BurstType    : 0x01 (Hybrid Wrap)
+I (97) octal_psram: BurstLen     : 0x01 (32 Byte)
+I (97) octal_psram: Readlatency  : 0x02 (10 cycles@Fixed)
+I (98) octal_psram: DriveStrength: 0x00 (1/1)
+I (98) MSPI Timing: Enter psram timing tuning
+I (99) esp_psram: Found 8MB PSRAM device
+I (99) esp_psram: Speed: 80MHz
+I (99) cpu_start: Multicore app
+I (525) esp_psram: SPI SRAM memory test OK
+I (534) cpu_start: Pro cpu start user code
+I (534) cpu_start: cpu freq: 240000000 Hz
+I (534) app_init: Application information:
+I (534) app_init: Project name:     cartpole-fw
+I (535) app_init: App version:      795b8db
+I (535) app_init: Compile time:     Oct 23 2026 14:40:22
+I (535) app_init: ELF file SHA256:  3f4919593...
+I (535) app_init: ESP-IDF:          v6.1
+I (535) efuse_init: Min chip rev:     v0.0
+I (535) efuse_init: Max chip rev:     v0.99 
+I (536) efuse_init: Chip rev:         v0.2
+I (536) heap_init: Initializing. RAM available for dynamic allocation:
+I (536) heap_init: At 3FC9A9F0 len 0004ED20 (315 KiB): RAM
+I (536) heap_init: At 3FCE9710 len 00005724 (21 KiB): RAM
+I (537) heap_init: At 3FCF0000 len 00008000 (32 KiB): DRAM
+I (537) heap_init: At 600FE000 len 00001FE8 (7 KiB): RTCRAM
+I (537) esp_psram: Adding pool of 8192K of PSRAM memory to heap allocator
+I (538) spi_flash: detected chip: generic
+I (538) spi_flash: flash io: qio
+I (539) sleep_gpio: Configure to isolate all GPIO pins in sleep state
+I (539) sleep_gpio: Enable automatic switching of GPIO sleep configuration
+I (540) main_task: Started on CPU0
+I (540) esp_psram: Reserving pool of 32K of internal memory for DMA/internal allocations
+I (541) main_task: Calling app_main()
+I (546) settings: settings 已初始化（5 参数，NVS namespace 'cart'）
+I (546) bsp: GPIO: STEP=5 (OUT LOW), DIR=6 (OUT LOW), EN=21 (OUT HIGH=disabled)
+I (546) bsp: I2C: SDA=8 SCL=9 @ 400000 Hz (no internal pullup)
+I (551) bsp: I2C scan: device found at 0x22
+I (551) bsp: I2C scan: device found at 0x23
+I (563) bsp: I2C scan: 2 device(s) found (no internal pullup)
+I (563) bsp: Conclusion: board has external I2C pullups.
+I (564) bsp: SPI 小车位编码器: host=1 MOSI=11 MISO=13 SCLK=12
+I (564) bsp: SPI 摆角位编码器: host=2 MOSI=48 MISO=38 SCLK=47
+I (565) bsp: vbus ADC: io=4 分压 20000/2700 Ω（系数 8.407）
+I (566) bsp: BSP initialization complete
+I (567) me_cart: 在线——首读 raw=2037902（种子，pos=0）
+I (567) me_cart: 采样任务已启动：1 kHz，优先级 3，CPU1，2097152 counts/rev
+W (568) me_pole: 首读失败（全零帧（MISO 悬空/器件未应答）；末帧 rx = 00 00 00 00 00 00（tx = a0 03 00 00 0）——采样任务将继续重试
+I (568) me_pole: 采样任务已启动：1 kHz，优先级 3，CPU1，2097152 counts/rev
+I (569) tmc2209: UART2: TX=17 RX=18 @ 115200 baud 8N1
+E (577) me_pole: 连续 10 次读取失败——编码器标记 NOT OK（全零帧（MISO 悬空/器件未应答）；末帧 rx = 00 00 00 00 00 00（tx = a0 03 00 00 0）
+I (579) tmc2209: initialized: microstep=8, run=800mA, hold=400mA, VSENSE=1
+I (580) step_engine: step engine 已初始化（STEP=GPIO5，DIR=GPIO6，定时器 1MHz）
+I (580) cartaxis: 细分档 8 已生效，steps_per_mm=40.0（换算按已生效档）
+I (581) app_main: 总线电压 4.92 V
+I (582) app_main: CH224Q @0x22：PD=0 QC3=0 QC2=0 BC12=0
+I (582) app_main: CH224Q 当前档最大电流 0 mA
+I (582) uart: queue free spaces: 10
+I (583) cartproto: 协议通道 UART0 已初始化（事件队列驱动，TX=43 RX=44 @ 460800 baud）
+I (583) cartproto: comm_task 已启动（CPU0，优先级 5，栈 4096）
+I (584) cartproto: cartproto 已启动（行超时 100 ms）
+I (584) cartfsm: 模式机已启动：1 kHz，优先级 4，CPU1，上电 DISABLED
+I (584) app_main: cartpole 固件已启动
+I (585) main_task: Returned from app_main()
+I (584) telemetry: STATE 流任务已启动：200 Hz，优先级 2，CPU1
+ESP-ROM:esp32s3-20210327
+Build:Mar 27 2021
+rst:0x15 (USB_UART_CHIP_RESET),boot:0xb (SPI_FAST_FLASH_BOOT)
+Saved PC:0x4037be96
+--- 0x4037be96: esp_cpu_wait_for_intr at /opt/esp/idf/components/esp_hw_support/cpu.c:64
+SPIWP:0xee
+mode:DIO, clock div:1
+load:0x3fce2820,len:0x16bc
+load:0x403c8700,len:0xf44
+load:0x403cb700,len:0x31f4
+entry 0x403c8928
+I (24) boot: ESP-IDF v6.1 2nd stage bootloader
+I (24) boot: compile time Oct 23 2026 12:26:42
+I (25) boot: Multicore bootloader
+I (25) boot: chip revision: v0.2
+I (25) boot: efuse block revision: v1.4
+I (25) qio_mode: Enabling default flash chip QIO
+I (25) boot.esp32s3: Boot SPI Speed : 80MHz
+I (26) boot.esp32s3: SPI Mode       : QIO
+I (26) boot.esp32s3: SPI Flash Size : 16MB
+I (26) boot: Enabling RNG early entropy source...
+I (26) boot: Partition Table:
+I (26) boot: ## Label            Usage          Type ST Offset   Length
+I (27) boot:  0 nvs              WiFi data        01 02 00009000 00006000
+I (27) boot:  1 phy_init         RF data          01 01 0000f000 00001000
+I (27) boot:  2 factory          factory app      00 00 00010000 00200000
+I (28) boot: End of partition table
+I (28) esp_image: segment 0: paddr=00010020 vaddr=3c030020 size=135fch ( 79356) map
+I (41) esp_image: segment 1: paddr=00023624 vaddr=3fc96000 size=03c8ch ( 15500) load
+I (44) esp_image: segment 2: paddr=000272b8 vaddr=40374000 size=08d60h ( 36192) load
+I (52) esp_image: segment 3: paddr=00030020 vaddr=42000020 size=28b00h (166656) map
+I (78) esp_image: segment 4: paddr=00058b28 vaddr=4037cd60 size=09230h ( 37424) load
+I (86) esp_image: segment 5: paddr=00061d60 vaddr=50000000 size=00024h (    36) load
+I (94) boot: Loaded app from partition at offset 0x10000
+I (94) boot: Disabling RNG early entropy source...
+I (95) octal_psram: vendor id    : 0x0d (AP)
+I (95) octal_psram: dev id       : 0x02 (generation 3)
+I (95) octal_psram: density      : 0x03 (64 Mbit)
+I (96) octal_psram: good-die     : 0x01 (Pass)
+I (96) octal_psram: Latency      : 0x01 (Fixed)
+I (96) octal_psram: VCC          : 0x01 (3V)
+I (96) octal_psram: SRF          : 0x01 (Fast Refresh)
+I (97) octal_psram: BurstType    : 0x01 (Hybrid Wrap)
+I (97) octal_psram: BurstLen     : 0x01 (32 Byte)
+I (97) octal_psram: Readlatency  : 0x02 (10 cycles@Fixed)
+I (98) octal_psram: DriveStrength: 0x00 (1/1)
+I (98) MSPI Timing: Enter psram timing tuning
+I (99) esp_psram: Found 8MB PSRAM device
+I (99) esp_psram: Speed: 80MHz
+I (99) cpu_start: Multicore app
+I (525) esp_psram: SPI SRAM memory test OK
+I (534) cpu_start: Pro cpu start user code
+I (534) cpu_start: cpu freq: 240000000 Hz
+I (534) app_init: Application information:
+I (534) app_init: Project name:     cartpole-fw
+I (535) app_init: App version:      795b8db
+I (535) app_init: Compile time:     Oct 23 2026 14:40:22
+I (535) app_init: ELF file SHA256:  3f4919593...
+I (535) app_init: ESP-IDF:          v6.1
+I (535) efuse_init: Min chip rev:     v0.0
+I (535) efuse_init: Max chip rev:     v0.99 
+I (536) efuse_init: Chip rev:         v0.2
+I (536) heap_init: Initializing. RAM available for dynamic allocation:
+I (536) heap_init: At 3FC9A9F0 len 0004ED20 (315 KiB): RAM
+I (536) heap_init: At 3FCE9710 len 00005724 (21 KiB): RAM
+I (536) heap_init: At 3FCF0000 len 00008000 (32 KiB): DRAM
+I (537) heap_init: At 600FE000 len 00001FE8 (7 KiB): RTCRAM
+I (537) esp_psram: Adding pool of 8192K of PSRAM memory to heap allocator
+I (538) spi_flash: detected chip: generic
+I (538) spi_flash: flash io: qio
+I (539) sleep_gpio: Configure to isolate all GPIO pins in sleep state
+I (539) sleep_gpio: Enable automatic switching of GPIO sleep configuration
+I (540) main_task: Started on CPU0
+I (540) esp_psram: Reserving pool of 32K of internal memory for DMA/internal allocations
+I (541) main_task: Calling app_main()
+I (546) settings: settings 已初始化（5 参数，NVS namespace 'cart'）
+I (546) bsp: GPIO: STEP=5 (OUT LOW), DIR=6 (OUT LOW), EN=21 (OUT HIGH=disabled)
+I (546) bsp: I2C: SDA=8 SCL=9 @ 400000 Hz (no internal pullup)
+I (551) bsp: I2C scan: device found at 0x22
+I (551) bsp: I2C scan: device found at 0x23
+I (563) bsp: I2C scan: 2 device(s) found (no internal pullup)
+I (563) bsp: Conclusion: board has external I2C pullups.
+I (564) bsp: SPI 小车位编码器: host=1 MOSI=11 MISO=13 SCLK=12
+I (565) bsp: SPI 摆角位编码器: host=2 MOSI=48 MISO=38 SCLK=47
+I (565) bsp: vbus ADC: io=4 分压 20000/2700 Ω（系数 8.407）
+I (566) bsp: BSP initialization complete
+I (567) me_cart: 在线——首读 raw=2037898（种子，pos=0）
+I (567) me_cart: 采样任务已启动：1 kHz，优先级 3，CPU1，2097152 counts/rev
+W (568) me_pole: 首读失败（全零帧（MISO 悬空/器件未应答）；末帧 rx = 00 00 00 00 00 00（tx = a0 03 00 00 0）——采样任务将继续重试
+I (568) me_pole: 采样任务已启动：1 kHz，优先级 3，CPU1，2097152 counts/rev
+I (569) tmc2209: UART2: TX=17 RX=18 @ 115200 baud 8N1
+E (577) me_pole: 连续 10 次读取失败——编码器标记 NOT OK（全零帧（MISO 悬空/器件未应答）；末帧 rx = 00 00 00 00 00 00（tx = a0 03 00 00 0）
+I (579) tmc2209: initialized: microstep=8, run=800mA, hold=400mA, VSENSE=1
+I (580) step_engine: step engine 已初始化（STEP=GPIO5，DIR=GPIO6，定时器 1MHz）
+I (580) cartaxis: 细分档 8 已生效，steps_per_mm=40.0（换算按已生效档）
+I (581) app_main: 总线电压 4.92 V
+I (582) app_main: CH224Q @0x22：PD=0 QC3=0 QC2=0 BC12=0
+I (582) app_main: CH224Q 当前档最大电流 0 mA
+I (582) uart: queue free spaces: 10
+I (583) cartproto: 协议通道 UART0 已初始化（事件队列驱动，TX=43 RX=44 @ 460800 baud）
+I (583) cartproto: comm_task 已启动（CPU0，优先级 5，栈 4096）
+I (584) cartproto: cartproto 已启动（行超时 100 ms）
+I (584) cartfsm: 模式机已启动：1 kHz，优先级 4，CPU1，上电 DISABLED
+I (584) app_main: cartpole 固件已启动
+I (585) main_task: Returned from app_main()
+I (584) telemetry: STATE 流任务已启动：200 Hz，优先级 2，CPU1
+ESP-ROM:esp32s3-20210327
+Build:Mar 27 2021
+rst:0x15 (USB_UART_CHIP_RESET),boot:0xb (SPI_FAST_FLASH_BOOT)
+Saved PC:0x4037be96
+--- 0x4037be96: esp_cpu_wait_for_intr at /opt/esp/idf/components/esp_hw_support/cpu.c:64
+SPIWP:0xee
+mode:DIO, clock div:1
+load:0x3fce2820,len:0x16bc
+load:0x403c8700,len:0xf44
+load:0x403cb700,len:0x31f4
+entry 0x403c8928
+I (24) boot: ESP-IDF v6.1 2nd stage bootloader
+I (24) boot: compile time Oct 23 2026 12:26:42
+I (25) boot: Multicore bootloader
+I (25) boot: chip revision: v0.2
+I (25) boot: efuse block revision: v1.4
+I (25) qio_mode: Enabling default flash chip QIO
+I (25) boot.esp32s3: Boot SPI Speed : 80MHz
+I (26) boot.esp32s3: SPI Mode       : QIO
+I (26) boot.esp32s3: SPI Flash Size : 16MB
+I (26) boot: Enabling RNG early entropy source...
+I (26) boot: Partition Table:
+I (26) boot: ## Label            Usage          Type ST Offset   Length
+I (27) boot:  0 nvs              WiFi data        01 02 00009000 00006000
+I (27) boot:  1 phy_init         RF data          01 01 0000f000 00001000
+I (27) boot:  2 factory          factory app      00 00 00010000 00200000
+I (28) boot: End of partition table
+I (28) esp_image: segment 0: paddr=00010020 vaddr=3c030020 size=135fch ( 79356) map
+I (41) esp_image: segment 1: paddr=00023624 vaddr=3fc96000 size=03c8ch ( 15500) load
+I (44) esp_image: segment 2: paddr=000272b8 vaddr=40374000 size=08d60h ( 36192) load
+I (52) esp_image: segment 3: paddr=00030020 vaddr=42000020 size=28b00h (166656) map
+I (78) esp_image: segment 4: paddr=00058b28 vaddr=4037cd60 size=09230h ( 37424) load
+I (86) esp_image: segment 5: paddr=00061d60 vaddr=50000000 size=00024h (    36) load
+I (94) boot: Loaded app from partition at offset 0x10000
+I (94) boot: Disabling RNG early entropy source...
+I (95) octal_psram: vendor id    : 0x0d (AP)
+I (95) octal_psram: dev id       : 0x02 (generation 3)
+I (95) octal_psram: density      : 0x03 (64 Mbit)
+I (96) octal_psram: good-die     : 0x01 (Pass)
+I (96) octal_psram: Latency      : 0x01 (Fixed)
+I (96) octal_psram: VCC          : 0x01 (3V)
+I (96) octal_psram: SRF          : 0x01 (Fast Refresh)
+I (97) octal_psram: BurstType    : 0x01 (Hybrid Wrap)
+I (97) octal_psram: BurstLen     : 0x01 (32 Byte)
+I (97) octal_psram: Readlatency  : 0x02 (10 cycles@Fixed)
+I (97) octal_psram: DriveStrength: 0x00 (1/1)
+I (98) MSPI Timing: Enter psram timing tuning
+I (99) esp_psram: Found 8MB PSRAM device
+I (99) esp_psram: Speed: 80MHz
+I (99) cpu_start: Multicore app
+I (525) esp_psram: SPI SRAM memory test OK
+I (534) cpu_start: Pro cpu start user code
+I (534) cpu_start: cpu freq: 240000000 Hz
+I (534) app_init: Application information:
+I (534) app_init: Project name:     cartpole-fw
+I (534) app_init: App version:      795b8db
+I (535) app_init: Compile time:     Oct 23 2026 14:40:22
+I (535) app_init: ELF file SHA256:  3f4919593...
+I (535) app_init: ESP-IDF:          v6.1
+I (535) efuse_init: Min chip rev:     v0.0
+I (535) efuse_init: Max chip rev:     v0.99 
+I (535) efuse_init: Chip rev:         v0.2
+I (536) heap_init: Initializing. RAM available for dynamic allocation:
+I (536) heap_init: At 3FC9A9F0 len 0004ED20 (315 KiB): RAM
+I (536) heap_init: At 3FCE9710 len 00005724 (21 KiB): RAM
+I (536) heap_init: At 3FCF0000 len 00008000 (32 KiB): DRAM
+I (536) heap_init: At 600FE000 len 00001FE8 (7 KiB): RTCRAM
+I (537) esp_psram: Adding pool of 8192K of PSRAM memory to heap allocator
+I (538) spi_flash: detected chip: generic
+I (538) spi_flash: flash io: qio
+I (538) sleep_gpio: Configure to isolate all GPIO pins in sleep state
+I (539) sleep_gpio: Enable automatic switching of GPIO sleep configuration
+I (539) main_task: Started on CPU0
+I (539) esp_psram: Reserving pool of 32K of internal memory for DMA/internal allocations
+I (540) main_task: Calling app_main()
+I (545) settings: settings 已初始化（5 参数，NVS namespace 'cart'）
+I (545) bsp: GPIO: STEP=5 (OUT LOW), DIR=6 (OUT LOW), EN=21 (OUT HIGH=disabled)
+I (545) bsp: I2C: SDA=8 SCL=9 @ 400000 Hz (no internal pullup)
+I (550) bsp: I2C scan: device found at 0x22
+I (550) bsp: I2C scan: device found at 0x23
+I (562) bsp: I2C scan: 2 device(s) found (no internal pullup)
+I (562) bsp: Conclusion: board has external I2C pullups.
+I (563) bsp: SPI 小车位编码器: host=1 MOSI=11 MISO=13 SCLK=12
+I (564) bsp: SPI 摆角位编码器: host=2 MOSI=48 MISO=38 SCLK=47
+I (564) bsp: vbus ADC: io=4 分压 20000/2700 Ω（系数 8.407）
+I (565) bsp: BSP initialization complete
+I (566) me_cart: 在线——首读 raw=2037901（种子，pos=0）
+I (566) me_cart: 采样任务已启动：1 kHz，优先级 3，CPU1，2097152 counts/rev
+W (567) me_pole: 首读失败（全零帧（MISO 悬空/器件未应答）；末帧 rx = 00 00 00 00 00 00（tx = a0 03 00 00 0）——采样任务将继续重试
+I (567) me_pole: 采样任务已启动：1 kHz，优先级 3，CPU1，2097152 counts/rev
+I (568) tmc2209: UART2: TX=17 RX=18 @ 115200 baud 8N1
+E (576) me_pole: 连续 10 次读取失败——编码器标记 NOT OK（全零帧（MISO 悬空/器件未应答）；末帧 rx = 00 00 00 00 00 00（tx = a0 03 00 00 0）
+I (578) tmc2209: initialized: microstep=8, run=800mA, hold=400mA, VSENSE=1
+I (579) step_engine: step engine 已初始化（STEP=GPIO5，DIR=GPIO6，定时器 1MHz）
+I (579) cartaxis: 细分档 8 已生效，steps_per_mm=40.0（换算按已生效档）
+I (580) app_main: 总线电压 4.90 V
+I (581) app_main: CH224Q @0x22：PD=0 QC3=0 QC2=0 BC12=0
+I (581) app_main: CH224Q 当前档最大电流 0 mA
+I (581) uart: queue free spaces: 10
+I (582) cartproto: 协议通道 UART0 已初始化（事件队列驱动，TX=43 RX=44 @ 460800 baud）
+I (582) cartproto: comm_task 已启动（CPU0，优先级 5，栈 4096）
+I (583) cartproto: cartproto 已启动（行超时 100 ms）
+I (583) cartfsm: 模式机已启动：1 kHz，优先级 4，CPU1，上电 DISABLED
+I (583) app_main: cartpole 固件已启动
+I (584) main_task: Returned from app_main()
+I (583) telemetry: STATE 流任务已启动：200 Hz，优先级 2，CPU1
+ESP-ROM:esp32s3-20210327
+Build:Mar 27 2021
+rst:0x15 (USB_UART_CHIP_RESET),boot:0xb (SPI_FAST_FLASH_BOOT)
+Saved PC:0x4037be96
+--- 0x4037be96: esp_cpu_wait_for_intr at /opt/esp/idf/components/esp_hw_support/cpu.c:64
+SPIWP:0xee
+mode:DIO, clock div:1
+load:0x3fce2820,len:0x16bc
+load:0x403c8700,len:0xf44
+load:0x403cb700,len:0x31f4
+entry 0x403c8928
+I (24) boot: ESP-IDF v6.1 2nd stage bootloader
+I (24) boot: compile time Oct 23 2026 12:26:42
+I (25) boot: Multicore bootloader
+I (25) boot: chip revision: v0.2
+I (25) boot: efuse block revision: v1.4
+I (25) qio_mode: Enabling default flash chip QIO
+I (25) boot.esp32s3: Boot SPI Speed : 80MHz
+I (26) boot.esp32s3: SPI Mode       : QIO
+I (26) boot.esp32s3: SPI Flash Size : 16MB
+I (26) boot: Enabling RNG early entropy source...
+I (26) boot: Partition Table:
+I (26) boot: ## Label            Usage          Type ST Offset   Length
+I (27) boot:  0 nvs              WiFi data        01 02 00009000 00006000
+I (27) boot:  1 phy_init         RF data          01 01 0000f000 00001000
+I (27) boot:  2 factory          factory app      00 00 00010000 00200000
+I (28) boot: End of partition table
+I (28) esp_image: segment 0: paddr=00010020 vaddr=3c030020 size=135fch ( 79356) map
+I (41) esp_image: segment 1: paddr=00023624 vaddr=3fc96000 size=03c8ch ( 15500) load
+I (44) esp_image: segment 2: paddr=000272b8 vaddr=40374000 size=08d60h ( 36192) load
+I (52) esp_image: segment 3: paddr=00030020 vaddr=42000020 size=28b00h (166656) map
+I (78) esp_image: segment 4: paddr=00058b28 vaddr=4037cd60 size=09230h ( 37424) load
+I (86) esp_image: segment 5: paddr=00061d60 vaddr=50000000 size=00024h (    36) load
+I (94) boot: Loaded app from partition at offset 0x10000
+I (94) boot: Disabling RNG early entropy source...
+I (95) octal_psram: vendor id    : 0x0d (AP)
+I (95) octal_psram: dev id       : 0x02 (generation 3)
+I (95) octal_psram: density      : 0x03 (64 Mbit)
+I (96) octal_psram: good-die     : 0x01 (Pass)
+I (96) octal_psram: Latency      : 0x01 (Fixed)
+I (96) octal_psram: VCC          : 0x01 (3V)
+I (96) octal_psram: SRF          : 0x01 (Fast Refresh)
+I (97) octal_psram: BurstType    : 0x01 (Hybrid Wrap)
+I (97) octal_psram: BurstLen     : 0x01 (32 Byte)
+I (97) octal_psram: Readlatency  : 0x02 (10 cycles@Fixed)
+I (97) octal_psram: DriveStrength: 0x00 (1/1)
+I (98) MSPI Timing: Enter psram timing tuning
+I (99) esp_psram: Found 8MB PSRAM device
+I (99) esp_psram: Speed: 80MHz
+I (99) cpu_start: Multicore app
+I (525) esp_psram: SPI SRAM memory test OK
+I (534) cpu_start: Pro cpu start user code
+I (534) cpu_start: cpu freq: 240000000 Hz
+I (534) app_init: Application information:
+I (534) app_init: Project name:     cartpole-fw
+I (534) app_init: App version:      795b8db
+I (535) app_init: Compile time:     Oct 23 2026 14:40:22
+I (535) app_init: ELF file SHA256:  3f4919593...
+I (535) app_init: ESP-IDF:          v6.1
+I (535) efuse_init: Min chip rev:     v0.0
+I (535) efuse_init: Max chip rev:     v0.99 
+I (535) efuse_init: Chip rev:         v0.2
+I (536) heap_init: Initializing. RAM available for dynamic allocation:
+I (536) heap_init: At 3FC9A9F0 len 0004ED20 (315 KiB): RAM
+I (536) heap_init: At 3FCE9710 len 00005724 (21 KiB): RAM
+I (536) heap_init: At 3FCF0000 len 00008000 (32 KiB): DRAM
+I (536) heap_init: At 600FE000 len 00001FE8 (7 KiB): RTCRAM
+I (537) esp_psram: Adding pool of 8192K of PSRAM memory to heap allocator
+I (538) spi_flash: detected chip: generic
+I (538) spi_flash: flash io: qio
+I (538) sleep_gpio: Configure to isolate all GPIO pins in sleep state
+I (539) sleep_gpio: Enable automatic switching of GPIO sleep configuration
+I (540) main_task: Started on CPU0
+I (540) esp_psram: Reserving pool of 32K of internal memory for DMA/internal allocations
+I (541) main_task: Calling app_main()
+I (546) settings: settings 已初始化（5 参数，NVS namespace 'cart'）
+I (546) bsp: GPIO: STEP=5 (OUT LOW), DIR=6 (OUT LOW), EN=21 (OUT HIGH=disabled)
+I (546) bsp: I2C: SDA=8 SCL=9 @ 400000 Hz (no internal pullup)
+I (551) bsp: I2C scan: device found at 0x22
+I (551) bsp: I2C scan: device found at 0x23
+I (563) bsp: I2C scan: 2 device(s) found (no internal pullup)
+I (563) bsp: Conclusion: board has external I2C pullups.
+I (564) bsp: SPI 小车位编码器: host=1 MOSI=11 MISO=13 SCLK=12
+I (564) bsp: SPI 摆角位编码器: host=2 MOSI=48 MISO=38 SCLK=47
+I (565) bsp: vbus ADC: io=4 分压 20000/2700 Ω（系数 8.407）
+I (566) bsp: BSP initialization complete
+I (567) me_cart: 在线——首读 raw=2037901（种子，pos=0）
+I (567) me_cart: 采样任务已启动：1 kHz，优先级 3，CPU1，2097152 counts/rev
+W (568) me_pole: 首读失败（全零帧（MISO 悬空/器件未应答）；末帧 rx = 00 00 00 00 00 00（tx = a0 03 00 00 0）——采样任务将继续重试
+I (568) me_pole: 采样任务已启动：1 kHz，优先级 3，CPU1，2097152 counts/rev
+I (569) tmc2209: UART2: TX=17 RX=18 @ 115200 baud 8N1
+E (577) me_pole: 连续 10 次读取失败——编码器标记 NOT OK（全零帧（MISO 悬空/器件未应答）；末帧 rx = 00 00 00 00 00 00（tx = a0 03 00 00 0）
+I (579) tmc2209: initialized: microstep=8, run=800mA, hold=400mA, VSENSE=1
+I (580) step_engine: step engine 已初始化（STEP=GPIO5，DIR=GPIO6，定时器 1MHz）
+I (580) cartaxis: 细分档 8 已生效，steps_per_mm=40.0（换算按已生效档）
+I (581) app_main: 总线电压 4.92 V
+I (582) app_main: CH224Q @0x22：PD=0 QC3=0 QC2=0 BC12=0
+I (582) app_main: CH224Q 当前档最大电流 0 mA
+I (582) uart: queue free spaces: 10
+I (583) cartproto: 协议通道 UART0 已初始化（事件队列驱动，TX=43 RX=44 @ 460800 baud）
+I (583) cartproto: comm_task 已启动（CPU0，优先级 5，栈 4096）
+I (584) cartproto: cartproto 已启动（行超时 100 ms）
+I (584) cartfsm: 模式机已启动：1 kHz，优先级 4，CPU1，上电 DISABLED
+I (584) app_main: cartpole 固件已启动
+I (584) telemetry: STATE 流任务已启动：200 Hz，优先级 2，CPU1
+I (585) main_task: Returned from app_main()
+
+
+Script done on 2026-10-23 17:18:07+08:00 [COMMAND_EXIT_CODE="0"]
