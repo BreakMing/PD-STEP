@@ -69,10 +69,12 @@ components/
                 驱动，经 motor 组合）
   <每个组件>/test/  组件单元测试（Unity，仅测试工程编入）
 main/app_main.c 启动接线（创建全部实例、分发句柄、运行/保持电流中转）
-test/           独立测试工程（TEST_COMPONENTS + Unity 菜单）
+test/           独立测试工程（Unity 菜单或 UART0 空载测流）
+  main/test_app_main.c       Unity 菜单入口
+  main/current_measurement/ 测流入口、运行时序与 PD 调档验证
 host_tests/     宿主可跑的纯逻辑测试（gcc，无 ESP 依赖）
 tools/          cartpole_host.py 联调工具
-docs/reviews/   抄录与上板验收记录
+docs/reviews/   器件事务说明、联调记录与原始证据
 ```
 
 任务/CPU 布局：CPU0 = cartproto 通讯（prio 5）+ STEP ISR；
@@ -134,3 +136,5 @@ python tools/cartpole_host.py --port COM7 query|mark-left|mark-right|enable|vel|
 上板验收按主仓库 `deploy/v2/onboard-checklist.md`（C 阶段，两点
 标定规程）与 `docs/reviews/T10-acceptance.md`（端到端五用例）
 执行并回填。
+
+实板联调与软件检查记录见[验证记录索引](docs/reviews/README.md)。

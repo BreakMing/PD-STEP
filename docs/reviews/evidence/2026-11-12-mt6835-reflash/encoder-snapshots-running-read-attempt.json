@@ -1,0 +1,20 @@
+{
+  "method": "通过原生USB JTAG读取正式固件中的板载实例状态，不发送使能或运动指令。",
+  "elf": "build/cartpole-fw.elf",
+  "snapshots": [],
+  "debug_commands": [
+    {
+      "command": "targets esp32s3.cpu1",
+      "reply": ""
+    },
+    {
+      "command": "read_memory 0x3fc9a724 32 1",
+      "reply": "failed to read memory"
+    },
+    {
+      "command": "shutdown",
+      "reply": ""
+    }
+  ],
+  "caveat": "状态快照不是逐帧CRC抓取，不能据此证明快照间每一帧无错误。"
+}

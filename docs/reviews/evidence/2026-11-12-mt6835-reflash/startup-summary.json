@@ -1,0 +1,20 @@
+{
+  "date_utc": "2026-11-12T07:30:04.018874+00:00",
+  "usb_serial": "44:1B:F6:8D:10:98",
+  "monitor_seconds": 45.086,
+  "cart_lines": [
+    "I (567) me_cart: 在线——首读 raw=464765（种子，pos=0）",
+    "I (568) me_cart: 采样任务已启动：1 kHz，优先级 3，CPU1，2097152 counts/rev"
+  ],
+  "cart_first_raw": 464765,
+  "cart_failure_or_warning_lines": [],
+  "application_started": true,
+  "enable_initialized_high": true,
+  "external_encoder_lines": [
+    "W (568) me_pole: 首读失败（全零帧（MISO 悬空/器件未应答）；末帧 rx = 00 00 00 00 00 00（tx = a0 03 00 00 0）——采样任务将继续重试",
+    "I (569) me_pole: 采样任务已启动：1 kHz，优先级 3，CPU1，2097152 counts/rev",
+    "E (578) me_pole: 连续 10 次读取失败——编码器标记 NOT OK（全零帧（MISO 悬空/器件未应答）；末帧 rx = 00 00 00 00 00 00（tx = a0 03 00 00 0）"
+  ],
+  "crash_lines": [],
+  "caveat": "日志仅在连续失败达到门限或状态变化时报告；没有逐帧抓取，不能把日志无告警换算成所有帧零错误。"
+}

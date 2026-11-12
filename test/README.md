@@ -8,6 +8,19 @@
 | `CURRENT_MEASUREMENT=OFF`（默认） | `cartpole-test` | 原生 USB 的 Unity 菜单；用例见各组件 `test/`。 |
 | `CURRENT_MEASUREMENT=ON` | `cartpole-current-test` | UART0 的固定空载测流指令。 |
 
+## 源码组织
+
+默认入口 [test_app_main.c](main/test_app_main.c)负责 Unity 菜单。
+测流入口与纯逻辑统一放在 `main/current_measurement/`，由构建选项选择：
+
+| 文件 | 职责 |
+| --- | --- |
+| [app_main.c](main/current_measurement/app_main.c) | 初始化测流硬件、收发 UART0 诊断命令、执行电机与 PD 调档检查。 |
+| [current_sequence.c](main/current_measurement/current_sequence.c) | 命令解析以及运行、保持、禁用的时序；固定参数由同目录的头文件定义。 |
+| [current_pd.c](main/current_measurement/current_pd.c) | 调档准入、稳定采样、超时和恢复状态；验证参数由同目录的头文件定义。 |
+
+后两者不依赖 ESP-IDF，宿主测试直接编译对应源码。
+
 ## Unity 测试
 
 在仓库根目录加载 ESP-IDF 环境后执行：
@@ -36,7 +49,7 @@ idf.py -C test -B "$current_test_build" \
 ```
 
 构建配置、定时边界和固定电流参数以
-[current_sequence.h](main/current_sequence.h)为准。
+[current_sequence.h](main/current_measurement/current_sequence.h)为准。
 Flash 参数由构建目录的 `flash_args` 生成。烧录前核对当前 ESP32 的 USB 标识，
 通过原生 USB 写入该目录中的产物。复位后从 UART0（GPIO43 TX、GPIO44 RX，
 460800 8N1，3.3 V TTL，共地）交互；USB-C 可以改接 PD 电源。
@@ -74,7 +87,7 @@ TMC 没有温度或短路告警。驱动配置还会核对 IOIN 版本、GCONF�
 ### PD 调档契约
 
 切档复用 CH224Q 驱动。`PD=1` 只表示协议握手有效，不能单独证明电压档位。
-时间、采样间隔与稳定次数以 [current_pd.h](main/current_pd.h) 为准：写入请求后至少等待
+时间、采样间隔与稳定次数以 [current_pd.h](main/current_measurement/current_pd.h) 为准：写入请求后至少等待
 3 秒，再以不小于 100 ms 的间隔取得连续 5 次 PD 有效且 VBUS 位于目标 ±5% 的读数，
 才输出 `CURRENT PD_DONE`；6 秒仍未满足条件则输出超时。`PD_REQUEST` 仅表示写入完成。
 
@@ -120,8 +133,8 @@ Micsig CP1003B 当前采用 100 mV/A 档位。
 在仓库根目录执行以下单元测试，不访问硬件：
 
 ```bash
-gcc -std=c11 -Wall -Wextra -Werror -Itest/main \
-  host_tests/current_sequence_test.c test/main/current_sequence.c \
+gcc -std=c11 -Wall -Wextra -Werror -Itest/main/current_measurement \
+  host_tests/current_sequence_test.c test/main/current_measurement/current_sequence.c \
   -o /tmp/pd-step-current-sequence-test
 /tmp/pd-step-current-sequence-test
 ```
@@ -132,8 +145,8 @@ gcc -std=c11 -Wall -Wextra -Werror -Itest/main \
 PD 验证状态的单元测试：
 
 ```bash
-gcc -std=c11 -Wall -Wextra -Werror -Itest/main \
-  host_tests/current_pd_test.c test/main/current_pd.c \
+gcc -std=c11 -Wall -Wextra -Werror -Itest/main/current_measurement \
+  host_tests/current_pd_test.c test/main/current_measurement/current_pd.c \
   -o /tmp/pd-step-current-pd-test
 /tmp/pd-step-current-pd-test
 ```

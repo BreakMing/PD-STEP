@@ -1,0 +1,15 @@
+Open On-Chip Debugger v0.12.0-esp32-20260703 (2026-07-03-13:49)
+Licensed under GNU GPL v2
+For bug reports, read
+	http://openocd.org/doc/doxygen/bugs.html
+none
+0
+Info : esp_usb_jtag: capabilities descriptor set to 0x2000
+WARNING: ESP flash support is disabled!
+WARNING: ESP flash support is disabled!
+force hard breakpoints
+Info : Listening on port 16666 for tcl connections
+Info : telnet server disabled
+Error: libusb_open() failed with LIBUSB_ERROR_ACCESS
+Error: esp_usb_jtag: could not find or open device!
+

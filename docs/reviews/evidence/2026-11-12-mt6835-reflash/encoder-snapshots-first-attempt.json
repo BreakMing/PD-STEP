@@ -1,0 +1,7 @@
+{
+  "method": "通过原生USB JTAG读取正式固件中的板载实例状态，不发送使能或运动指令。",
+  "elf": "build/cartpole-fw.elf",
+  "snapshots": [],
+  "debug_commands": [],
+  "caveat": "状态快照不是逐帧CRC抓取，不能据此证明快照间每一帧无错误。"
+}

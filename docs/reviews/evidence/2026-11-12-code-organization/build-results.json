@@ -1,0 +1,46 @@
+[
+  {
+    "name": "firmware",
+    "command": [
+      "idf.py",
+      "-B",
+      "/workspaces/PD-STEP/build",
+      "build"
+    ],
+    "exit_code": 0,
+    "seconds": 2.69,
+    "log": "firmware-build.txt"
+  },
+  {
+    "name": "current-measurement",
+    "command": [
+      "idf.py",
+      "-C",
+      "test",
+      "-B",
+      "/workspaces/PD-STEP/build/current-measurement",
+      "-DIDF_TARGET=esp32s3",
+      "-DSDKCONFIG=/workspaces/PD-STEP/build/current-measurement/sdkconfig",
+      "-DCURRENT_MEASUREMENT=ON",
+      "build"
+    ],
+    "exit_code": 0,
+    "seconds": 8.31,
+    "log": "current-measurement-build.txt"
+  },
+  {
+    "name": "unity",
+    "command": [
+      "idf.py",
+      "-C",
+      "test",
+      "-B",
+      "/workspaces/PD-STEP/build/acceptance-tests",
+      "-DCURRENT_MEASUREMENT=OFF",
+      "build"
+    ],
+    "exit_code": 0,
+    "seconds": 8.92,
+    "log": "unity-build.txt"
+  }
+]

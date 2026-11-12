@@ -1,0 +1,27 @@
+[
+  {
+    "old": "test/main/current_measurement_main.c",
+    "new": "test/main/current_measurement/app_main.c",
+    "sha256": "a597432e6d21c94336a581f506bef08b90ba241a38b11dd835d1e92602f44518"
+  },
+  {
+    "old": "test/main/current_sequence.c",
+    "new": "test/main/current_measurement/current_sequence.c",
+    "sha256": "97cbb232ca0c0c4b7b4571658b126882e74345580843802ac6e47ca15553ffb5"
+  },
+  {
+    "old": "test/main/current_sequence.h",
+    "new": "test/main/current_measurement/current_sequence.h",
+    "sha256": "84906ef752099195ccb945953f14f5b0583d55e25927ba3314f89552d3148802"
+  },
+  {
+    "old": "test/main/current_pd.c",
+    "new": "test/main/current_measurement/current_pd.c",
+    "sha256": "ecce086382262e70997163822569dadfac2fa7ed8829bcf5573a438ce3752eb1"
+  },
+  {
+    "old": "test/main/current_pd.h",
+    "new": "test/main/current_measurement/current_pd.h",
+    "sha256": "a5ddd197d3b56b2b79c4a37f9e619f694348c419be373efbe63ac9e30347935d"
+  }
+]

@@ -41,8 +41,8 @@ void bsp_early_init(void);
  *   - GPIO: STEP output LOW, DIR output LOW.
  *   - I2C master bus (using new i2c_master API from ESP-IDF v6).
  *     Scans the bus for devices in the 0x08–0x77 range.
- *     If nothing responds, the bus is recreated with internal pullups
- *     and rescanned (the board may lack external pullups — T0 unknown).
+ *     默认关闭 ESP32-S3 内部上拉；无地址应答时启用内部上拉重试。
+ *     扫描只报告应答情况，板上上拉来源以 docs/hardware.md 为准。
  *
  * @return ESP_OK on success, error code otherwise.
  */

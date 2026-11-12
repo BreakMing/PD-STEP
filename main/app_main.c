@@ -91,8 +91,8 @@ void app_main(void)
         if (!settings_subscribe(on_driver_settings)) {
             ESP_LOGW("app_main", "settings 订阅失败（槽满）——运行/保持电流变更不会生效");
         }
-        /* rev2 供电观测（非致命——诱骗由 CF1 电阻保证上电成立）：
-         * vbus 电压与 CH224Q 握手状态进启动日志，供诱骗成功判定 */
+        /* CFG1 电阻给出上电默认请求，实际电压由适配器协商决定。
+         * 同时记录 VBUS 与 CH224Q 握手状态，查询失败只记录日志。 */
         float vbus = bsp_vbus_read_volt();
         ESP_LOGI("app_main", "总线电压 %.2f V", (double)vbus);
         {

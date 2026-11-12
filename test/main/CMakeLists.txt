@@ -1,6 +1,9 @@
 set(test_main_sources "test_app_main.c")
 if(CURRENT_MEASUREMENT)
-    set(test_main_sources "current_measurement_main.c" "current_sequence.c" "current_pd.c")
+    set(test_main_sources
+        "current_measurement/app_main.c"
+        "current_measurement/current_sequence.c"
+        "current_measurement/current_pd.c")
 endif()
 
 # ESP-IDF 提前扫描依赖时不保留自定义构建变量，依赖必须统一声明。

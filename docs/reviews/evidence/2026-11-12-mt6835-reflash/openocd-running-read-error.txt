@@ -1,0 +1,30 @@
+Open On-Chip Debugger v0.12.0-esp32-20260703 (2026-07-03-13:49)
+Licensed under GNU GPL v2
+For bug reports, read
+	http://openocd.org/doc/doxygen/bugs.html
+none
+0
+Info : esp_usb_jtag: capabilities descriptor set to 0x2000
+WARNING: ESP flash support is disabled!
+WARNING: ESP flash support is disabled!
+force hard breakpoints
+Info : Listening on port 16666 for tcl connections
+Info : telnet server disabled
+Info : esp_usb_jtag: serial (44:1B:F6:8D:10:98)
+Info : esp_usb_jtag: Device found. Base speed 40000KHz, div range 1 to 255
+Info : clock speed 40000 kHz
+Info : JTAG tap: esp32s3.tap0 tap/device found: 0x120034e5 (mfg: 0x272 (Tensilica), part: 0x2003, ver: 0x1)
+Info : JTAG tap: esp32s3.tap1 tap/device found: 0x120034e5 (mfg: 0x272 (Tensilica), part: 0x2003, ver: 0x1)
+Info : [esp32s3.cpu0] Examination succeed
+Info : [esp32s3.cpu1] Examination succeed
+Info : [esp32s3.cpu0] gdb port disabled
+Info : [esp32s3.cpu1] gdb port disabled
+Info : [esp32s3.cpu0] Debug controller was reset.
+Info : [esp32s3.cpu0] Core was reset.
+Info : [esp32s3.cpu1] Debug controller was reset.
+Info : [esp32s3.cpu1] Core was reset.
+Info : accepting 'tcl' connection on tcp/16666
+Error: [esp32s3.cpu1] not halted
+failed to read memory
+shutdown command invoked
+Info : dropped 'tcl' connection

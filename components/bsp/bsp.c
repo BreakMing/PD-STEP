@@ -131,12 +131,9 @@ static esp_err_t bsp_gpio_init(void)
 /* ================================================================
  * I2C bus init + scan
  * ================================================================
- * Strategy:
- *   1. Create bus WITHOUT internal pullup (assume external pullups).
- *   2. Scan 0x08–0x77.
- *   3. If zero devices found: delete bus, recreate WITH internal pullup, rescan.
- *   4. Log which address(es) replied. 器件在场性与健康判定归
- *      magnetic_encoder 的首读与失败计数，本层不按地址识别器件。
+ * 默认关闭 ESP32-S3 内部上拉并扫描；没有地址应答时重建总线，
+ * 启用内部上拉后再扫描。扫描只记录应答情况，不推断上拉来源或器件类型；
+ * 板级接线以 docs/hardware.md 为准，各器件由对应驱动读取并判断状态。
  */
 static esp_err_t bsp_i2c_create_bus(bool enable_internal_pullup)
 {
@@ -186,8 +183,7 @@ static esp_err_t bsp_i2c_init(void)
     int count = bsp_i2c_scan();
 
     if (count == 0) {
-        ESP_LOGW(TAG, "I2C scan found 0 devices (no pullup). "
-                 "Board may lack external pullups; trying internal pullup fallback.");
+        ESP_LOGW(TAG, "关闭 ESP32-S3 内部上拉时没有 I2C 地址应答，启用内部上拉后重试");
 
         /* Delete bus and recreate with internal pullups enabled */
         i2c_del_master_bus(s_i2c_bus);
@@ -212,8 +208,7 @@ static esp_err_t bsp_i2c_init(void)
             ESP_LOGI(TAG, "I2C scan with internal pullup: %d device(s) found", count);
         }
     } else {
-        ESP_LOGI(TAG, "I2C scan: %d device(s) found (no internal pullup)", count);
-        ESP_LOGI(TAG, "Conclusion: board has external I2C pullups.");
+        ESP_LOGI(TAG, "关闭 ESP32-S3 内部上拉时有 %d 个 I2C 地址应答", count);
     }
 
     return ESP_OK;

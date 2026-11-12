@@ -1,0 +1,335 @@
+{
+  "method": "通过原生USB JTAG短暂停核读取正式固件中的板载实例状态，每次读取后恢复并运行0.5秒，不发送使能或运动指令。",
+  "elf": "build/cartpole-fw.elf",
+  "snapshots": [
+    {
+      "index": 1,
+      "raw": 464763,
+      "status": 0,
+      "failure_streak": 0,
+      "is_ok": true
+    },
+    {
+      "index": 2,
+      "raw": 464763,
+      "status": 0,
+      "failure_streak": 0,
+      "is_ok": true
+    },
+    {
+      "index": 3,
+      "raw": 464763,
+      "status": 0,
+      "failure_streak": 0,
+      "is_ok": true
+    },
+    {
+      "index": 4,
+      "raw": 464763,
+      "status": 0,
+      "failure_streak": 0,
+      "is_ok": true
+    },
+    {
+      "index": 5,
+      "raw": 464763,
+      "status": 0,
+      "failure_streak": 0,
+      "is_ok": true
+    },
+    {
+      "index": 6,
+      "raw": 464763,
+      "status": 0,
+      "failure_streak": 0,
+      "is_ok": true
+    },
+    {
+      "index": 7,
+      "raw": 464763,
+      "status": 0,
+      "failure_streak": 0,
+      "is_ok": true
+    },
+    {
+      "index": 8,
+      "raw": 464763,
+      "status": 0,
+      "failure_streak": 0,
+      "is_ok": true
+    },
+    {
+      "index": 9,
+      "raw": 464763,
+      "status": 0,
+      "failure_streak": 0,
+      "is_ok": true
+    },
+    {
+      "index": 10,
+      "raw": 464763,
+      "status": 0,
+      "failure_streak": 0,
+      "is_ok": true
+    }
+  ],
+  "debug_commands": [
+    {
+      "command": "targets esp32s3.cpu1",
+      "reply": ""
+    },
+    {
+      "command": "halt",
+      "reply": ""
+    },
+    {
+      "command": "read_memory 0x3fc9a724 32 1",
+      "reply": "0x3fceaf30"
+    },
+    {
+      "command": "read_memory 0x3fceb004 32 1",
+      "reply": "0x7177b"
+    },
+    {
+      "command": "read_memory 0x3fceb008 8 1",
+      "reply": "0x0"
+    },
+    {
+      "command": "read_memory 0x3fceb00c 32 1",
+      "reply": "0x0"
+    },
+    {
+      "command": "read_memory 0x3fceb010 8 1",
+      "reply": "0x1"
+    },
+    {
+      "command": "resume",
+      "reply": ""
+    },
+    {
+      "command": "halt",
+      "reply": ""
+    },
+    {
+      "command": "read_memory 0x3fceb004 32 1",
+      "reply": "0x7177b"
+    },
+    {
+      "command": "read_memory 0x3fceb008 8 1",
+      "reply": "0x0"
+    },
+    {
+      "command": "read_memory 0x3fceb00c 32 1",
+      "reply": "0x0"
+    },
+    {
+      "command": "read_memory 0x3fceb010 8 1",
+      "reply": "0x1"
+    },
+    {
+      "command": "resume",
+      "reply": ""
+    },
+    {
+      "command": "halt",
+      "reply": ""
+    },
+    {
+      "command": "read_memory 0x3fceb004 32 1",
+      "reply": "0x7177b"
+    },
+    {
+      "command": "read_memory 0x3fceb008 8 1",
+      "reply": "0x0"
+    },
+    {
+      "command": "read_memory 0x3fceb00c 32 1",
+      "reply": "0x0"
+    },
+    {
+      "command": "read_memory 0x3fceb010 8 1",
+      "reply": "0x1"
+    },
+    {
+      "command": "resume",
+      "reply": ""
+    },
+    {
+      "command": "halt",
+      "reply": ""
+    },
+    {
+      "command": "read_memory 0x3fceb004 32 1",
+      "reply": "0x7177b"
+    },
+    {
+      "command": "read_memory 0x3fceb008 8 1",
+      "reply": "0x0"
+    },
+    {
+      "command": "read_memory 0x3fceb00c 32 1",
+      "reply": "0x0"
+    },
+    {
+      "command": "read_memory 0x3fceb010 8 1",
+      "reply": "0x1"
+    },
+    {
+      "command": "resume",
+      "reply": ""
+    },
+    {
+      "command": "halt",
+      "reply": ""
+    },
+    {
+      "command": "read_memory 0x3fceb004 32 1",
+      "reply": "0x7177b"
+    },
+    {
+      "command": "read_memory 0x3fceb008 8 1",
+      "reply": "0x0"
+    },
+    {
+      "command": "read_memory 0x3fceb00c 32 1",
+      "reply": "0x0"
+    },
+    {
+      "command": "read_memory 0x3fceb010 8 1",
+      "reply": "0x1"
+    },
+    {
+      "command": "resume",
+      "reply": ""
+    },
+    {
+      "command": "halt",
+      "reply": ""
+    },
+    {
+      "command": "read_memory 0x3fceb004 32 1",
+      "reply": "0x7177b"
+    },
+    {
+      "command": "read_memory 0x3fceb008 8 1",
+      "reply": "0x0"
+    },
+    {
+      "command": "read_memory 0x3fceb00c 32 1",
+      "reply": "0x0"
+    },
+    {
+      "command": "read_memory 0x3fceb010 8 1",
+      "reply": "0x1"
+    },
+    {
+      "command": "resume",
+      "reply": ""
+    },
+    {
+      "command": "halt",
+      "reply": ""
+    },
+    {
+      "command": "read_memory 0x3fceb004 32 1",
+      "reply": "0x7177b"
+    },
+    {
+      "command": "read_memory 0x3fceb008 8 1",
+      "reply": "0x0"
+    },
+    {
+      "command": "read_memory 0x3fceb00c 32 1",
+      "reply": "0x0"
+    },
+    {
+      "command": "read_memory 0x3fceb010 8 1",
+      "reply": "0x1"
+    },
+    {
+      "command": "resume",
+      "reply": ""
+    },
+    {
+      "command": "halt",
+      "reply": ""
+    },
+    {
+      "command": "read_memory 0x3fceb004 32 1",
+      "reply": "0x7177b"
+    },
+    {
+      "command": "read_memory 0x3fceb008 8 1",
+      "reply": "0x0"
+    },
+    {
+      "command": "read_memory 0x3fceb00c 32 1",
+      "reply": "0x0"
+    },
+    {
+      "command": "read_memory 0x3fceb010 8 1",
+      "reply": "0x1"
+    },
+    {
+      "command": "resume",
+      "reply": ""
+    },
+    {
+      "command": "halt",
+      "reply": ""
+    },
+    {
+      "command": "read_memory 0x3fceb004 32 1",
+      "reply": "0x7177b"
+    },
+    {
+      "command": "read_memory 0x3fceb008 8 1",
+      "reply": "0x0"
+    },
+    {
+      "command": "read_memory 0x3fceb00c 32 1",
+      "reply": "0x0"
+    },
+    {
+      "command": "read_memory 0x3fceb010 8 1",
+      "reply": "0x1"
+    },
+    {
+      "command": "resume",
+      "reply": ""
+    },
+    {
+      "command": "halt",
+      "reply": ""
+    },
+    {
+      "command": "read_memory 0x3fceb004 32 1",
+      "reply": "0x7177b"
+    },
+    {
+      "command": "read_memory 0x3fceb008 8 1",
+      "reply": "0x0"
+    },
+    {
+      "command": "read_memory 0x3fceb00c 32 1",
+      "reply": "0x0"
+    },
+    {
+      "command": "read_memory 0x3fceb010 8 1",
+      "reply": "0x1"
+    },
+    {
+      "command": "resume",
+      "reply": ""
+    },
+    {
+      "command": "targets",
+      "reply": "    TargetName         Type       Endian TapName            State       \n--  ------------------ ---------- ------ ------------------ ------------\n 0  esp32s3.cpu0       esp32s3    little esp32s3.tap0       running\n 1* esp32s3.cpu1       esp32s3    little esp32s3.tap1       running"
+    },
+    {
+      "command": "shutdown",
+      "reply": ""
+    }
+  ],
+  "caveat": "状态快照不是逐帧CRC抓取，不能据此证明快照间每一帧无错误。"
+}

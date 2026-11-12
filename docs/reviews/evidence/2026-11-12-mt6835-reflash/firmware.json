@@ -1,0 +1,18 @@
+{
+  "cartpole-fw.bin": {
+    "bytes": 335280,
+    "sha256": "81ec6c80d07d3aafcee9ae4aae7916456e805b53aa5b4b40309cc05e36a9c11e"
+  },
+  "cartpole-fw.elf": {
+    "bytes": 5676600,
+    "sha256": "30b3de1fe7e75cc511be8bf3e34b0c268e21de333645d9000f727ae5fd50c283"
+  },
+  "bootloader/bootloader.bin": {
+    "bytes": 22608,
+    "sha256": "b169804bd7a14d188d53b23eff93efae142f6a4b11bb8f3738bb26f12da9d79a"
+  },
+  "partition_table/partition-table.bin": {
+    "bytes": 3072,
+    "sha256": "5e71c3c890e04714daa03b21a0d23953a2dadf9fdf15eec02b886f7b6e9f8c81"
+  }
+}

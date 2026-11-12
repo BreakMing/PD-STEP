@@ -1,0 +1,23 @@
+[
+  {
+    "name": "firmware",
+    "selected_test_entry_sources": [],
+    "result": "PASS"
+  },
+  {
+    "name": "current-measurement",
+    "selected_test_entry_sources": [
+      "test/main/current_measurement/app_main.c",
+      "test/main/current_measurement/current_pd.c",
+      "test/main/current_measurement/current_sequence.c"
+    ],
+    "result": "PASS"
+  },
+  {
+    "name": "unity",
+    "selected_test_entry_sources": [
+      "test/main/test_app_main.c"
+    ],
+    "result": "PASS"
+  }
+]

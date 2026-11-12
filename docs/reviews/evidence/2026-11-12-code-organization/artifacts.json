@@ -1,0 +1,20 @@
+{
+  "firmware": {
+    "file": "build/cartpole-fw.bin",
+    "bytes": 335168,
+    "sha256": "1dec66c35be1e94ac40b1e49f6d0a4002af95d691223b42d287819c34b275f31",
+    "flashed": false
+  },
+  "current-measurement": {
+    "file": "build/current-measurement/cartpole-current-test.bin",
+    "bytes": 294864,
+    "sha256": "6321e40826ab231e9c828bc55f8627e5b3f0d599f90b583c8e6631e4ec3f5d95",
+    "flashed": false
+  },
+  "unity": {
+    "file": "build/acceptance-tests/cartpole-test.bin",
+    "bytes": 352416,
+    "sha256": "676f551b97daadb2ec957d1a18c8c3ae544994245cb7c247d8faf522f51f94b1",
+    "flashed": false
+  }
+}
